@@ -408,10 +408,13 @@ function Test-WSLConnectivity {
     }
 
     # Generate summary
-    $totalTests = $result.DNSTests.Count + $result.PortTests.Count + ($result.InternetAccess ? 1 : 0)
+    $internetTestCount = if ($result.InternetAccess) { 1 } else { 0 }
+    $totalTests = $result.DNSTests.Count + $result.PortTests.Count + $internetTestCount
+
+    $internetPassCount = if ($result.InternetAccess -and $result.InternetAccess.Success) { 1 } else { 0 }
     $passedTests = ($result.DNSTests | Where-Object { $_.Success }).Count +
                    ($result.PortTests | Where-Object { $_.Success }).Count +
-                   ($result.InternetAccess.Success ? 1 : 0)
+                   $internetPassCount
 
     $criticalIssues = ($result.Issues | Where-Object { $_.Severity -eq 'Critical' }).Count
     $warningIssues = ($result.Issues | Where-Object { $_.Severity -eq 'Warning' }).Count
