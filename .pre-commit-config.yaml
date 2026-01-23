@@ -1,0 +1,54 @@
+repos:
+  - repo: local
+    hooks:
+      - id: psscriptanalyzer
+        name: PSScriptAnalyzer
+        entry: pwsh -NoProfile -Command "Invoke-ScriptAnalyzer -Path . -Recurse -Settings PSScriptAnalyzerSettings.psd1 -EnableExit"
+        language: system
+        types: [text]
+        files: \.(ps1|psm1|psd1)$
+        pass_filenames: false
+
+      - id: powershell-syntax
+        name: PowerShell Syntax Check
+        entry: pwsh -NoProfile -Command "$files = @(); foreach ($arg in $args) { if ($arg -match '\\.(ps1|psm1|psd1)$') { $files += $arg } }; if ($files) { $errors = @(); $files | ForEach-Object { $parseErrors = $null; $null = [System.Management.Automation.Language.Parser]::ParseFile($_, [ref]$null, [ref]$parseErrors); if ($parseErrors) { $errors += \"${_}: $($parseErrors -join ', ')\" } }; if ($errors) { $errors | ForEach-Object { Write-Error $_ }; exit 1 } }"
+        language: system
+        types: [text]
+        files: \.(ps1|psm1|psd1)$
+
+      - id: pester-unit-tests
+        name: Pester Unit Tests
+        entry: pwsh -NoProfile -Command "if (Test-Path Tests\.pester.ps1) { .\Tests\.pester.ps1 -Type Unit } else { Write-Host 'No Pester test runner found. Skipping tests.' }"
+        language: system
+        pass_filenames: false
+        stages: [commit]
+
+      - id: check-module-manifests
+        name: Validate Module Manifests
+        entry: pwsh -NoProfile -Command "Get-ChildItem -Path Modules -Recurse -Filter *.psd1 | ForEach-Object { try { Test-ModuleManifest $_.FullName -ErrorAction Stop; Write-Host \"✓ $($_.Name) valid\" } catch { Write-Error \"✗ $($_.Name): $_\"; exit 1 } }"
+        language: system
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+        exclude: \.(txt|log)$
+      - id: check-yaml
+        exclude: \.github/workflows/
+      - id: check-json
+      - id: mixed-line-ending
+        args: ['--fix=crlf']
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+      - id: check-case-conflict
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types_or: [yaml, json, markdown]
+        exclude: ^(\.github/workflows/|Tests/coverage\.xml)

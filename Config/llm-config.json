@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "providers": {
+    "ollama": {
+      "enabled": true,
+      "baseUrl": "http://localhost:11434",
+      "defaultModel": "qwen2.5-coder:7b",
+      "fallbackModels": [
+        "mistral:7b",
+        "deepseek-r1:8b"
+      ],
+      "timeout": 120000,
+      "retryAttempts": 3,
+      "retryDelayMs": 1000
+    },
+    "lmstudio": {
+      "enabled": true,
+      "baseUrl": "http://localhost:1234",
+      "priority": 2,
+      "timeout": 120000
+    }
+  },
+  "contextManagement": {
+    "maxContextTokens": 16384,
+    "reservedForResponse": 4096,
+    "systemPromptFile": "DIAGNOSE.md",
+    "decisionTreeFile": "DIAGNOSE_LOGIC.md"
+  },
+  "prompts": {
+    "diagnosticAnalysis": {
+      "temperature": 0.3,
+      "maxTokens": 4096,
+      "topP": 0.9
+    },
+    "optimization": {
+      "temperature": 0.5,
+      "maxTokens": 2048,
+      "topP": 0.95
+    }
+  },
+  "responseFormat": {
+    "includeReasoningSteps": true,
+    "structuredOutput": true,
+    "markdownFormatting": true
+  }
+}

@@ -1,0 +1,94 @@
+name: PowerShell Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          Invoke-ScriptAnalyzer -Path . -Recurse -Settings PSScriptAnalyzerSettings.psd1 -EnableExit
+
+      - name: Check PowerShell Syntax
+        shell: pwsh
+        run: |
+          $errors = @()
+          Get-ChildItem -Recurse -Include *.ps1,*.psm1,*.psd1 | ForEach-Object {
+              $parseErrors = $null
+              $null = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$parseErrors)
+              if ($parseErrors) {
+                  $errors += "$($_.Name): $($parseErrors -join ', ')"
+              }
+          }
+          if ($errors) {
+              $errors | ForEach-Object { Write-Error $_ }
+              exit 1
+          }
+
+  test:
+    runs-on: windows-latest
+    needs: lint
+    strategy:
+      matrix:
+        powershell: ['5.1', '7.4']
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: pwsh
+        run: Install-Module Pester -MinimumVersion 5.6.1 -Force -Scope CurrentUser
+
+      - name: Run Tests
+        shell: pwsh
+        run: |
+          if (Test-Path ".\Tests\.pester.ps1") {
+              .\Tests\.pester.ps1 -CI
+          } else {
+              Write-Warning "No Pester test runner found. Skipping tests."
+          }
+
+      - name: Upload Coverage
+        if: success() && hashFiles('Tests/coverage.xml') != ''
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./Tests/coverage.xml
+          flags: unittests
+          fail_ci_if_error: false
+
+  integration:
+    runs-on: windows-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test Module Import
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path Modules -Directory | ForEach-Object {
+              $modulePath = Join-Path $_.FullName "$($_.Name).psd1"
+              if (Test-Path $modulePath) {
+                  Write-Host "Testing import of $($_.Name)..."
+                  Import-Module $modulePath -Force -ErrorAction Stop
+                  Write-Host "✓ $($_.Name) imported successfully"
+              }
+          }
+
+      - name: Run Hardware Diagnostics (Dry Run)
+        shell: pwsh
+        run: |
+          if (Test-Path ".\Get-PcDiagnostics.ps1") {
+              # Test syntax only, don't run full diagnostics in CI
+              $null = Get-Command ".\Get-PcDiagnostics.ps1" -Syntax
+              Write-Host "✓ Get-PcDiagnostics.ps1 syntax valid"
+          }

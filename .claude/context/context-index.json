@@ -1,0 +1,140 @@
+{
+  "project": {
+    "name": "PC_AI",
+    "type": "diagnostics-agent",
+    "location": "C:\\Users\\david\\PC_AI",
+    "platform": "Windows 10/11",
+    "integrations": ["WSL2", "Docker", "Hyper-V"]
+  },
+  "context": {
+    "version": "1.0.0",
+    "created": "2025-01-23",
+    "updated": "2025-01-23",
+    "files": {
+      "full": "project-context.md",
+      "quick": "quick-context.md",
+      "index": "context-index.json"
+    }
+  },
+  "state": {
+    "current_phase": "initial_setup",
+    "core_functional": true,
+    "migration_pending": true,
+    "blockers": []
+  },
+  "files": {
+    "core": [
+      {
+        "name": "Get-PcDiagnostics.ps1",
+        "type": "script",
+        "status": "functional",
+        "requires_admin": true
+      },
+      {
+        "name": "DIAGNOSE.md",
+        "type": "llm_prompt",
+        "status": "complete"
+      },
+      {
+        "name": "DIAGNOSE_LOGIC.md",
+        "type": "decision_tree",
+        "status": "complete"
+      },
+      {
+        "name": "CLAUDE.md",
+        "type": "documentation",
+        "status": "complete"
+      }
+    ],
+    "migration_candidates": [
+      {
+        "name": "Optimize-Disks.ps1",
+        "category": "disk",
+        "priority": "high"
+      },
+      {
+        "name": "wsl2-comprehensive-optimizer.ps1",
+        "category": "wsl2",
+        "priority": "high"
+      },
+      {
+        "name": "wsl2-config-analyzer.ps1",
+        "category": "wsl2",
+        "priority": "high"
+      },
+      {
+        "name": "diagnose-docker-desktop.ps1",
+        "category": "docker",
+        "priority": "high"
+      },
+      {
+        "name": "check_virt_errors.ps1",
+        "category": "error_analysis",
+        "priority": "high"
+      },
+      {
+        "name": "wsl_diagnostics.ps1",
+        "category": "wsl2",
+        "priority": "medium"
+      },
+      {
+        "name": "wsl2-network-stability.ps1",
+        "category": "wsl2",
+        "priority": "medium"
+      },
+      {
+        "name": "check_logs.ps1",
+        "category": "error_analysis",
+        "priority": "medium"
+      },
+      {
+        "name": "clean_machine_path.ps1",
+        "category": "cleanup",
+        "priority": "medium"
+      },
+      {
+        "name": "quick_status.ps1",
+        "category": "wsl2",
+        "priority": "low"
+      },
+      {
+        "name": "cleanup-duplicates.ps1",
+        "category": "cleanup",
+        "priority": "low"
+      },
+      {
+        "name": "wezterm-performance-profiler.ps1",
+        "category": "performance",
+        "priority": "low"
+      }
+    ]
+  },
+  "design_decisions": {
+    "architecture": "3-file pattern (prompt, logic, script)",
+    "safety_mode": "read_only_default",
+    "wmi_api": "Get-CimInstance (not Get-WmiObject)",
+    "event_window": "3 days default",
+    "output_format": "structured with priority classification"
+  },
+  "diagnostic_categories": {
+    "implemented": [
+      "device_manager_errors",
+      "disk_smart_status",
+      "system_event_errors",
+      "usb_controllers",
+      "network_adapters"
+    ],
+    "planned": [
+      "cpu_memory_performance",
+      "thermal_monitoring",
+      "scheduled_runs",
+      "automated_workflows"
+    ]
+  },
+  "roadmap": {
+    "phase1": "Script consolidation from home directory",
+    "phase2": "Enhanced diagnostics (CPU, thermal, GPU)",
+    "phase3": "Automation (scheduled runs, alerts)",
+    "phase4": "LLM integration (Python wrapper, streaming)"
+  }
+}

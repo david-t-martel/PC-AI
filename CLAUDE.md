@@ -1,0 +1,182 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+**PC_AI** is a local LLM-powered PC diagnostics and optimization agent designed to:
+- Diagnose hardware issues, device errors, and system problems
+- Analyze event logs, SMART status, and device configurations
+- Propose optimizations for disk, network, WSL2, virtualization, and system performance
+- Clean up duplicates, PATH entries, and unnecessary system artifacts
+
+The agent operates on **Windows 10/11** with WSL2 integration, targeting development workstations with Docker, Hyper-V, and cross-platform tooling.
+
+## Architecture
+
+```
+PC_AI/
+├── DIAGNOSE.md           # LLM system prompt defining assistant behavior
+├── DIAGNOSE_LOGIC.md     # Branched reasoning decision tree for analysis
+├── Get-PcDiagnostics.ps1 # Core hardware/device diagnostics script
+└── CLAUDE.md             # This file
+```
+
+### Design Pattern
+
+1. **DIAGNOSE.md** - Defines the LLM assistant's role, safety constraints, and workflow
+2. **DIAGNOSE_LOGIC.md** - Branched reasoning logic for analyzing diagnostic output
+3. **Get-PcDiagnostics.ps1** - Read-only PowerShell script that collects system data
+
+The agent follows a **collect → parse → reason → recommend** workflow where diagnostics output is structured into categories and analyzed using decision trees.
+
+## Commands
+
+### Run Hardware Diagnostics
+```powershell
+# Requires Administrator
+.\Get-PcDiagnostics.ps1
+# Creates: Desktop\Hardware-Diagnostics-Report.txt
+```
+
+### Output Sections
+The diagnostic report contains:
+1. **Device Manager Errors** - Devices with ConfigManagerErrorCode != 0
+2. **Disk SMART Status** - Drive health via wmic
+3. **System Event Errors** - Disk/USB errors from last 3 days
+4. **USB Device Status** - USB controllers and device status
+5. **Network Adapter Status** - Physical adapter configuration
+
+## Scripts to Migrate from `~\*`
+
+The following scripts from the home directory are candidates for consolidation into this project:
+
+### Disk Optimization
+- `Optimize-Disks.ps1` - Smart TRIM/defrag for SSD/HDD with scheduled task support
+
+### WSL2/Hyper-V
+- `wsl2-comprehensive-optimizer.ps1` - Full WSL2 optimization (Defender exclusions, VMQ, network)
+- `wsl2-config-analyzer.ps1` - Detailed analysis of .wslconfig, Hyper-V, network, Defender
+- `wsl_diagnostics.ps1` - Quick WSL/Hyper-V service status check
+- `wsl2-network-stability.ps1` - Network interface and port configuration
+- `quick_status.ps1` - Fast virtualization status overview
+
+### Error Analysis
+- `check_virt_errors.ps1` - Hyper-V Compute errors, .NET OOM, vmcompute issues
+- `check_logs.ps1` - 7-day scan of Hyper-V and virtualization logs
+
+### Docker
+- `diagnose-docker-desktop.ps1` - Docker Desktop process/VHDX/config diagnostics
+
+### Cleanup
+- `clean_machine_path.ps1` - Remove duplicate/stale PATH entries
+- `cleanup-duplicates.ps1` - Duplicate file detection and removal
+
+### Performance
+- `wezterm-performance-profiler.ps1` - Terminal startup/memory/render benchmarking
+
+## Diagnostic Categories
+
+### Priority Classification
+- **Critical**: SMART failures, disk bad blocks, hardware virtualization disabled
+- **High**: USB controller errors, device driver failures, service crashes
+- **Medium**: Performance degradation, missing Defender exclusions, VMQ issues
+- **Low**: Unused adapters, informational warnings
+
+### ConfigManagerErrorCode Reference
+| Code | Meaning |
+|------|---------|
+| 1 | Device not configured correctly |
+| 10 | Device cannot start |
+| 12 | Cannot find enough free resources |
+| 22 | Device is disabled |
+| 28 | Drivers not installed |
+| 31 | Device not working properly |
+| 43 | Device stopped responding |
+
+## Safety Constraints
+
+- **Read-only by default** - Diagnostics collect data without modifications
+- **No destructive commands** without explicit user consent and backup warnings
+- **Disk repair** (chkdsk /r) requires backup confirmation first
+- **BIOS/firmware updates** need context and warning
+- **Professional escalation** for suspected hardware failure
+
+## Integration Points
+
+### Event Log Queries
+```powershell
+# Disk/USB errors
+Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2,3; StartTime=(Get-Date).AddDays(-3)}
+
+# Hyper-V Compute errors
+Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Hyper-V-Compute-Admin'; Level=2,3}
+```
+
+### WMI/CIM Queries
+```powershell
+# Device errors
+Get-CimInstance Win32_PnPEntity | Where-Object { $_.ConfigManagerErrorCode -ne 0 }
+
+# Physical network adapters
+Get-CimInstance Win32_NetworkAdapter | Where-Object { $_.PhysicalAdapter -eq $true }
+
+# Disk status
+wmic diskdrive get model, status
+```
+
+### WSL2 Integration
+```powershell
+# WSL status
+wsl --status
+wsl -l -v
+
+# Network in WSL
+wsl ip addr show
+wsl ip route show
+```
+
+## Expected Output Format
+
+When reporting findings, use this structure:
+
+```
+## Summary
+- [2-4 bullet points of key findings]
+
+## Findings by Category
+### Devices with Errors
+### Disk Health
+### USB Stability
+### Network Adapters
+
+## Priority Issues
+- Critical: [list]
+- High: [list]
+- Medium: [list]
+
+## Recommended Next Steps
+1. [Numbered, safe actions]
+2. [Warnings for risky operations]
+```
+
+## Development Notes
+
+### Adding New Diagnostics
+1. Add data collection to `Get-PcDiagnostics.ps1`
+2. Add parsing logic to `DIAGNOSE_LOGIC.md`
+3. Update category handling in `DIAGNOSE.md`
+
+### Testing
+```powershell
+# Test diagnostics script runs without errors
+.\Get-PcDiagnostics.ps1
+
+# Verify report created
+Test-Path "$env:USERPROFILE\Desktop\Hardware-Diagnostics-Report.txt"
+```
+
+### PowerShell Requirements
+- Requires Administrator for full diagnostics
+- Uses Get-CimInstance (not deprecated Get-WmiObject)
+- Handles missing features gracefully with try/catch

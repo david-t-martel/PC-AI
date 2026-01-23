@@ -1,0 +1,1799 @@
+#Requires -Version 5.1
+
+<#
+.SYNOPSIS
+    PC-AI - Local LLM-Powered PC Diagnostics Framework
+
+.DESCRIPTION
+    Unified CLI for PC diagnostics, optimization, USB management, and LLM-powered analysis.
+    Provides a comprehensive interface to all PC-AI modules including:
+    - Hardware diagnostics (devices, disks, USB, network adapters)
+    - Virtualization management (WSL2, Hyper-V, Docker)
+    - USB/WSL passthrough management
+    - Network diagnostics and VSock optimization
+    - Performance monitoring and optimization
+    - System cleanup (PATH, temp files, duplicates)
+    - LLM-powered analysis via Ollama
+
+.PARAMETER Command
+    Main command: diagnose, optimize, usb, analyze, chat, llm, cleanup, perf, status, version, help
+
+.PARAMETER Arguments
+    Additional arguments for the command
+
+.EXAMPLE
+    .\PC-AI.ps1 diagnose all
+    Run full system diagnostics
+
+.EXAMPLE
+    .\PC-AI.ps1 analyze --report "report.txt"
+    Analyze diagnostic report with LLM
+
+.EXAMPLE
+    .\PC-AI.ps1 usb list
+    List all USB devices
+
+.EXAMPLE
+    .\PC-AI.ps1 optimize wsl --dry-run
+    Preview WSL optimization changes
+
+.NOTES
+    Author: PC_AI Framework
+    Version: 1.0.0
+    Requires: Windows 10/11 with PowerShell 5.1+
+#>
+
+[CmdletBinding()]
+param(
+    [Parameter(Position = 0)]
+    [ValidateSet('diagnose', 'optimize', 'usb', 'analyze', 'chat', 'llm', 'cleanup', 'perf', 'status', 'version', 'help')]
+    [string]$Command,
+
+    [Parameter(Position = 1, ValueFromRemainingArguments)]
+    [string[]]$Arguments
+)
+
+#region Script Configuration
+$script:Version = '1.0.0'
+$script:ModulesPath = Join-Path $PSScriptRoot 'Modules'
+$script:ConfigPath = Join-Path $PSScriptRoot 'Config'
+$script:ReportsPath = Join-Path $PSScriptRoot 'Reports'
+$script:LoadedModules = @{}
+$script:Settings = $null
+$script:LLMConfig = $null
+#endregion
+
+#region Output Formatting Functions
+function Write-Success {
+    param([string]$Message)
+    Write-Host $Message -ForegroundColor Green
+}
+
+function Write-Warning {
+    param([string]$Message)
+    Write-Host "WARNING: $Message" -ForegroundColor Yellow
+}
+
+function Write-Error {
+    param([string]$Message)
+    Write-Host "ERROR: $Message" -ForegroundColor Red
+}
+
+function Write-Info {
+    param([string]$Message)
+    Write-Host $Message -ForegroundColor Cyan
+}
+
+function Write-Header {
+    param([string]$Message)
+    Write-Host ""
+    Write-Host "=== $Message ===" -ForegroundColor Magenta
+    Write-Host ""
+}
+
+function Write-SubHeader {
+    param([string]$Message)
+    Write-Host "--- $Message ---" -ForegroundColor DarkCyan
+}
+
+function Write-Bullet {
+    param([string]$Message, [string]$Color = 'White')
+    Write-Host "  * $Message" -ForegroundColor $Color
+}
+#endregion
+
+#region Module Loading Functions
+function Ensure-Module {
+    <#
+    .SYNOPSIS
+        Lazy-loads a PC-AI module only when needed
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$ModuleName
+    )
+
+    if ($script:LoadedModules[$ModuleName]) {
+        return $true
+    }
+
+    $modulePath = Join-Path $script:ModulesPath "$ModuleName\$ModuleName.psd1"
+
+    if (-not (Test-Path $modulePath)) {
+        Write-Error "Module not found: $ModuleName"
+        Write-Info "Expected path: $modulePath"
+        return $false
+    }
+
+    try {
+        Import-Module $modulePath -Force -ErrorAction Stop
+        $script:LoadedModules[$ModuleName] = $true
+        return $true
+    }
+    catch {
+        Write-Error "Failed to load module $ModuleName`: $_"
+        return $false
+    }
+}
+
+function Get-LoadedModules {
+    return $script:LoadedModules.Keys | Sort-Object
+}
+#endregion
+
+#region Configuration Functions
+function Load-Settings {
+    if ($null -ne $script:Settings) {
+        return $script:Settings
+    }
+
+    $settingsPath = Join-Path $script:ConfigPath 'settings.json'
+
+    if (Test-Path $settingsPath) {
+        try {
+            $script:Settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
+            return $script:Settings
+        }
+        catch {
+            Write-Warning "Could not load settings: $_"
+            return $null
+        }
+    }
+
+    return $null
+}
+
+function Load-LLMConfig {
+    if ($null -ne $script:LLMConfig) {
+        return $script:LLMConfig
+    }
+
+    $llmConfigPath = Join-Path $script:ConfigPath 'llm-config.json'
+
+    if (Test-Path $llmConfigPath) {
+        try {
+            $script:LLMConfig = Get-Content $llmConfigPath -Raw | ConvertFrom-Json
+            return $script:LLMConfig
+        }
+        catch {
+            Write-Warning "Could not load LLM config: $_"
+            return $null
+        }
+    }
+
+    return $null
+}
+#endregion
+
+#region Admin Detection Functions
+function Test-Administrator {
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Require-Administrator {
+    param([string]$Operation = "this operation")
+
+    if (-not (Test-Administrator)) {
+        Write-Error "Administrator privileges required for $Operation"
+        Write-Info "Please run PowerShell as Administrator and try again."
+        return $false
+    }
+    return $true
+}
+
+function Warn-NonAdministrator {
+    param([string]$Operation = "this operation")
+
+    if (-not (Test-Administrator)) {
+        Write-Warning "Some features of $Operation may require Administrator privileges"
+        Write-Warning "Consider running as Administrator for full functionality"
+    }
+}
+#endregion
+
+#region Argument Parsing Functions
+function Parse-Arguments {
+    param(
+        [string[]]$InputArgs,
+        [hashtable]$Defaults = @{}
+    )
+
+    $parsed = @{
+        SubCommand = $null
+        Flags = @{}
+        Values = @{}
+        Positional = @()
+    }
+
+    # Initialize defaults
+    foreach ($key in $Defaults.Keys) {
+        $parsed.Values[$key] = $Defaults[$key]
+    }
+
+    $i = 0
+    while ($i -lt $InputArgs.Count) {
+        $arg = $InputArgs[$i]
+
+        if ($arg -match '^--(.+)=(.+)$') {
+            # --key=value format
+            $parsed.Values[$Matches[1]] = $Matches[2]
+        }
+        elseif ($arg -match '^--(.+)$') {
+            $key = $Matches[1]
+            if ($i + 1 -lt $InputArgs.Count -and $InputArgs[$i + 1] -notmatch '^-') {
+                # --key value format
+                $parsed.Values[$key] = $InputArgs[$i + 1]
+                $i++
+            }
+            else {
+                # --flag (boolean)
+                $parsed.Flags[$key] = $true
+            }
+        }
+        elseif ($arg -match '^-([a-zA-Z])$') {
+            # Short flag
+            $parsed.Flags[$Matches[1]] = $true
+        }
+        elseif ($null -eq $parsed.SubCommand -and $arg -notmatch '^-') {
+            # First positional is subcommand
+            $parsed.SubCommand = $arg
+        }
+        else {
+            # Additional positional arguments
+            $parsed.Positional += $arg
+        }
+
+        $i++
+    }
+
+    return $parsed
+}
+#endregion
+
+#region Help System
+function Show-MainHelp {
+    Write-Header "PC-AI v$script:Version - Local LLM-Powered PC Diagnostics"
+
+    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 <command> [subcommand] [options]"
+    Write-Host ""
+
+    Write-Host "COMMANDS:" -ForegroundColor Yellow
+    Write-Host "    diagnose    Hardware and system diagnostics" -ForegroundColor White
+    Write-Host "    optimize    System optimization operations" -ForegroundColor White
+    Write-Host "    usb         USB device and WSL passthrough management" -ForegroundColor White
+    Write-Host "    analyze     LLM-powered diagnostic analysis" -ForegroundColor White
+    Write-Host "    chat        Interactive LLM chat interface" -ForegroundColor White
+    Write-Host "    llm         LLM configuration and status" -ForegroundColor White
+    Write-Host "    cleanup     System cleanup operations" -ForegroundColor White
+    Write-Host "    perf        Performance monitoring and analysis" -ForegroundColor White
+    Write-Host "    status      Overall system status summary" -ForegroundColor White
+    Write-Host "    version     Show framework version" -ForegroundColor White
+    Write-Host "    help        Show this help or help for specific command" -ForegroundColor White
+    Write-Host ""
+
+    Write-Host "EXAMPLES:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 diagnose all              # Full system diagnostics"
+    Write-Host "    .\PC-AI.ps1 optimize wsl --dry-run    # Preview WSL optimizations"
+    Write-Host "    .\PC-AI.ps1 usb list                  # List USB devices"
+    Write-Host "    .\PC-AI.ps1 analyze                   # Analyze latest report with LLM"
+    Write-Host "    .\PC-AI.ps1 help diagnose             # Help for diagnose command"
+    Write-Host ""
+
+    Write-Host "Run '.\PC-AI.ps1 help <command>' for more information on a command." -ForegroundColor DarkGray
+}
+
+function Show-DiagnoseHelp {
+    Write-Header "diagnose - Hardware and System Diagnostics"
+
+    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 diagnose <subcommand> [options]"
+    Write-Host ""
+
+    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
+    Write-Host "    hardware    Device Manager errors, SMART status, USB, network adapters"
+    Write-Host "    wsl         WSL2 status, distributions, networking"
+    Write-Host "    network     Network adapters, connectivity, DNS"
+    Write-Host "    hyperv      Hyper-V status and configuration"
+    Write-Host "    docker      Docker Desktop status and configuration"
+    Write-Host "    events      System event log analysis"
+    Write-Host "    all         Run all diagnostics and generate report"
+    Write-Host ""
+
+    Write-Host "OPTIONS:" -ForegroundColor Yellow
+    Write-Host "    --output <path>     Save report to specified path"
+    Write-Host "    --format <fmt>      Output format: txt, json (default: txt)"
+    Write-Host "    --days <n>          Event log lookback days (default: 3)"
+    Write-Host ""
+
+    Write-Host "EXAMPLES:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 diagnose hardware"
+    Write-Host "    .\PC-AI.ps1 diagnose wsl"
+    Write-Host "    .\PC-AI.ps1 diagnose all --output C:\Reports\diag.txt"
+    Write-Host "    .\PC-AI.ps1 diagnose events --days 7"
+}
+
+function Show-OptimizeHelp {
+    Write-Header "optimize - System Optimization Operations"
+
+    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 optimize <subcommand> [options]"
+    Write-Host ""
+
+    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
+    Write-Host "    wsl         Optimize WSL2 configuration (.wslconfig, Defender exclusions)"
+    Write-Host "    disk        Optimize disks (TRIM for SSD, defrag for HDD)"
+    Write-Host "    vsock       Optimize VSock for WSL2 networking"
+    Write-Host "    defender    Set Windows Defender exclusions for dev tools"
+    Write-Host "    network     Repair WSL networking issues"
+    Write-Host ""
+
+    Write-Host "OPTIONS:" -ForegroundColor Yellow
+    Write-Host "    --dry-run           Preview changes without applying"
+    Write-Host "    --profile <name>    Use named profile (for vsock)"
+    Write-Host "    --force             Skip confirmations"
+    Write-Host "    --backup            Create backup before changes (default: true)"
+    Write-Host ""
+
+    Write-Host "EXAMPLES:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 optimize wsl --dry-run"
+    Write-Host "    .\PC-AI.ps1 optimize disk"
+    Write-Host "    .\PC-AI.ps1 optimize vsock --profile performance"
+}
+
+function Show-UsbHelp {
+    Write-Header "usb - USB Device and WSL Passthrough Management"
+
+    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 usb <subcommand> [options]"
+    Write-Host ""
+
+    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
+    Write-Host "    list        List all USB devices"
+    Write-Host "    attach      Attach USB device to WSL"
+    Write-Host "    detach      Detach USB device from WSL"
+    Write-Host "    status      Show USB/WSL passthrough status"
+    Write-Host "    bind        Bind USB device for WSL passthrough"
+    Write-Host ""
+
+    Write-Host "OPTIONS:" -ForegroundColor Yellow
+    Write-Host "    --busid <id>            USB bus ID (e.g., 1-2)"
+    Write-Host "    --distribution <name>   WSL distribution name (default: default)"
+    Write-Host "    --unbind                Unbind device after detach"
+    Write-Host ""
+
+    Write-Host "EXAMPLES:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 usb list"
+    Write-Host "    .\PC-AI.ps1 usb attach --busid 1-2"
+    Write-Host "    .\PC-AI.ps1 usb attach --busid 1-2 --distribution Ubuntu"
+    Write-Host "    .\PC-AI.ps1 usb detach --busid 1-2 --unbind"
+}
+
+function Show-AnalyzeHelp {
+    Write-Header "analyze - LLM-Powered Diagnostic Analysis"
+
+    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 analyze [options]"
+    Write-Host ""
+
+    Write-Host "DESCRIPTION:" -ForegroundColor Yellow
+    Write-Host "    Analyzes diagnostic reports using a local LLM (Ollama) to identify"
+    Write-Host "    issues, prioritize problems, and suggest remediation steps."
+    Write-Host ""
+
+    Write-Host "OPTIONS:" -ForegroundColor Yellow
+    Write-Host "    --report <path>     Path to diagnostic report (default: latest report)"
+    Write-Host "    --model <name>      LLM model to use (default: from config)"
+    Write-Host "    --temperature <n>   Model temperature (default: 0.3)"
+    Write-Host "    --output <path>     Save analysis to file"
+    Write-Host ""
+
+    Write-Host "EXAMPLES:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 analyze"
+    Write-Host "    .\PC-AI.ps1 analyze --report C:\Reports\diag.txt"
+    Write-Host "    .\PC-AI.ps1 analyze --model mistral:7b"
+}
+
+function Show-CleanupHelp {
+    Write-Header "cleanup - System Cleanup Operations"
+
+    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 cleanup <subcommand> [options]"
+    Write-Host ""
+
+    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
+    Write-Host "    path        Analyze and fix PATH environment variable"
+    Write-Host "    temp        Clear temporary files"
+    Write-Host "    duplicates  Find duplicate files in a directory"
+    Write-Host ""
+
+    Write-Host "OPTIONS:" -ForegroundColor Yellow
+    Write-Host "    --dry-run           Preview changes without applying"
+    Write-Host "    --force             Skip confirmations"
+    Write-Host "    --recursive         Search recursively (for duplicates)"
+    Write-Host ""
+
+    Write-Host "EXAMPLES:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 cleanup path --dry-run"
+    Write-Host "    .\PC-AI.ps1 cleanup temp"
+    Write-Host "    .\PC-AI.ps1 cleanup duplicates C:\Downloads --recursive"
+}
+
+function Show-PerfHelp {
+    Write-Header "perf - Performance Monitoring and Analysis"
+
+    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 perf <subcommand> [options]"
+    Write-Host ""
+
+    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
+    Write-Host "    disk        Disk space analysis"
+    Write-Host "    process     Top processes by resource usage"
+    Write-Host "    watch       Real-time system resource monitoring"
+    Write-Host "    vsock       VSock performance monitoring"
+    Write-Host ""
+
+    Write-Host "OPTIONS:" -ForegroundColor Yellow
+    Write-Host "    --top <n>           Number of top processes to show (default: 10)"
+    Write-Host "    --duration <s>      Watch duration in seconds"
+    Write-Host "    --interval <ms>     Update interval in milliseconds"
+    Write-Host "    --sort <field>      Sort by: cpu, memory, io (default: cpu)"
+    Write-Host ""
+
+    Write-Host "EXAMPLES:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 perf disk"
+    Write-Host "    .\PC-AI.ps1 perf process --top 20 --sort memory"
+    Write-Host "    .\PC-AI.ps1 perf watch --duration 60"
+}
+
+function Show-LLMHelp {
+    Write-Header "llm - LLM Configuration and Status"
+
+    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 llm <subcommand> [options]"
+    Write-Host ""
+
+    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
+    Write-Host "    status      Check LLM provider availability"
+    Write-Host "    models      List available models"
+    Write-Host "    config      Show or set LLM configuration"
+    Write-Host "    test        Test LLM connectivity"
+    Write-Host ""
+
+    Write-Host "OPTIONS:" -ForegroundColor Yellow
+    Write-Host "    --provider <name>   Provider: ollama, lmstudio"
+    Write-Host "    --model <name>      Model name for config"
+    Write-Host ""
+
+    Write-Host "EXAMPLES:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 llm status"
+    Write-Host "    .\PC-AI.ps1 llm models --provider ollama"
+    Write-Host "    .\PC-AI.ps1 llm config --model qwen2.5-coder:7b"
+}
+
+function Show-ChatHelp {
+    Write-Header "chat - Interactive LLM Chat Interface"
+
+    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host "    .\PC-AI.ps1 chat [options]"
+    Write-Host ""
+
+    Write-Host "DESCRIPTION:" -ForegroundColor Yellow
+    Write-Host "    Start an interactive chat session with the LLM for PC diagnostics"
+    Write-Host "    and troubleshooting assistance."
+    Write-Host ""
+
+    Write-Host "OPTIONS:" -ForegroundColor Yellow
+    Write-Host "    --model <name>      LLM model to use"
+    Write-Host "    --system <path>     Custom system prompt file"
+    Write-Host "    --context           Include diagnostic context"
+    Write-Host ""
+
+    Write-Host "CHAT COMMANDS:" -ForegroundColor Yellow
+    Write-Host "    /quit, /exit        Exit chat session"
+    Write-Host "    /clear              Clear conversation history"
+    Write-Host "    /diag               Run diagnostics and include in context"
+    Write-Host "    /help               Show chat commands"
+}
+
+function Show-Help {
+    param([string]$Topic)
+
+    switch ($Topic) {
+        'diagnose' { Show-DiagnoseHelp }
+        'optimize' { Show-OptimizeHelp }
+        'usb' { Show-UsbHelp }
+        'analyze' { Show-AnalyzeHelp }
+        'cleanup' { Show-CleanupHelp }
+        'perf' { Show-PerfHelp }
+        'llm' { Show-LLMHelp }
+        'chat' { Show-ChatHelp }
+        default { Show-MainHelp }
+    }
+}
+#endregion
+
+#region Command Implementations
+
+#region Diagnose Commands
+function Invoke-DiagnoseCommand {
+    param([string[]]$CmdArgs)
+
+    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+        output = $null
+        format = 'txt'
+        days = 3
+    }
+
+    $subCommand = $parsed.SubCommand
+
+    switch ($subCommand) {
+        'hardware' {
+            Warn-NonAdministrator "hardware diagnostics"
+
+            if (-not (Ensure-Module 'PC-AI.Hardware')) { return }
+
+            Write-Header "Hardware Diagnostics"
+
+            Write-SubHeader "Device Manager Errors"
+            $deviceErrors = Get-DeviceErrors
+            if ($deviceErrors) {
+                $deviceErrors | ForEach-Object {
+                    Write-Bullet "$($_.Name) - Error Code: $($_.ConfigManagerErrorCode)" -Color Red
+                }
+            }
+            else {
+                Write-Success "No device errors found"
+            }
+
+            Write-SubHeader "Disk Health (SMART)"
+            $diskHealth = Get-DiskHealth
+            $diskHealth | ForEach-Object {
+                $color = if ($_.Status -eq 'OK') { 'Green' } else { 'Red' }
+                Write-Bullet "$($_.Model) - Status: $($_.Status)" -Color $color
+            }
+
+            Write-SubHeader "USB Device Status"
+            $usbStatus = Get-UsbStatus
+            Write-Bullet "USB Controllers: $($usbStatus.Controllers)"
+            Write-Bullet "Connected Devices: $($usbStatus.Devices)"
+
+            Write-SubHeader "Network Adapters"
+            $adapters = Get-NetworkAdapters
+            $adapters | Where-Object { $_.PhysicalAdapter } | ForEach-Object {
+                $status = if ($_.NetEnabled) { 'Connected' } else { 'Disconnected' }
+                $color = if ($_.NetEnabled) { 'Green' } else { 'Yellow' }
+                Write-Bullet "$($_.Name) - $status" -Color $color
+            }
+        }
+
+        'wsl' {
+            if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
+
+            Write-Header "WSL2 Diagnostics"
+            $wslStatus = Get-WSLStatus
+
+            Write-SubHeader "WSL Status"
+            Write-Bullet "Version: $($wslStatus.Version)"
+            Write-Bullet "Default Distribution: $($wslStatus.DefaultDistribution)"
+
+            if ($wslStatus.Distributions) {
+                Write-SubHeader "Distributions"
+                $wslStatus.Distributions | ForEach-Object {
+                    $color = if ($_.State -eq 'Running') { 'Green' } else { 'Gray' }
+                    Write-Bullet "$($_.Name) (WSL$($_.Version)) - $($_.State)" -Color $color
+                }
+            }
+
+            if ($wslStatus.NetworkInfo) {
+                Write-SubHeader "Network Configuration"
+                Write-Bullet "IP Address: $($wslStatus.NetworkInfo.IPAddress)"
+                Write-Bullet "Gateway: $($wslStatus.NetworkInfo.Gateway)"
+            }
+        }
+
+        'network' {
+            if (-not (Ensure-Module 'PC-AI.Network')) { return }
+
+            Write-Header "Network Diagnostics"
+            $netDiag = Get-NetworkDiagnostics
+
+            Write-SubHeader "Network Adapters"
+            $netDiag.Adapters | ForEach-Object {
+                $color = if ($_.Status -eq 'Up') { 'Green' } else { 'Yellow' }
+                Write-Bullet "$($_.Name) - $($_.Status)" -Color $color
+            }
+
+            Write-SubHeader "Connectivity Tests"
+            $netDiag.Connectivity | ForEach-Object {
+                $color = if ($_.Success) { 'Green' } else { 'Red' }
+                Write-Bullet "$($_.Target): $(if ($_.Success) { 'OK' } else { 'Failed' })" -Color $color
+            }
+        }
+
+        'hyperv' {
+            if (-not (Require-Administrator "Hyper-V diagnostics")) { return }
+            if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
+
+            Write-Header "Hyper-V Diagnostics"
+            $hypervStatus = Get-HyperVStatus
+
+            Write-SubHeader "Hyper-V Status"
+            $color = if ($hypervStatus.Enabled) { 'Green' } else { 'Red' }
+            Write-Bullet "Hyper-V Enabled: $($hypervStatus.Enabled)" -Color $color
+
+            if ($hypervStatus.VMs) {
+                Write-SubHeader "Virtual Machines"
+                $hypervStatus.VMs | ForEach-Object {
+                    Write-Bullet "$($_.Name) - $($_.State)"
+                }
+            }
+        }
+
+        'docker' {
+            if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
+
+            Write-Header "Docker Diagnostics"
+            $dockerStatus = Get-DockerStatus
+
+            Write-SubHeader "Docker Desktop Status"
+            $color = if ($dockerStatus.Running) { 'Green' } else { 'Red' }
+            Write-Bullet "Running: $($dockerStatus.Running)" -Color $color
+
+            if ($dockerStatus.Version) {
+                Write-Bullet "Version: $($dockerStatus.Version)"
+            }
+
+            if ($dockerStatus.Containers) {
+                Write-SubHeader "Containers"
+                Write-Bullet "Running: $($dockerStatus.Containers.Running)"
+                Write-Bullet "Stopped: $($dockerStatus.Containers.Stopped)"
+            }
+        }
+
+        'events' {
+            Warn-NonAdministrator "event log analysis"
+            if (-not (Ensure-Module 'PC-AI.Hardware')) { return }
+
+            $days = [int]$parsed.Values['days']
+            Write-Header "System Events (Last $days Days)"
+
+            $events = Get-SystemEvents -Days $days
+
+            if ($events.Critical) {
+                Write-SubHeader "Critical Events"
+                $events.Critical | Select-Object -First 10 | ForEach-Object {
+                    Write-Bullet "$($_.TimeCreated): $($_.Message)" -Color Red
+                }
+            }
+
+            if ($events.Error) {
+                Write-SubHeader "Error Events"
+                $events.Error | Select-Object -First 10 | ForEach-Object {
+                    Write-Bullet "$($_.TimeCreated): $($_.Message)" -Color Yellow
+                }
+            }
+
+            if (-not $events.Critical -and -not $events.Error) {
+                Write-Success "No critical or error events found"
+            }
+        }
+
+        'all' {
+            Warn-NonAdministrator "full system diagnostics"
+            if (-not (Ensure-Module 'PC-AI.Hardware')) { return }
+
+            Write-Header "Full System Diagnostics"
+
+            $outputPath = $parsed.Values['output']
+            if (-not $outputPath) {
+                $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+                $outputPath = Join-Path $script:ReportsPath "Diagnostics-$timestamp.txt"
+            }
+
+            # Ensure Reports directory exists
+            $reportsDir = Split-Path $outputPath -Parent
+            if (-not (Test-Path $reportsDir)) {
+                New-Item -Path $reportsDir -ItemType Directory -Force | Out-Null
+            }
+
+            Write-Info "Generating comprehensive diagnostic report..."
+            Write-Info "Output: $outputPath"
+
+            try {
+                $report = New-DiagnosticReport -OutputPath $outputPath
+                Write-Success "Diagnostic report generated successfully"
+                Write-Info "Report saved to: $outputPath"
+
+                # Show summary
+                if ($report.Summary) {
+                    Write-SubHeader "Summary"
+                    Write-Bullet "Device Errors: $($report.Summary.DeviceErrors)"
+                    Write-Bullet "Disk Issues: $($report.Summary.DiskIssues)"
+                    Write-Bullet "Network Issues: $($report.Summary.NetworkIssues)"
+                }
+            }
+            catch {
+                Write-Error "Failed to generate report: $_"
+            }
+        }
+
+        default {
+            if ($subCommand) {
+                Write-Error "Unknown diagnose subcommand: $subCommand"
+            }
+            Show-DiagnoseHelp
+        }
+    }
+}
+#endregion
+
+#region Optimize Commands
+function Invoke-OptimizeCommand {
+    param([string[]]$CmdArgs)
+
+    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+        profile = 'default'
+        backup = 'true'
+    }
+
+    $subCommand = $parsed.SubCommand
+    $dryRun = $parsed.Flags['dry-run'] -or $parsed.Flags['n']
+    $force = $parsed.Flags['force'] -or $parsed.Flags['f']
+
+    switch ($subCommand) {
+        'wsl' {
+            if (-not (Require-Administrator "WSL optimization")) { return }
+            if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
+
+            Write-Header "WSL2 Optimization"
+
+            if ($dryRun) {
+                Write-Info "[DRY RUN] Showing proposed changes..."
+            }
+
+            try {
+                $result = Optimize-WSLConfig -DryRun:$dryRun -Force:$force
+
+                if ($result.Changes) {
+                    Write-SubHeader "Proposed/Applied Changes"
+                    $result.Changes | ForEach-Object {
+                        Write-Bullet $_
+                    }
+                }
+
+                if (-not $dryRun -and $result.Success) {
+                    Write-Success "WSL optimization completed successfully"
+                    if ($result.RestartRequired) {
+                        Write-Warning "WSL restart required. Run: wsl --shutdown"
+                    }
+                }
+            }
+            catch {
+                Write-Error "WSL optimization failed: $_"
+            }
+        }
+
+        'disk' {
+            if (-not (Require-Administrator "disk optimization")) { return }
+            if (-not (Ensure-Module 'PC-AI.Performance')) { return }
+
+            Write-Header "Disk Optimization"
+
+            if ($dryRun) {
+                Write-Info "[DRY RUN] Showing disk optimization plan..."
+            }
+
+            try {
+                $result = Optimize-Disks -DryRun:$dryRun -Force:$force
+
+                if ($result.Disks) {
+                    Write-SubHeader "Optimization Results"
+                    $result.Disks | ForEach-Object {
+                        $action = if ($_.IsSSD) { 'TRIM' } else { 'Defrag' }
+                        Write-Bullet "$($_.DriveLetter): $action - $($_.Status)"
+                    }
+                }
+            }
+            catch {
+                Write-Error "Disk optimization failed: $_"
+            }
+        }
+
+        'vsock' {
+            if (-not (Require-Administrator "VSock optimization")) { return }
+            if (-not (Ensure-Module 'PC-AI.Network')) { return }
+
+            Write-Header "VSock Optimization"
+
+            $profile = $parsed.Values['profile']
+
+            if ($dryRun) {
+                Write-Info "[DRY RUN] Profile: $profile"
+            }
+
+            try {
+                $result = Optimize-VSock -Profile $profile -DryRun:$dryRun
+
+                if ($result.Settings) {
+                    Write-SubHeader "VSock Settings"
+                    $result.Settings | ForEach-Object {
+                        Write-Bullet "$($_.Name): $($_.Value)"
+                    }
+                }
+
+                if ($result.Success -and -not $dryRun) {
+                    Write-Success "VSock optimization completed"
+                }
+            }
+            catch {
+                Write-Error "VSock optimization failed: $_"
+            }
+        }
+
+        'defender' {
+            if (-not (Require-Administrator "Defender exclusions")) { return }
+            if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
+
+            Write-Header "Windows Defender Exclusions"
+
+            if ($dryRun) {
+                Write-Info "[DRY RUN] Showing proposed exclusions..."
+            }
+
+            try {
+                $result = Set-WSLDefenderExclusions -DryRun:$dryRun
+
+                if ($result.Exclusions) {
+                    Write-SubHeader "Exclusions"
+                    $result.Exclusions | ForEach-Object {
+                        Write-Bullet "$($_.Type): $($_.Path)"
+                    }
+                }
+
+                if ($result.Success -and -not $dryRun) {
+                    Write-Success "Defender exclusions configured"
+                }
+            }
+            catch {
+                Write-Error "Failed to set exclusions: $_"
+            }
+        }
+
+        'network' {
+            if (-not (Require-Administrator "network repair")) { return }
+            if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
+
+            Write-Header "WSL Network Repair"
+
+            if ($dryRun) {
+                Write-Info "[DRY RUN] Showing repair actions..."
+            }
+
+            try {
+                $result = Repair-WSLNetworking -DryRun:$dryRun
+
+                if ($result.Actions) {
+                    Write-SubHeader "Repair Actions"
+                    $result.Actions | ForEach-Object {
+                        Write-Bullet $_
+                    }
+                }
+
+                if ($result.Success -and -not $dryRun) {
+                    Write-Success "Network repair completed"
+                }
+            }
+            catch {
+                Write-Error "Network repair failed: $_"
+            }
+        }
+
+        default {
+            if ($subCommand) {
+                Write-Error "Unknown optimize subcommand: $subCommand"
+            }
+            Show-OptimizeHelp
+        }
+    }
+}
+#endregion
+
+#region USB Commands
+function Invoke-UsbCommand {
+    param([string[]]$CmdArgs)
+
+    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+        distribution = $null
+        busid = $null
+    }
+
+    $subCommand = $parsed.SubCommand
+    $unbind = $parsed.Flags['unbind']
+
+    if (-not (Ensure-Module 'PC-AI.USB')) { return }
+
+    switch ($subCommand) {
+        'list' {
+            Write-Header "USB Devices"
+
+            try {
+                $devices = Get-UsbDeviceList
+
+                if ($devices) {
+                    $devices | ForEach-Object {
+                        $state = if ($_.Attached) { '[Attached to WSL]' } else { '' }
+                        $color = if ($_.Attached) { 'Green' } else { 'White' }
+                        Write-Host "  $($_.BusId)  " -NoNewline -ForegroundColor Cyan
+                        Write-Host "$($_.Description) $state" -ForegroundColor $color
+                    }
+                }
+                else {
+                    Write-Info "No USB devices found"
+                }
+            }
+            catch {
+                Write-Error "Failed to list USB devices: $_"
+            }
+        }
+
+        'attach' {
+            if (-not (Require-Administrator "USB attach")) { return }
+
+            $busid = $parsed.Values['busid']
+            if (-not $busid -and $parsed.Positional) {
+                $busid = $parsed.Positional[0]
+            }
+
+            if (-not $busid) {
+                Write-Error "Bus ID required. Use: PC-AI usb attach --busid <id>"
+                Write-Info "Run 'PC-AI usb list' to see available devices"
+                return
+            }
+
+            $distribution = $parsed.Values['distribution']
+
+            Write-Header "Attaching USB Device"
+            Write-Info "Bus ID: $busid"
+            if ($distribution) {
+                Write-Info "Distribution: $distribution"
+            }
+
+            try {
+                $result = Mount-UsbToWSL -BusId $busid -Distribution $distribution
+
+                if ($result.Success) {
+                    Write-Success "Device attached successfully"
+                }
+                else {
+                    Write-Error "Failed to attach device: $($result.Error)"
+                }
+            }
+            catch {
+                Write-Error "Failed to attach USB device: $_"
+            }
+        }
+
+        'detach' {
+            if (-not (Require-Administrator "USB detach")) { return }
+
+            $busid = $parsed.Values['busid']
+            if (-not $busid -and $parsed.Positional) {
+                $busid = $parsed.Positional[0]
+            }
+
+            if (-not $busid) {
+                Write-Error "Bus ID required. Use: PC-AI usb detach --busid <id>"
+                return
+            }
+
+            Write-Header "Detaching USB Device"
+            Write-Info "Bus ID: $busid"
+
+            try {
+                $result = Dismount-UsbFromWSL -BusId $busid -Unbind:$unbind
+
+                if ($result.Success) {
+                    Write-Success "Device detached successfully"
+                    if ($unbind) {
+                        Write-Info "Device unbound from usbipd"
+                    }
+                }
+                else {
+                    Write-Error "Failed to detach device: $($result.Error)"
+                }
+            }
+            catch {
+                Write-Error "Failed to detach USB device: $_"
+            }
+        }
+
+        'status' {
+            Write-Header "USB/WSL Passthrough Status"
+
+            try {
+                $status = Get-UsbWSLStatus
+
+                Write-SubHeader "usbipd Status"
+                $color = if ($status.UsbIpdInstalled) { 'Green' } else { 'Red' }
+                Write-Bullet "usbipd-win Installed: $($status.UsbIpdInstalled)" -Color $color
+
+                if ($status.AttachedDevices) {
+                    Write-SubHeader "Attached to WSL"
+                    $status.AttachedDevices | ForEach-Object {
+                        Write-Bullet "$($_.BusId): $($_.Description)" -Color Green
+                    }
+                }
+
+                if ($status.BoundDevices) {
+                    Write-SubHeader "Bound (Ready to Attach)"
+                    $status.BoundDevices | ForEach-Object {
+                        Write-Bullet "$($_.BusId): $($_.Description)" -Color Yellow
+                    }
+                }
+            }
+            catch {
+                Write-Error "Failed to get USB status: $_"
+            }
+        }
+
+        'bind' {
+            if (-not (Require-Administrator "USB bind")) { return }
+
+            $busid = $parsed.Values['busid']
+            if (-not $busid -and $parsed.Positional) {
+                $busid = $parsed.Positional[0]
+            }
+
+            if (-not $busid) {
+                Write-Error "Bus ID required. Use: PC-AI usb bind --busid <id>"
+                return
+            }
+
+            Write-Header "Binding USB Device"
+            Write-Info "Bus ID: $busid"
+
+            try {
+                $result = Invoke-UsbBind -BusId $busid
+
+                if ($result.Success) {
+                    Write-Success "Device bound successfully"
+                    Write-Info "Device is now ready for WSL attachment"
+                }
+                else {
+                    Write-Error "Failed to bind device: $($result.Error)"
+                }
+            }
+            catch {
+                Write-Error "Failed to bind USB device: $_"
+            }
+        }
+
+        default {
+            if ($subCommand) {
+                Write-Error "Unknown usb subcommand: $subCommand"
+            }
+            Show-UsbHelp
+        }
+    }
+}
+#endregion
+
+#region Analyze Commands
+function Invoke-AnalyzeCommand {
+    param([string[]]$CmdArgs)
+
+    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+        report = $null
+        model = $null
+        temperature = '0.3'
+        output = $null
+    }
+
+    if (-not (Ensure-Module 'PC-AI.LLM')) { return }
+
+    Write-Header "LLM Diagnostic Analysis"
+
+    # Check LLM availability first
+    $llmStatus = Get-LLMStatus
+    if (-not $llmStatus.Available) {
+        Write-Error "No LLM provider available"
+        Write-Info "Ensure Ollama is running: ollama serve"
+        return
+    }
+
+    $reportPath = $parsed.Values['report']
+
+    # Find latest report if not specified
+    if (-not $reportPath) {
+        $latestReport = Get-ChildItem -Path $script:ReportsPath -Filter '*.txt' -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+        if ($latestReport) {
+            $reportPath = $latestReport.FullName
+            Write-Info "Using latest report: $reportPath"
+        }
+        else {
+            Write-Warning "No diagnostic reports found. Run 'PC-AI diagnose all' first."
+
+            # Offer to run diagnostics
+            $response = Read-Host "Run diagnostics now? (y/n)"
+            if ($response -eq 'y') {
+                Invoke-DiagnoseCommand @('all')
+                $latestReport = Get-ChildItem -Path $script:ReportsPath -Filter '*.txt' |
+                    Sort-Object LastWriteTime -Descending |
+                    Select-Object -First 1
+                if ($latestReport) {
+                    $reportPath = $latestReport.FullName
+                }
+            }
+            else {
+                return
+            }
+        }
+    }
+
+    if (-not (Test-Path $reportPath)) {
+        Write-Error "Report not found: $reportPath"
+        return
+    }
+
+    $model = $parsed.Values['model']
+    if (-not $model) {
+        $llmConfig = Load-LLMConfig
+        $model = $llmConfig.providers.ollama.defaultModel
+    }
+
+    Write-Info "Model: $model"
+    Write-Info "Analyzing report..."
+
+    try {
+        $analysisParams = @{
+            ReportPath = $reportPath
+        }
+
+        if ($model) {
+            $analysisParams['Model'] = $model
+        }
+
+        if ($parsed.Values['temperature']) {
+            $analysisParams['Temperature'] = [double]$parsed.Values['temperature']
+        }
+
+        $result = Invoke-PCDiagnosis @analysisParams
+
+        Write-Header "Analysis Results"
+
+        if ($result.Summary) {
+            Write-SubHeader "Summary"
+            Write-Host $result.Summary
+        }
+
+        if ($result.Issues) {
+            Write-SubHeader "Identified Issues"
+            $result.Issues | ForEach-Object {
+                $color = switch ($_.Priority) {
+                    'Critical' { 'Red' }
+                    'High' { 'Yellow' }
+                    'Medium' { 'Cyan' }
+                    default { 'White' }
+                }
+                Write-Bullet "[$($_.Priority)] $($_.Description)" -Color $color
+            }
+        }
+
+        if ($result.Recommendations) {
+            Write-SubHeader "Recommendations"
+            $i = 1
+            $result.Recommendations | ForEach-Object {
+                Write-Host "  $i. $_" -ForegroundColor Green
+                $i++
+            }
+        }
+
+        # Save analysis if output specified
+        $outputPath = $parsed.Values['output']
+        if ($outputPath) {
+            $result | ConvertTo-Json -Depth 10 | Set-Content $outputPath
+            Write-Info "Analysis saved to: $outputPath"
+        }
+    }
+    catch {
+        Write-Error "Analysis failed: $_"
+    }
+}
+#endregion
+
+#region Chat Commands
+function Invoke-ChatCommand {
+    param([string[]]$CmdArgs)
+
+    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+        model = $null
+        system = $null
+    }
+
+    if (-not (Ensure-Module 'PC-AI.LLM')) { return }
+
+    # Check LLM availability
+    $llmStatus = Get-LLMStatus
+    if (-not $llmStatus.Available) {
+        Write-Error "No LLM provider available"
+        Write-Info "Ensure Ollama is running: ollama serve"
+        return
+    }
+
+    $model = $parsed.Values['model']
+    if (-not $model) {
+        $llmConfig = Load-LLMConfig
+        $model = $llmConfig.providers.ollama.defaultModel
+    }
+
+    $includeContext = $parsed.Flags['context']
+
+    Write-Header "PC-AI Chat"
+    Write-Info "Model: $model"
+    Write-Info "Type '/help' for commands, '/quit' to exit"
+    Write-Host ""
+
+    # Start chat session
+    try {
+        $chatParams = @{
+            Model = $model
+            Interactive = $true
+        }
+
+        if ($includeContext) {
+            $chatParams['IncludeDiagnosticContext'] = $true
+        }
+
+        if ($parsed.Values['system']) {
+            $chatParams['SystemPromptPath'] = $parsed.Values['system']
+        }
+
+        Invoke-LLMChat @chatParams
+    }
+    catch {
+        Write-Error "Chat session failed: $_"
+    }
+}
+#endregion
+
+#region LLM Commands
+function Invoke-LLMCommand {
+    param([string[]]$CmdArgs)
+
+    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+        provider = 'ollama'
+        model = $null
+    }
+
+    $subCommand = $parsed.SubCommand
+
+    if (-not (Ensure-Module 'PC-AI.LLM')) { return }
+
+    switch ($subCommand) {
+        'status' {
+            Write-Header "LLM Provider Status"
+
+            try {
+                $status = Get-LLMStatus
+
+                Write-SubHeader "Ollama"
+                $color = if ($status.Ollama.Available) { 'Green' } else { 'Red' }
+                Write-Bullet "Available: $($status.Ollama.Available)" -Color $color
+                if ($status.Ollama.Available) {
+                    Write-Bullet "URL: $($status.Ollama.Url)"
+                    Write-Bullet "Models Loaded: $($status.Ollama.ModelsLoaded -join ', ')"
+                }
+
+                if ($status.LMStudio) {
+                    Write-SubHeader "LM Studio"
+                    $color = if ($status.LMStudio.Available) { 'Green' } else { 'Red' }
+                    Write-Bullet "Available: $($status.LMStudio.Available)" -Color $color
+                }
+            }
+            catch {
+                Write-Error "Failed to get LLM status: $_"
+            }
+        }
+
+        'models' {
+            Write-Header "Available LLM Models"
+
+            $provider = $parsed.Values['provider']
+
+            try {
+                $status = Get-LLMStatus
+
+                if ($provider -eq 'ollama' -and $status.Ollama.Available) {
+                    Write-SubHeader "Ollama Models"
+                    $status.Ollama.AvailableModels | ForEach-Object {
+                        $loaded = if ($status.Ollama.ModelsLoaded -contains $_.Name) { '[Loaded]' } else { '' }
+                        $color = if ($loaded) { 'Green' } else { 'White' }
+                        Write-Bullet "$($_.Name) ($($_.Size)) $loaded" -Color $color
+                    }
+                }
+            }
+            catch {
+                Write-Error "Failed to list models: $_"
+            }
+        }
+
+        'config' {
+            Write-Header "LLM Configuration"
+
+            $llmConfig = Load-LLMConfig
+
+            if ($parsed.Values['model']) {
+                # Set model
+                $model = $parsed.Values['model']
+                try {
+                    Set-LLMConfig -DefaultModel $model
+                    Write-Success "Default model set to: $model"
+                }
+                catch {
+                    Write-Error "Failed to set model: $_"
+                }
+            }
+            else {
+                # Show config
+                Write-SubHeader "Current Configuration"
+                Write-Bullet "Default Model: $($llmConfig.providers.ollama.defaultModel)"
+                Write-Bullet "Fallback Models: $($llmConfig.providers.ollama.fallbackModels -join ', ')"
+                Write-Bullet "Timeout: $($llmConfig.providers.ollama.timeout)ms"
+                Write-Bullet "Max Context: $($llmConfig.contextManagement.maxContextTokens) tokens"
+            }
+        }
+
+        'test' {
+            Write-Header "LLM Connectivity Test"
+
+            try {
+                $testResult = Send-OllamaRequest -Prompt "Respond with 'OK' only." -Stream $false
+
+                if ($testResult) {
+                    Write-Success "LLM connectivity test passed"
+                    Write-Info "Response: $testResult"
+                }
+            }
+            catch {
+                Write-Error "LLM connectivity test failed: $_"
+            }
+        }
+
+        default {
+            if ($subCommand) {
+                Write-Error "Unknown llm subcommand: $subCommand"
+            }
+            Show-LLMHelp
+        }
+    }
+}
+#endregion
+
+#region Cleanup Commands
+function Invoke-CleanupCommand {
+    param([string[]]$CmdArgs)
+
+    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{}
+
+    $subCommand = $parsed.SubCommand
+    $dryRun = $parsed.Flags['dry-run'] -or $parsed.Flags['n']
+    $force = $parsed.Flags['force'] -or $parsed.Flags['f']
+    $recursive = $parsed.Flags['recursive'] -or $parsed.Flags['r']
+
+    if (-not (Ensure-Module 'PC-AI.Cleanup')) { return }
+
+    switch ($subCommand) {
+        'path' {
+            Write-Header "PATH Environment Cleanup"
+
+            if ($dryRun) {
+                Write-Info "[DRY RUN] Analyzing PATH..."
+            }
+
+            try {
+                $analysis = Get-PathDuplicates
+
+                if ($analysis.Duplicates) {
+                    Write-SubHeader "Duplicate Entries"
+                    $analysis.Duplicates | ForEach-Object {
+                        Write-Bullet $_ -Color Yellow
+                    }
+                }
+
+                if ($analysis.NonExistent) {
+                    Write-SubHeader "Non-Existent Paths"
+                    $analysis.NonExistent | ForEach-Object {
+                        Write-Bullet $_ -Color Red
+                    }
+                }
+
+                if (-not $analysis.Duplicates -and -not $analysis.NonExistent) {
+                    Write-Success "PATH is clean - no issues found"
+                    return
+                }
+
+                if (-not $dryRun) {
+                    if (-not $force) {
+                        $response = Read-Host "Clean up PATH? (y/n)"
+                        if ($response -ne 'y') {
+                            Write-Info "Cleanup cancelled"
+                            return
+                        }
+                    }
+
+                    if (-not (Require-Administrator "PATH cleanup")) { return }
+
+                    $result = Repair-MachinePath -CreateBackup
+
+                    if ($result.Success) {
+                        Write-Success "PATH cleaned successfully"
+                        Write-Info "Entries removed: $($result.EntriesRemoved)"
+                        if ($result.BackupPath) {
+                            Write-Info "Backup saved to: $($result.BackupPath)"
+                        }
+                    }
+                }
+            }
+            catch {
+                Write-Error "PATH cleanup failed: $_"
+            }
+        }
+
+        'temp' {
+            Write-Header "Temporary Files Cleanup"
+
+            if ($dryRun) {
+                Write-Info "[DRY RUN] Analyzing temp files..."
+            }
+
+            try {
+                $result = Clear-TempFiles -DryRun:$dryRun
+
+                Write-SubHeader "Cleanup Summary"
+                Write-Bullet "Files found: $($result.FilesFound)"
+                Write-Bullet "Space to recover: $([math]::Round($result.SpaceBytes / 1MB, 2)) MB"
+
+                if (-not $dryRun) {
+                    Write-Bullet "Files deleted: $($result.FilesDeleted)"
+                    Write-Bullet "Space recovered: $([math]::Round($result.SpaceRecovered / 1MB, 2)) MB"
+
+                    if ($result.Errors) {
+                        Write-SubHeader "Errors (files in use)"
+                        $result.Errors | Select-Object -First 5 | ForEach-Object {
+                            Write-Bullet $_ -Color Yellow
+                        }
+                    }
+                }
+            }
+            catch {
+                Write-Error "Temp cleanup failed: $_"
+            }
+        }
+
+        'duplicates' {
+            $searchPath = if ($parsed.Positional) { $parsed.Positional[0] } else { $null }
+
+            if (-not $searchPath) {
+                Write-Error "Path required. Use: PC-AI cleanup duplicates <path>"
+                return
+            }
+
+            if (-not (Test-Path $searchPath)) {
+                Write-Error "Path not found: $searchPath"
+                return
+            }
+
+            Write-Header "Duplicate File Detection"
+            Write-Info "Searching: $searchPath"
+            Write-Info "Recursive: $recursive"
+
+            try {
+                $result = Find-DuplicateFiles -Path $searchPath -Recursive:$recursive
+
+                if ($result.DuplicateSets) {
+                    Write-SubHeader "Duplicate Sets Found: $($result.DuplicateSets.Count)"
+
+                    $result.DuplicateSets | Select-Object -First 10 | ForEach-Object {
+                        Write-Host ""
+                        Write-Host "  Hash: $($_.Hash.Substring(0, 16))..." -ForegroundColor DarkGray
+                        Write-Host "  Size: $([math]::Round($_.Size / 1KB, 2)) KB" -ForegroundColor DarkGray
+                        $_.Files | ForEach-Object {
+                            Write-Bullet $_
+                        }
+                    }
+
+                    Write-Host ""
+                    Write-Bullet "Total duplicate sets: $($result.DuplicateSets.Count)" -Color Yellow
+                    Write-Bullet "Potential space savings: $([math]::Round($result.WastedSpace / 1MB, 2)) MB" -Color Yellow
+                }
+                else {
+                    Write-Success "No duplicate files found"
+                }
+            }
+            catch {
+                Write-Error "Duplicate detection failed: $_"
+            }
+        }
+
+        default {
+            if ($subCommand) {
+                Write-Error "Unknown cleanup subcommand: $subCommand"
+            }
+            Show-CleanupHelp
+        }
+    }
+}
+#endregion
+
+#region Performance Commands
+function Invoke-PerfCommand {
+    param([string[]]$CmdArgs)
+
+    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+        top = 10
+        duration = 30
+        interval = 1000
+        sort = 'cpu'
+    }
+
+    $subCommand = $parsed.SubCommand
+
+    if (-not (Ensure-Module 'PC-AI.Performance')) { return }
+
+    switch ($subCommand) {
+        'disk' {
+            Write-Header "Disk Space Analysis"
+
+            try {
+                $diskSpace = Get-DiskSpace
+
+                $diskSpace | ForEach-Object {
+                    $usedPercent = [math]::Round($_.UsedPercent, 1)
+                    $freeGB = [math]::Round($_.FreeGB, 2)
+                    $totalGB = [math]::Round($_.TotalGB, 2)
+
+                    $color = if ($usedPercent -gt 90) { 'Red' }
+                            elseif ($usedPercent -gt 75) { 'Yellow' }
+                            else { 'Green' }
+
+                    Write-Host ""
+                    Write-Host "  Drive $($_.DriveLetter):" -ForegroundColor Cyan
+                    Write-Host "    Used: " -NoNewline
+                    Write-Host "$usedPercent%" -ForegroundColor $color -NoNewline
+                    Write-Host " ($($totalGB - $freeGB) GB / $totalGB GB)"
+                    Write-Host "    Free: $freeGB GB"
+                    Write-Host "    Type: $($_.DriveType)"
+
+                    # Visual bar
+                    $barLength = 30
+                    $filledLength = [math]::Round($usedPercent / 100 * $barLength)
+                    $bar = '=' * $filledLength + '-' * ($barLength - $filledLength)
+                    Write-Host "    [$bar]" -ForegroundColor $color
+                }
+            }
+            catch {
+                Write-Error "Disk analysis failed: $_"
+            }
+        }
+
+        'process' {
+            Write-Header "Top Processes by Resource Usage"
+
+            $topN = [int]$parsed.Values['top']
+            $sortBy = $parsed.Values['sort']
+
+            try {
+                $processes = Get-ProcessPerformance -Top $topN -SortBy $sortBy
+
+                Write-SubHeader "Top $topN by $($sortBy.ToUpper())"
+
+                $format = "{0,-6} {1,-30} {2,10} {3,12}"
+                Write-Host ($format -f "PID", "Name", "CPU %", "Memory MB") -ForegroundColor DarkGray
+
+                $processes | ForEach-Object {
+                    $cpuColor = if ($_.CPUPercent -gt 50) { 'Red' }
+                               elseif ($_.CPUPercent -gt 25) { 'Yellow' }
+                               else { 'White' }
+
+                    $memMB = [math]::Round($_.MemoryMB, 1)
+                    $name = if ($_.Name.Length -gt 28) { $_.Name.Substring(0, 28) + '..' } else { $_.Name }
+
+                    Write-Host ($format -f $_.PID, $name, "$($_.CPUPercent)%", "$memMB MB") -ForegroundColor $cpuColor
+                }
+            }
+            catch {
+                Write-Error "Process analysis failed: $_"
+            }
+        }
+
+        'watch' {
+            Write-Header "Real-Time System Monitor"
+
+            $duration = [int]$parsed.Values['duration']
+            $interval = [int]$parsed.Values['interval']
+
+            Write-Info "Duration: $duration seconds"
+            Write-Info "Interval: $interval ms"
+            Write-Info "Press Ctrl+C to stop early"
+            Write-Host ""
+
+            try {
+                Watch-SystemResources -Duration $duration -IntervalMs $interval
+            }
+            catch {
+                Write-Error "Monitoring failed: $_"
+            }
+        }
+
+        'vsock' {
+            if (-not (Ensure-Module 'PC-AI.Network')) { return }
+
+            Write-Header "VSock Performance Monitor"
+
+            try {
+                Watch-VSockPerformance
+            }
+            catch {
+                Write-Error "VSock monitoring failed: $_"
+            }
+        }
+
+        default {
+            if ($subCommand) {
+                Write-Error "Unknown perf subcommand: $subCommand"
+            }
+            Show-PerfHelp
+        }
+    }
+}
+#endregion
+
+#region Status Command
+function Invoke-StatusCommand {
+    Write-Header "PC-AI System Status"
+
+    # Framework info
+    Write-SubHeader "Framework"
+    Write-Bullet "Version: $script:Version"
+    Write-Bullet "Modules Path: $script:ModulesPath"
+    Write-Bullet "Config Path: $script:ConfigPath"
+
+    # Admin status
+    $isAdmin = Test-Administrator
+    $adminColor = if ($isAdmin) { 'Green' } else { 'Yellow' }
+    Write-Bullet "Administrator: $isAdmin" -Color $adminColor
+
+    # Module status
+    Write-SubHeader "Modules"
+    $modules = @(
+        'PC-AI.Hardware',
+        'PC-AI.Virtualization',
+        'PC-AI.USB',
+        'PC-AI.Network',
+        'PC-AI.Performance',
+        'PC-AI.Cleanup',
+        'PC-AI.LLM'
+    )
+
+    foreach ($moduleName in $modules) {
+        $modulePath = Join-Path $script:ModulesPath "$moduleName\$moduleName.psd1"
+        $exists = Test-Path $modulePath
+        $color = if ($exists) { 'Green' } else { 'Red' }
+        $status = if ($exists) { 'Available' } else { 'Missing' }
+        Write-Bullet "$moduleName`: $status" -Color $color
+    }
+
+    # LLM status (quick check)
+    Write-SubHeader "LLM Provider"
+    try {
+        $ollamaTest = Invoke-RestMethod -Uri 'http://localhost:11434/api/tags' -Method Get -TimeoutSec 2 -ErrorAction SilentlyContinue
+        Write-Bullet "Ollama: Running" -Color Green
+    }
+    catch {
+        Write-Bullet "Ollama: Not Running" -Color Yellow
+    }
+
+    # Quick system info
+    Write-SubHeader "System"
+    $os = Get-CimInstance Win32_OperatingSystem
+    $cs = Get-CimInstance Win32_ComputerSystem
+    Write-Bullet "OS: $($os.Caption)"
+    Write-Bullet "Memory: $([math]::Round($cs.TotalPhysicalMemory / 1GB, 1)) GB"
+    Write-Bullet "Free Memory: $([math]::Round($os.FreePhysicalMemory / 1MB, 0)) MB"
+}
+#endregion
+
+#region Version Command
+function Invoke-VersionCommand {
+    Write-Host ""
+    Write-Host "PC-AI Framework" -ForegroundColor Cyan
+    Write-Host "Version: $script:Version" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Local LLM-Powered PC Diagnostics and Optimization"
+    Write-Host "Copyright (c) 2025 PC_AI Project"
+    Write-Host ""
+
+    # Module versions
+    Write-Host "Module Versions:" -ForegroundColor DarkGray
+    $modules = Get-ChildItem -Path $script:ModulesPath -Directory -ErrorAction SilentlyContinue
+
+    foreach ($module in $modules) {
+        $manifest = Join-Path $module.FullName "$($module.Name).psd1"
+        if (Test-Path $manifest) {
+            try {
+                $data = Import-PowerShellDataFile $manifest
+                Write-Host "  $($module.Name): $($data.ModuleVersion)" -ForegroundColor DarkGray
+            }
+            catch {
+                Write-Host "  $($module.Name): Unknown" -ForegroundColor DarkGray
+            }
+        }
+    }
+}
+#endregion
+
+#endregion
+
+#region Main Entry Point
+function Main {
+    # Load settings
+    $null = Load-Settings
+
+    # Handle empty command
+    if (-not $Command) {
+        Show-MainHelp
+        return
+    }
+
+    # Route to command handler
+    switch ($Command) {
+        'diagnose' { Invoke-DiagnoseCommand -CmdArgs $Arguments }
+        'optimize' { Invoke-OptimizeCommand -CmdArgs $Arguments }
+        'usb' { Invoke-UsbCommand -CmdArgs $Arguments }
+        'analyze' { Invoke-AnalyzeCommand -CmdArgs $Arguments }
+        'chat' { Invoke-ChatCommand -CmdArgs $Arguments }
+        'llm' { Invoke-LLMCommand -CmdArgs $Arguments }
+        'cleanup' { Invoke-CleanupCommand -CmdArgs $Arguments }
+        'perf' { Invoke-PerfCommand -CmdArgs $Arguments }
+        'status' { Invoke-StatusCommand }
+        'version' { Invoke-VersionCommand }
+        'help' {
+            $topic = if ($Arguments) { $Arguments[0] } else { $null }
+            Show-Help -Topic $topic
+        }
+        default {
+            Write-Error "Unknown command: $Command"
+            Show-MainHelp
+        }
+    }
+}
+
+# Run main function
+Main
+#endregion

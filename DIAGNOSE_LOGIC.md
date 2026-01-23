@@ -1,0 +1,356 @@
+Branched Reasoning Logic
+When you have the report contents, follow this decision tree to analyze and respond.
+6.1 Parse the Report
+
+
+Identify sections in the report by headings:
+
+"== 1. Devices with Errors in Device Manager =="
+"== 2. Disk SMART Overall Status =="
+"== 3. Recent System Errors/Warnings..."
+"== 4. USB Controllers and USB Devices Status =="
+"== 5. Physical Network Adapters Status =="
+
+
+
+Extract data:
+
+From Section 1: list each device with:
+
+Name, PNPClass, Manufacturer, ConfigManagerErrorCode, Status
+
+
+From Section 2: disk models and their Status values.
+From Section 3: list of events with:
+
+TimeCreated, ProviderName, Id, LevelDisplayName, key phrases in Message.
+
+
+From Section 4: USB devices, especially non-zero ConfigManagerErrorCode.
+From Section 5: network adapters with:
+
+Name, NetEnabled, Status, Speed.
+
+
+
+
+
+
+6.2 Branch 1: Devices with ConfigManager Errors (Section 1 and 4)
+Condition: One or more devices with ConfigManagerErrorCode != 0 or Status not "OK".
+Steps:
+
+
+Classify each device by PNPClass and/or its name:
+
+DiskDrive / storage-related
+Net / network
+USB
+Display / graphics
+Media / audio
+HIDClass / input devices
+Unknown / unclassified
+
+
+
+For each device, follow appropriate branch:
+
+
+6.2.1 Storage / Disk Device Errors
+
+Likely issues: driver failures, failing disk, misconfigured controller.
+Recommended actions (in order, with safety):
+
+Advise user to back up important data first if the device corresponds to a primary or data disk.
+Recommend:
+
+Checking for updated chipset and storage controller drivers from system or motherboard vendor.
+Ensuring no loose or damaged cables (for desktop systems).
+
+
+If combined with bad SMART status or disk error events (see Branch 2), treat as critical.
+Do not automatically recommend destructive commands (like chkdsk /r) without:
+
+Explicit warning
+Advising backups first
+
+
+
+
+
+6.2.2 USB Device / Controller Errors
+
+Likely issues: flaky USB hub, underpowered ports, bad cable, driver issue.
+Actions:
+
+Suggest trying the device:
+
+On a different USB port.
+Without a USB hub (direct to PC).
+With a different cable, if applicable.
+
+
+Recommend:
+
+Updating USB controller / chipset drivers from the vendor site.
+Disabling USB power-saving features for affected devices:
+
+Device Manager → device properties → Power Management.
+
+
+
+
+If events in Section 3 show repeated USB plug/unplug errors, note likely hardware / cable instability.
+
+
+
+6.2.3 Network Adapter Errors
+
+Indicators: ConfigManagerErrorCode non-zero or NetEnabled = False when user expects connectivity.
+Actions:
+
+Ask if the adapter is supposed to be in use (e.g., Ethernet vs. Wi-Fi).
+If yes:
+
+Suggest disabling and re-enabling the adapter in Device Manager.
+Recommend vendor driver update (Intel, Realtek, etc.).
+
+
+If adapter is unused (e.g., old virtual adapter), suggest it may be safe to leave as-is or disable.
+
+
+
+6.2.4 Unknown Devices
+
+Indicators: PNPClass is null/Unknown, generic names like "Unknown device".
+Actions:
+
+Suggest user installs:
+
+OEM drivers (from Dell/HP/Lenovo/etc.) or driver packs appropriate for their model.
+
+
+If device has no functional impact the user cares about, mark as low priority.
+
+
+
+
+6.3 Branch 2: Disk Health Issues (Section 2 + Section 3)
+Condition: Any disk status not OK in Section 2, or storage-related errors in Section 3.
+6.3.1 SMART Status Not OK
+
+Critical condition.
+Response:
+
+Clearly state:
+
+“One or more disks may be failing. This is a critical issue.”
+
+
+Recommend:
+
+Immediate backup of important files.
+Avoiding heavy disk operations (no large writes or repairs) until data is backed up.
+
+
+After backup, suggest:
+
+Using vendor tools (e.g., Samsung Magician, Intel SSD Toolbox) for deeper diagnostics.
+Planning disk replacement if confirmed.
+
+
+
+
+
+6.3.2 Disk-Related System Events
+Look for messages like:
+
+“The device \Device\HarddiskX has a bad block”
+“Reset to device, \Device\RaidPort0, was issued”
+Frequent disk, storahci, nvme, or stornvme errors.
+
+If such events are found:
+
+Explain that the system is experiencing I/O errors or instability on that disk.
+Combine with SMART status:
+
+If SMART is also bad → High probability of failing hardware.
+If SMART is OK but events persist → could be:
+
+Cabling issues (for SATA)
+Controller/driver problems
+Power issues (for external drives)
+
+
+
+
+Recommend:
+
+Backup as a precaution.
+Checking physical connections (if internal desktop).
+Updating storage controller drivers.
+If external: trying another port, cable, or PC to isolate the problem.
+
+
+
+
+6.4 Branch 3: USB Instability (Section 3 + Section 4)
+Condition: Multiple USB-related warnings/errors, or many USB devices with non-zero error codes.
+Response:
+
+Highlight that USB subsystem appears unstable.
+Recommend:
+
+Simplifying the setup temporarily:
+
+Disconnect all non-essential USB devices.
+Reconnect devices one by one, prioritizing critical components.
+
+
+Avoiding unpowered hubs or questionable adapters.
+Updating chipset and USB drivers from OEM.
+
+
+If a particular device repeatedly shows issues:
+
+Suggest testing that device on another machine.
+Conclude whether device or host is at fault.
+
+
+
+
+6.5 Branch 4: Network Adapter Status (Section 5)
+Condition: Network adapters show problems in Section 5.
+
+Examples:
+
+Expected adapter has NetEnabled = False or poor Status.
+Only low-speed link on wired connection where higher speed is expected.
+
+
+
+Response:
+
+Ask user:
+
+Which network connection they are actively using (Ethernet vs. Wi-Fi).
+
+
+For the in-use adapter:
+
+If disabled or erroring:
+
+Suggest enabling it and checking Device Manager for errors.
+Recommend updated driver from OEM.
+
+
+
+
+For adapters the user does not use:
+
+Mark issues as non-critical but optionally suggest:
+
+Disabling unused adapters to reduce noise/confusion.
+
+
+
+
+
+
+6.6 Branch 5: No Apparent Issues Found
+Condition:
+
+Section 1: No devices with non-zero ConfigManagerErrorCode.
+Section 2: All disks show OK.
+Section 3: No critical/warning disk/USB events in last few days.
+Section 4: USB devices mostly Status = OK.
+Section 5: Network adapters appear normal or as expected.
+
+Response:
+
+Inform the user that no obvious low-level hardware issues were found.
+Ask:
+
+What symptoms they are experiencing (e.g., freezes, slowdowns, disconnects).
+
+
+Offer to:
+
+Run more targeted diagnostics in that area (e.g., performance, memory, CPU thermals) via additional scripts or instructions.
+
+
+
+
+7. Output Formatting
+When reporting findings, use a structured format:
+
+Summary
+
+Brief, high-level overview (2–4 bullet points).
+
+
+Findings by Category
+
+Devices with errors
+Disk health
+USB stability
+Network adapters
+
+
+Priority Issues
+
+Clearly label Critical, High, Medium, Low.
+
+
+Recommended Next Steps
+
+For each category, provide numbered steps.
+Call out risky steps with explicit warnings.
+
+
+
+Example structure:
+
+
+Summary
+
+One USB controller has driver issues.
+One external disk shows intermittent errors but SMART is OK.
+
+
+
+Findings
+
+USB: Controller X shows ConfigManagerErrorCode 10 (device cannot start).
+Disk: External Drive Y has multiple reset events, SMART appears OK.
+
+
+
+Priority Issues
+
+High: USB controller instability affecting multiple devices.
+Medium: External disk I/O errors – monitor and back up data.
+
+
+
+Next Steps
+
+Update chipset/USB drivers from OEM site.
+Connect external drive directly to a rear motherboard USB port.
+Back up important data from the external disk as a precaution.
+
+
+
+
+8. Safety & Escalation
+
+If you detect possible disk failure or system-level instability, always:
+
+Advise immediate backup of important data.
+Recommend professional/IT assistance if user is not comfortable with hardware replacements.
+
+
+Do not encourage:
+
+BIOS/firmware updates without warning and context.
+Aggressive disk repair commands (e.g., chkdsk /r on a failing disk) without backups.

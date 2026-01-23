@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract Version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Version: $version"
+
+      - name: Run Tests
+        shell: pwsh
+        run: |
+          Install-Module Pester -MinimumVersion 5.6.1 -Force -Scope CurrentUser
+          if (Test-Path ".\Tests\.pester.ps1") {
+              .\Tests\.pester.ps1 -CI
+          }
+
+      - name: Build Release Package
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $releasePath = "PC-AI-$version"
+
+          # Create release directory structure
+          New-Item -ItemType Directory -Path $releasePath -Force
+          New-Item -ItemType Directory -Path "$releasePath\Modules" -Force
+          New-Item -ItemType Directory -Path "$releasePath\Reports" -Force
+          New-Item -ItemType Directory -Path "$releasePath\Config" -Force
+
+          # Copy modules
+          Copy-Item -Path "Modules\*" -Destination "$releasePath\Modules\" -Recurse -Force
+
+          # Copy main scripts
+          Copy-Item -Path "Get-PcDiagnostics.ps1" -Destination $releasePath -Force
+
+          # Copy documentation
+          Copy-Item -Path "DIAGNOSE.md" -Destination $releasePath -Force
+          Copy-Item -Path "DIAGNOSE_LOGIC.md" -Destination $releasePath -Force
+          Copy-Item -Path "CLAUDE.md" -Destination $releasePath -Force
+          Copy-Item -Path "README.md" -Destination $releasePath -Force -ErrorAction SilentlyContinue
+
+          # Create install script
+          @'
+          # PC_AI Installation Script
+          param(
+              [string]$InstallPath = "$env:ProgramFiles\PC-AI"
+          )
+
+          Write-Host "Installing PC_AI to $InstallPath..." -ForegroundColor Cyan
+
+          # Create installation directory
+          New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
+
+          # Copy modules
+          Copy-Item -Path "Modules\*" -Destination "$InstallPath\Modules\" -Recurse -Force
+
+          # Copy scripts
+          Copy-Item -Path "Get-PcDiagnostics.ps1" -Destination "$InstallPath\" -Force
+
+          # Add to PSModulePath if not already present
+          $currentPath = [Environment]::GetEnvironmentVariable("PSModulePath", "Machine")
+          $modulePath = "$InstallPath\Modules"
+          if ($currentPath -notlike "*$modulePath*") {
+              $newPath = "$currentPath;$modulePath"
+              [Environment]::SetEnvironmentVariable("PSModulePath", $newPath, "Machine")
+              Write-Host "✓ Added to PSModulePath" -ForegroundColor Green
+          }
+
+          Write-Host "`n✓ PC_AI installed successfully!" -ForegroundColor Green
+          Write-Host "`nTo get started, run: Import-Module PC-AI.Hardware" -ForegroundColor Cyan
+          '@ | Out-File -FilePath "$releasePath\Install.ps1" -Encoding UTF8
+
+          # Create archive
+          Compress-Archive -Path $releasePath -DestinationPath "PC-AI-$version.zip" -Force
+          Write-Host "✓ Created PC-AI-$version.zip"
+
+      - name: Generate Release Notes
+        id: notes
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $notes = @"
+          ## PC_AI v$version
+
+          ### Components
+          - Hardware diagnostics module
+          - Virtualization optimization module
+          - USB diagnostics module
+          - Network analysis module
+          - Performance tuning module
+          - Cleanup utilities module
+          - LLM integration module (Ollama)
+
+          ### Installation
+          ``````powershell
+          # Extract the zip file
+          Expand-Archive PC-AI-$version.zip -DestinationPath C:\PC-AI
+
+          # Run installation (requires Administrator)
+          cd C:\PC-AI\PC-AI-$version
+          .\Install.ps1
+          ``````
+
+          ### Quick Start
+          ``````powershell
+          # Import modules
+          Import-Module PC-AI.Hardware
+
+          # Run hardware diagnostics
+          Get-HardwareDiagnostics
+
+          # Or use the comprehensive diagnostics script
+          C:\Program Files\PC-AI\Get-PcDiagnostics.ps1
+          ``````
+
+          ### System Requirements
+          - Windows 10 1809+ or Windows 11
+          - PowerShell 5.1 or PowerShell 7.4+
+          - Administrator privileges for full diagnostics
+
+          ### Documentation
+          See the included DIAGNOSE.md and CLAUDE.md files for detailed usage instructions.
+          "@
+
+          # Save to file for GitHub release
+          $notes | Out-File -FilePath "RELEASE_NOTES.md" -Encoding UTF8
+
+          # Export for GitHub Actions (handle multiline)
+          "RELEASE_NOTES<<EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $notes | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: RELEASE_NOTES.md
+          files: |
+            PC-AI-${{ steps.version.outputs.VERSION }}.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PC-AI-${{ steps.version.outputs.VERSION }}
+          path: PC-AI-${{ steps.version.outputs.VERSION }}.zip
+          retention-days: 90

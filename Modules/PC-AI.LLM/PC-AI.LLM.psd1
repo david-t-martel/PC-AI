@@ -1,0 +1,42 @@
+@{
+    # Module metadata
+    RootModule = 'PC-AI.LLM.psm1'
+    ModuleVersion = '1.0.0'
+    GUID = 'a9b3c7d6-1e8f-4a2b-3c5d-6e7f8a9b0c1d'
+    Author = 'PC-AI Project'
+    CompanyName = 'PC-AI'
+    Copyright = '(c) 2026 PC-AI Project. All rights reserved.'
+    Description = 'PowerShell module for integrating Ollama LLM with PC diagnostics and analysis'
+
+    # Minimum PowerShell version
+    PowerShellVersion = '5.1'
+
+    # Functions to export
+    FunctionsToExport = @(
+        'Get-LLMStatus'
+        'Send-OllamaRequest'
+        'Invoke-LLMChat'
+        'Invoke-PCDiagnosis'
+        'Set-LLMConfig'
+    )
+
+    # Cmdlets to export
+    CmdletsToExport = @()
+
+    # Variables to export
+    VariablesToExport = @()
+
+    # Aliases to export
+    AliasesToExport = @()
+
+    # Private data
+    PrivateData = @{
+        PSData = @{
+            Tags = @('Ollama', 'LLM', 'AI', 'Diagnostics', 'PC-AI')
+            LicenseUri = ''
+            ProjectUri = ''
+            IconUri = ''
+            ReleaseNotes = 'Initial release with Ollama integration for PC diagnostics'
+        }
+    }
+}
