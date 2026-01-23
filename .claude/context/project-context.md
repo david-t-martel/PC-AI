@@ -1,16 +1,16 @@
 # PC_AI Project Context
 
-> Last Updated: 2025-01-23
-> Context Version: 2.0.0
-> Session Type: Full Project Documentation
+> Last Updated: 2026-01-23
+> Context Version: 3.0.0
+> Session Type: Test Fixing Campaign
 
 ## Quick Context (< 500 tokens)
 
-**Current Task**: PC-AI.Acceleration module completed with Rust tool integration
-**Immediate Goals**: Install missing Rust tools (dust, btm), integrate acceleration into other modules
-**Recent Decisions**: PS7+ ForEach-Object -Parallel pattern for native parallelism, fallback strategy for Rust tools
-**Active Blockers**: None - all 8 modules functional
-**Key Achievement**: ripgrep 44.6x faster than Select-String for content search
+**Current Task**: Fix Pester test failures - targeting 95%+ pass rate
+**Immediate Goals**: Fix remaining ~26 test failures, push to GitHub as public repository
+**Recent Decisions**: Module-scoped mocking with -ModuleName, admin-skip pattern, encoding fix for PS5.1/PS7+
+**Active Blockers**: Optimize-Disks context failures, CursorPosition console errors
+**Key Achievement**: Test pass rate improved from 23% to 79% (173/218 tests passing)
 
 ---
 
@@ -428,7 +428,39 @@ safety_mode: read_only_default
 
 ## 12. Session History
 
-### 2025-01-23 (Current): Acceleration Module Complete
+### 2026-01-23: Pester Test Fixing Campaign
+
+**Objective**: Fix failing Pester tests and achieve 95%+ pass rate
+
+**Starting State**: 23% pass rate (50/218 tests)
+**Current State**: ~79% pass rate (173/218 tests)
+
+#### Round 1: Network and USB Tests
+- **Agents**: test-automator, explore
+- **Modules Fixed**: PC-AI.Network (24/24), PC-AI.USB (24/24)
+- **Key Fixes**: Module-scoped mocking, ValidatePattern for BusId
+
+#### Round 2: Core Module Tests (Parallel)
+- **Agents**: 4 parallel fix agents
+- **Modules Fixed**:
+  - PC-AI.Hardware (33/33) - CIM cmdlet mocks
+  - PC-AI.LLM (28/28) - API endpoint mocking, parameter names
+  - PC-AI.Cleanup (26/26) - TestDrive paths, file operation mocks
+  - PC-AI.Performance (19/22) - Partial; Optimize-Disks context issues
+
+#### Round 3: Cross-Cutting Fixes
+- **Agents**: admin-skip, encoding-fix
+- **Patterns Applied**:
+  - `[System.IO.File]::WriteAllText()` for PS5.1/PS7+ compatibility
+  - `-Skip:(-not $script:IsAdmin)` for elevation-dependent tests
+
+#### Remaining Issues
+1. Optimize-Disks context failures (3 tests)
+2. CursorPosition console errors in Watch-VSockPerformance
+3. PC-AI.Virtualization tests (TBD)
+4. Admin tests skipped (~19 tests)
+
+### 2025-01-23 (Earlier): Acceleration Module Complete
 - Created PC-AI.Acceleration module with 9 public functions
 - Integrated 8 Rust CLI tools (rg, fd, procs, bat, hyperfine, tokei, eza, sd)
 - Identified 2 missing tools (dust, btm)
@@ -436,7 +468,7 @@ safety_mode: read_only_default
 - Documented PS7+ ForEach-Object -Parallel pattern
 - Performance benchmark: ripgrep 44.6x faster than Select-String
 
-### 2025-01-23 (Earlier): Initial Setup
+### 2025-01-23 (Initial): Project Setup
 - Created comprehensive project context
 - Documented 3-file architecture pattern
 - Identified 12 migration candidates from home directory

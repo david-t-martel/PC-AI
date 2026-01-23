@@ -4,23 +4,29 @@
     "type": "diagnostics-agent",
     "location": "C:\\Users\\david\\PC_AI",
     "platform": "Windows 10/11",
-    "integrations": ["WSL2", "Docker", "Hyper-V"]
+    "integrations": ["WSL2", "Docker", "Hyper-V", "Ollama", "LM Studio"]
   },
   "context": {
-    "version": "1.0.0",
+    "version": "3.0.0",
     "created": "2025-01-23",
-    "updated": "2025-01-23",
+    "updated": "2026-01-23",
     "files": {
       "full": "project-context.md",
+      "detailed": "pc-ai-project-context.md",
       "quick": "quick-context.md",
       "index": "context-index.json"
     }
   },
   "state": {
-    "current_phase": "initial_setup",
+    "current_phase": "test_fixing",
     "core_functional": true,
-    "migration_pending": true,
-    "blockers": []
+    "migration_pending": false,
+    "test_pass_rate": "79%",
+    "tests_total": 218,
+    "tests_passed": 173,
+    "tests_failed": 26,
+    "tests_skipped": 19,
+    "blockers": ["Optimize-Disks context failures", "CursorPosition console errors"]
   },
   "files": {
     "core": [
@@ -136,5 +142,51 @@
     "phase2": "Enhanced diagnostics (CPU, thermal, GPU)",
     "phase3": "Automation (scheduled runs, alerts)",
     "phase4": "LLM integration (Python wrapper, streaming)"
+  },
+  "agent_coordination_history": {
+    "sessions": [
+      {
+        "date": "2026-01-23",
+        "round": 1,
+        "agents": ["test-automator", "explore"],
+        "focus": "PC-AI.Network, PC-AI.USB tests",
+        "outcome": "48/48 tests passing"
+      },
+      {
+        "date": "2026-01-23",
+        "round": 2,
+        "agents": ["parallel-fix-hardware", "parallel-fix-llm", "parallel-fix-cleanup", "parallel-fix-performance"],
+        "focus": "Hardware, LLM, Cleanup, Performance tests",
+        "outcome": "106+ tests fixed"
+      },
+      {
+        "date": "2026-01-23",
+        "round": 3,
+        "agents": ["admin-skip", "encoding-fix"],
+        "focus": "Cross-cutting concerns",
+        "outcome": "PS5.1/PS7+ compatibility achieved"
+      }
+    ],
+    "lessons_learned": [
+      "Mock at the right level - Invoke-RestMethod for API calls",
+      "Verify return types - PSCustomObject not strings",
+      "Use -ModuleName for module-scoped mocks",
+      "Test exceptions with Should -Throw -ErrorAction Stop"
+    ]
+  },
+  "code_patterns": {
+    "encoding_fix": "[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::UTF8)",
+    "admin_skip": "-Skip:(-not $script:IsAdmin)",
+    "module_mock": "Mock Get-CimInstance { ... } -ModuleName PC-AI.Hardware",
+    "validate_pattern": "[ValidatePattern('^\\d+-\\d+$')]"
+  },
+  "test_status_by_module": {
+    "PC-AI.Network": { "total": 24, "passed": 24, "failed": 0 },
+    "PC-AI.USB": { "total": 24, "passed": 24, "failed": 0 },
+    "PC-AI.Hardware": { "total": 33, "passed": 33, "failed": 0 },
+    "PC-AI.LLM": { "total": 28, "passed": 28, "failed": 0 },
+    "PC-AI.Cleanup": { "total": 26, "passed": 26, "failed": 0 },
+    "PC-AI.Performance": { "total": 22, "passed": 19, "failed": 3 },
+    "PC-AI.Virtualization": { "total": "TBD", "passed": "TBD", "failed": "TBD" }
   }
 }
