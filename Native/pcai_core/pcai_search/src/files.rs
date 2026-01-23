@@ -1,0 +1,384 @@
+//! Fast file search with glob pattern matching.
+//!
+//! Uses `ignore` crate for parallel directory walking and `globset` for
+//! efficient pattern matching.
+
+use std::ffi::CStr;
+use std::os::raw::c_char;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
+use std::time::Instant;
+
+use globset::{Glob, GlobMatcher};
+use ignore::WalkBuilder;
+use serde::{Deserialize, Serialize};
+
+use pcai_core_lib::path::parse_path_ffi;
+use pcai_core_lib::string::{json_to_buffer, PcaiStringBuffer};
+use pcai_core_lib::PcaiStatus;
+
+/// Statistics returned by file search operations.
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Default)]
+pub struct FileSearchStats {
+    /// Operation status
+    pub status: PcaiStatus,
+    /// Total files scanned
+    pub files_scanned: u64,
+    /// Number of files matched
+    pub files_matched: u64,
+    /// Total size of matched files in bytes
+    pub total_size: u64,
+    /// Elapsed time in milliseconds
+    pub elapsed_ms: u64,
+}
+
+impl FileSearchStats {
+    fn error(status: PcaiStatus) -> Self {
+        Self {
+            status,
+            ..Default::default()
+        }
+    }
+}
+
+/// Information about a found file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FoundFile {
+    /// Full path to the file
+    pub path: String,
+    /// File size in bytes
+    pub size: u64,
+    /// Last modified timestamp (Unix epoch seconds)
+    pub modified: u64,
+    /// Whether the file is read-only
+    pub readonly: bool,
+}
+
+/// Complete result of a file search operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileSearchResult {
+    /// Operation status (as string for JSON)
+    pub status: String,
+    /// Pattern used for search
+    pub pattern: String,
+    /// Total files scanned
+    pub files_scanned: u64,
+    /// Number of files matched
+    pub files_matched: u64,
+    /// Total size of matched files
+    pub total_size: u64,
+    /// Elapsed time in milliseconds
+    pub elapsed_ms: u64,
+    /// Matched files (may be truncated by max_results)
+    pub files: Vec<FoundFile>,
+    /// Whether results were truncated
+    pub truncated: bool,
+}
+
+/// Configuration for file search.
+struct FileSearchConfig {
+    root_path: PathBuf,
+    pattern: String,
+    matcher: GlobMatcher,
+    max_results: u64,
+}
+
+impl FileSearchConfig {
+    fn from_ffi(
+        root_path: *const c_char,
+        pattern: *const c_char,
+        max_results: u64,
+    ) -> Result<Self, PcaiStatus> {
+        // Parse root path with cross-platform normalization
+        let root = parse_path_ffi(root_path)?;
+
+        if !root.exists() {
+            return Err(PcaiStatus::PathNotFound);
+        }
+
+        // Parse pattern (required)
+        if pattern.is_null() {
+            return Err(PcaiStatus::NullPointer);
+        }
+
+        let c_str = unsafe { CStr::from_ptr(pattern) };
+        let pattern_str = c_str.to_str().map_err(|_| PcaiStatus::InvalidUtf8)?;
+
+        if pattern_str.is_empty() {
+            return Err(PcaiStatus::InvalidArgument);
+        }
+
+        let glob = Glob::new(pattern_str).map_err(|_| PcaiStatus::InvalidArgument)?;
+
+        Ok(Self {
+            root_path: root,
+            pattern: pattern_str.to_string(),
+            matcher: glob.compile_matcher(),
+            max_results,
+        })
+    }
+}
+
+/// Searches for files matching the pattern.
+fn find_files_impl(config: &FileSearchConfig) -> FileSearchResult {
+    let start = Instant::now();
+    let files_scanned = AtomicU64::new(0);
+    let files_matched = AtomicU64::new(0);
+    let total_size = AtomicU64::new(0);
+    let found_files: Mutex<Vec<FoundFile>> = Mutex::new(Vec::new());
+    let truncated = AtomicBool::new(false);
+
+    let walker = WalkBuilder::new(&config.root_path)
+        .hidden(false)
+        .git_ignore(false)
+        .threads(num_cpus::get())
+        .build_parallel();
+
+    walker.run(|| {
+        Box::new(|entry| {
+            if let Ok(entry) = entry {
+                if let Ok(metadata) = entry.metadata() {
+                    if metadata.is_file() {
+                        files_scanned.fetch_add(1, Ordering::Relaxed);
+
+                        let path = entry.path();
+
+                        // Check if pattern matches
+                        if config.matcher.is_match(path)
+                            || config
+                                .matcher
+                                .is_match(path.file_name().unwrap_or_default())
+                        {
+                            // Check if we've hit max results
+                            let current = files_matched.fetch_add(1, Ordering::Relaxed);
+                            if config.max_results > 0 && current >= config.max_results {
+                                truncated.store(true, Ordering::Relaxed);
+                                return ignore::WalkState::Continue;
+                            }
+
+                            let size = metadata.len();
+                            total_size.fetch_add(size, Ordering::Relaxed);
+
+                            let modified = metadata
+                                .modified()
+                                .ok()
+                                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                                .map(|d| d.as_secs())
+                                .unwrap_or(0);
+
+                            let readonly = metadata.permissions().readonly();
+
+                            let file_info = FoundFile {
+                                path: path.to_string_lossy().into_owned(),
+                                size,
+                                modified,
+                                readonly,
+                            };
+
+                            found_files.lock().unwrap().push(file_info);
+                        }
+                    }
+                }
+            }
+            ignore::WalkState::Continue
+        })
+    });
+
+    let elapsed = start.elapsed();
+    // Recover data even if mutex was poisoned (thread panicked)
+    let mut files = found_files.into_inner().unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    // Sort by path for consistent output
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+
+    FileSearchResult {
+        status: "Success".to_string(),
+        pattern: config.pattern.clone(),
+        files_scanned: files_scanned.load(Ordering::Relaxed),
+        files_matched: files_matched.load(Ordering::Relaxed),
+        total_size: total_size.load(Ordering::Relaxed),
+        elapsed_ms: elapsed.as_millis() as u64,
+        files,
+        truncated: truncated.load(Ordering::Relaxed),
+    }
+}
+
+/// Returns only statistics without the file list.
+fn find_files_stats_impl(config: &FileSearchConfig) -> FileSearchStats {
+    // For stats-only, we still need to scan but don't store files
+    let start = Instant::now();
+    let files_scanned = AtomicU64::new(0);
+    let files_matched = AtomicU64::new(0);
+    let total_size = AtomicU64::new(0);
+
+    let walker = WalkBuilder::new(&config.root_path)
+        .hidden(false)
+        .git_ignore(false)
+        .threads(num_cpus::get())
+        .build_parallel();
+
+    walker.run(|| {
+        Box::new(|entry| {
+            if let Ok(entry) = entry {
+                if let Ok(metadata) = entry.metadata() {
+                    if metadata.is_file() {
+                        files_scanned.fetch_add(1, Ordering::Relaxed);
+
+                        let path = entry.path();
+
+                        if config.matcher.is_match(path)
+                            || config
+                                .matcher
+                                .is_match(path.file_name().unwrap_or_default())
+                        {
+                            files_matched.fetch_add(1, Ordering::Relaxed);
+                            total_size.fetch_add(metadata.len(), Ordering::Relaxed);
+                        }
+                    }
+                }
+            }
+            ignore::WalkState::Continue
+        })
+    });
+
+    let elapsed = start.elapsed();
+
+    FileSearchStats {
+        status: PcaiStatus::Success,
+        files_scanned: files_scanned.load(Ordering::Relaxed),
+        files_matched: files_matched.load(Ordering::Relaxed),
+        total_size: total_size.load(Ordering::Relaxed),
+        elapsed_ms: elapsed.as_millis() as u64,
+    }
+}
+
+// ============================================================================
+// FFI Entry Points
+// ============================================================================
+
+/// FFI entry point for file search with full JSON result.
+pub fn find_files_ffi(
+    root_path: *const c_char,
+    pattern: *const c_char,
+    max_results: u64,
+) -> PcaiStringBuffer {
+    match FileSearchConfig::from_ffi(root_path, pattern, max_results) {
+        Ok(config) => {
+            let result = find_files_impl(&config);
+            json_to_buffer(&result)
+        }
+        Err(status) => PcaiStringBuffer::error(status),
+    }
+}
+
+/// FFI entry point for file search with stats only.
+pub fn find_files_stats_ffi(
+    root_path: *const c_char,
+    pattern: *const c_char,
+    max_results: u64,
+) -> FileSearchStats {
+    match FileSearchConfig::from_ffi(root_path, pattern, max_results) {
+        Ok(config) => find_files_stats_impl(&config),
+        Err(status) => FileSearchStats::error(status),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn create_test_dir() -> TempDir {
+        let dir = TempDir::new().unwrap();
+
+        fs::write(dir.path().join("file1.txt"), "content 1").unwrap();
+        fs::write(dir.path().join("file2.txt"), "content 2").unwrap();
+        fs::write(dir.path().join("data.json"), "{}").unwrap();
+        fs::write(dir.path().join("readme.md"), "# Title").unwrap();
+
+        let subdir = dir.path().join("subdir");
+        fs::create_dir(&subdir).unwrap();
+        fs::write(subdir.join("nested.txt"), "nested").unwrap();
+        fs::write(subdir.join("config.json"), "{}").unwrap();
+
+        dir
+    }
+
+    #[test]
+    fn test_find_files_txt() {
+        let dir = create_test_dir();
+
+        let glob = Glob::new("*.txt").unwrap();
+        let config = FileSearchConfig {
+            root_path: dir.path().to_path_buf(),
+            pattern: "*.txt".to_string(),
+            matcher: glob.compile_matcher(),
+            max_results: 0,
+        };
+
+        let result = find_files_impl(&config);
+
+        assert_eq!(result.status, "Success");
+        assert_eq!(result.files_matched, 3); // file1.txt, file2.txt, nested.txt
+        assert!(!result.truncated);
+    }
+
+    #[test]
+    fn test_find_files_json() {
+        let dir = create_test_dir();
+
+        let glob = Glob::new("**/*.json").unwrap();
+        let config = FileSearchConfig {
+            root_path: dir.path().to_path_buf(),
+            pattern: "**/*.json".to_string(),
+            matcher: glob.compile_matcher(),
+            max_results: 0,
+        };
+
+        let result = find_files_impl(&config);
+
+        assert_eq!(result.status, "Success");
+        assert_eq!(result.files_matched, 2); // data.json, config.json
+    }
+
+    #[test]
+    fn test_find_files_max_results() {
+        let dir = create_test_dir();
+
+        let glob = Glob::new("*").unwrap();
+        let config = FileSearchConfig {
+            root_path: dir.path().to_path_buf(),
+            pattern: "*".to_string(),
+            matcher: glob.compile_matcher(),
+            max_results: 2,
+        };
+
+        let result = find_files_impl(&config);
+
+        assert_eq!(result.status, "Success");
+        assert!(result.files.len() <= 2);
+        // Note: truncated may or may not be true depending on race conditions
+    }
+
+    #[test]
+    fn test_find_files_stats() {
+        let dir = create_test_dir();
+
+        let glob = Glob::new("*.txt").unwrap();
+        let config = FileSearchConfig {
+            root_path: dir.path().to_path_buf(),
+            pattern: "*.txt".to_string(),
+            matcher: glob.compile_matcher(),
+            max_results: 0,
+        };
+
+        let stats = find_files_stats_impl(&config);
+
+        assert!(stats.status.is_success());
+        assert_eq!(stats.files_matched, 3);
+        assert!(stats.total_size > 0);
+    }
+}
