@@ -77,12 +77,14 @@ function Invoke-PCDiagnosis {
     begin {
         Write-Verbose "Initializing PC diagnosis analysis..."
 
-        # Get module root directory (go up from Public folder)
-        $moduleRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        # Get project root directory (go up from Public -> PC-AI.LLM -> Modules -> PC_AI)
+        $projectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 
-        # Paths to system prompts
-        $diagnosePromptPath = Join-Path -Path $moduleRoot -ChildPath 'DIAGNOSE.md'
-        $diagnoseLogicPath = Join-Path -Path $moduleRoot -ChildPath 'DIAGNOSE_LOGIC.md'
+        # Paths to system prompts in project root
+        $diagnosePromptPath = Join-Path -Path $projectRoot -ChildPath 'DIAGNOSE.md'
+        $diagnoseLogicPath = Join-Path -Path $projectRoot -ChildPath 'DIAGNOSE_LOGIC.md'
+
+        Write-Verbose "Looking for DIAGNOSE.md at: $diagnosePromptPath"
 
         # Load system prompts
         if (-not (Test-Path $diagnosePromptPath)) {
@@ -94,8 +96,8 @@ function Invoke-PCDiagnosis {
         }
 
         Write-Verbose "Loading system prompts..."
-        $diagnosePrompt = Get-Content -Path $diagnosePromptPath -Raw -Encoding UTF8
-        $diagnoseLogic = Get-Content -Path $diagnoseLogicPath -Raw -Encoding UTF8
+        $diagnosePrompt = Get-Content -Path $diagnosePromptPath -Raw -Encoding utf8
+        $diagnoseLogic = Get-Content -Path $diagnoseLogicPath -Raw -Encoding utf8
 
         # Combine into system prompt
         $systemPrompt = @"
@@ -135,7 +137,7 @@ Be concise, technical, and safety-conscious. Warn about destructive operations.
         # Load diagnostic report
         $diagnosticText = if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
             Write-Verbose "Loading diagnostic report from file: $DiagnosticReportPath"
-            Get-Content -Path $DiagnosticReportPath -Raw -Encoding UTF8
+            Get-Content -Path $DiagnosticReportPath -Raw -Encoding utf8
         }
         else {
             Write-Verbose "Using diagnostic report from text parameter"
@@ -220,7 +222,7 @@ $("-" * 80)
 Analysis completed at $($endTime.ToString('yyyy-MM-dd HH:mm:ss'))
 "@
 
-                $reportContent | Out-File -FilePath $OutputPath -Encoding UTF8 -Force
+                [System.IO.File]::WriteAllText($OutputPath, $reportContent, [System.Text.Encoding]::UTF8)
                 Write-Host "`nAnalysis report saved to: $OutputPath" -ForegroundColor Cyan
 
                 $result | Add-Member -MemberType NoteProperty -Name 'ReportSavedTo' -Value $OutputPath

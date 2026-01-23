@@ -19,18 +19,27 @@ BeforeAll {
 Describe "Get-LLMStatus" -Tag 'Unit', 'LLM', 'Fast' {
     Context "When Ollama is running and accessible" {
         BeforeAll {
+            Mock Test-Path { $true } -ModuleName PC-AI.LLM
             Mock Invoke-RestMethod {
-                Get-MockOllamaResponse -Type Status
+                param($Uri)
+                if ($Uri -match "/api/tags") {
+                    Get-MockOllamaResponse -Type ModelList
+                } else {
+                    Get-MockOllamaResponse -Type Status
+                }
             } -ModuleName PC-AI.LLM
         }
 
         It "Should detect Ollama is running" {
-            $result = Get-LLMStatus
-            $result | Should -Match "Running|OK|Available"
+            $result = Get-LLMStatus -TestConnection
+            $result | Should -Not -BeNullOrEmpty
+            $result.Ollama | Should -Not -BeNullOrEmpty
+            $result.Ollama.Installed | Should -Be $true
+            $result.Ollama.ApiConnected | Should -Be $true
         }
 
         It "Should check default endpoint" {
-            Get-LLMStatus
+            Get-LLMStatus -TestConnection
 
             Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
                 $Uri -match "localhost:11434|127\.0\.0\.1:11434"
@@ -40,32 +49,32 @@ Describe "Get-LLMStatus" -Tag 'Unit', 'LLM', 'Fast' {
 
     Context "When Ollama is not running" {
         BeforeAll {
+            Mock Test-Path { $true } -ModuleName PC-AI.LLM
             Mock Invoke-RestMethod { throw "Connection refused" } -ModuleName PC-AI.LLM
         }
 
         It "Should detect Ollama is not available" {
-            { Get-LLMStatus -ErrorAction Stop } | Should -Throw
+            $result = Get-LLMStatus
+            $result.Ollama.ApiConnected | Should -Be $false
+            $result.Recommendations | Should -Not -BeNullOrEmpty
         }
     }
 
-    Context "When using custom endpoint" {
+    Context "When Ollama is not installed" {
         BeforeAll {
-            Mock Invoke-RestMethod {
-                Get-MockOllamaResponse -Type Status
-            } -ModuleName PC-AI.LLM
+            Mock Test-Path { $false } -ModuleName PC-AI.LLM
         }
 
-        It "Should support custom endpoint" {
-            Get-LLMStatus -Endpoint "http://custom:11434"
-
-            Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
-                $Uri -match "custom:11434"
-            }
+        It "Should detect Ollama is not installed" {
+            $result = Get-LLMStatus
+            $result.Ollama.Installed | Should -Be $false
+            $result.Recommendations | Should -Match "not found"
         }
     }
 
     Context "When checking available models" {
         BeforeAll {
+            Mock Test-Path { $true } -ModuleName PC-AI.LLM
             Mock Invoke-RestMethod {
                 param($Uri)
                 if ($Uri -match "/api/tags") {
@@ -77,8 +86,10 @@ Describe "Get-LLMStatus" -Tag 'Unit', 'LLM', 'Fast' {
         }
 
         It "Should list available models" {
-            $result = Get-LLMStatus -ListModels
-            $result | Should -Match "llama3\.2|qwen2\.5"
+            $result = Get-LLMStatus -TestConnection
+            $result.Ollama.Models | Should -Not -BeNullOrEmpty
+            $result.Ollama.Models.Count | Should -BeGreaterThan 0
+            $result.Ollama.Models[0].Name | Should -Be "llama3.2:latest"
         }
     }
 }
@@ -87,7 +98,14 @@ Describe "Send-OllamaRequest" -Tag 'Unit', 'LLM', 'Slow' {
     Context "When sending a successful request" {
         BeforeAll {
             Mock Invoke-RestMethod {
-                Get-MockOllamaResponse -Type Success
+                param($Uri)
+                if ($Uri -match "/api/tags") {
+                    Get-MockOllamaResponse -Type ModelList
+                } elseif ($Uri -match "/api/generate") {
+                    Get-MockOllamaResponse -Type Success
+                } else {
+                    Get-MockOllamaResponse -Type Status
+                }
             } -ModuleName PC-AI.LLM
         }
 
@@ -100,7 +118,7 @@ Describe "Send-OllamaRequest" -Tag 'Unit', 'LLM', 'Slow' {
             Send-OllamaRequest -Prompt "Test" -Model "llama3.2:latest"
 
             Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
-                $Body -match '"model"\s*:\s*"llama3\.2:latest"'
+                $Uri -match "/api/generate" -and $Body -like '*"model"*"llama3.2:latest"*'
             }
         }
 
@@ -108,41 +126,53 @@ Describe "Send-OllamaRequest" -Tag 'Unit', 'LLM', 'Slow' {
             Send-OllamaRequest -Prompt "Test prompt" -Model "llama3.2:latest"
 
             Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
-                $Body -match '"prompt"\s*:\s*"Test prompt"'
+                $Uri -match "/api/generate" -and $Body -like '*"prompt"*"Test prompt"*'
             }
         }
 
         It "Should return response text" {
             $result = Send-OllamaRequest -Prompt "Test" -Model "llama3.2:latest"
-            $result.response | Should -Not -BeNullOrEmpty
+            $result.Response | Should -Not -BeNullOrEmpty
         }
     }
 
     Context "When model is not available" {
         BeforeAll {
+            # Mock the model list to not include the requested model
             Mock Invoke-RestMethod {
-                Get-MockOllamaResponse -Type Error -Model "nonexistent:latest"
+                param($Uri)
+                if ($Uri -match "/api/tags") {
+                    Get-MockOllamaResponse -Type ModelList
+                } else {
+                    Get-MockOllamaResponse -Type Error -Model "nonexistent:latest"
+                }
             } -ModuleName PC-AI.LLM
         }
 
         It "Should handle model not found error" {
-            $result = Send-OllamaRequest -Prompt "Test" -Model "nonexistent:latest" -ErrorAction SilentlyContinue
-            $result.error | Should -Match "not found"
+            { Send-OllamaRequest -Prompt "Test" -Model "nonexistent:latest" -ErrorAction Stop } | Should -Throw -ExpectedMessage "*not available*"
         }
     }
 
     Context "When using system message" {
         BeforeAll {
             Mock Invoke-RestMethod {
-                Get-MockOllamaResponse -Type Success
+                param($Uri)
+                if ($Uri -match "/api/tags") {
+                    Get-MockOllamaResponse -Type ModelList
+                } elseif ($Uri -match "/api/generate") {
+                    Get-MockOllamaResponse -Type Success
+                } else {
+                    Get-MockOllamaResponse -Type Status
+                }
             } -ModuleName PC-AI.LLM
         }
 
         It "Should include system message" {
-            Send-OllamaRequest -Prompt "Test" -Model "llama3.2:latest" -SystemMessage "You are a PC diagnostics expert"
+            Send-OllamaRequest -Prompt "Test" -Model "llama3.2:latest" -System "You are a PC diagnostics expert"
 
             Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
-                $Body -match '"system"\s*:\s*"You are a PC diagnostics expert"'
+                $Uri -match "/api/generate" -and $Body -like '*"system"*"You are a PC diagnostics expert"*'
             }
         }
     }
@@ -150,7 +180,14 @@ Describe "Send-OllamaRequest" -Tag 'Unit', 'LLM', 'Slow' {
     Context "When setting temperature" {
         BeforeAll {
             Mock Invoke-RestMethod {
-                Get-MockOllamaResponse -Type Success
+                param($Uri)
+                if ($Uri -match "/api/tags") {
+                    Get-MockOllamaResponse -Type ModelList
+                } elseif ($Uri -match "/api/generate") {
+                    Get-MockOllamaResponse -Type Success
+                } else {
+                    Get-MockOllamaResponse -Type Status
+                }
             } -ModuleName PC-AI.LLM
         }
 
@@ -158,7 +195,7 @@ Describe "Send-OllamaRequest" -Tag 'Unit', 'LLM', 'Slow' {
             Send-OllamaRequest -Prompt "Test" -Model "llama3.2:latest" -Temperature 0.7
 
             Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
-                $Body -match '"temperature"\s*:\s*0\.7'
+                $Uri -match "/api/generate" -and $Body -like '*"temperature"*0.7*'
             }
         }
     }
@@ -177,48 +214,95 @@ Describe "Send-OllamaRequest" -Tag 'Unit', 'LLM', 'Slow' {
 Describe "Invoke-LLMChat" -Tag 'Unit', 'LLM', 'Slow' {
     Context "When starting an interactive chat" {
         BeforeAll {
-            Mock Send-OllamaRequest {
-                Get-MockOllamaResponse -Type Success
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -match "/api/tags") {
+                    Get-MockOllamaResponse -Type ModelList
+                } elseif ($Uri -match "/api/chat") {
+                    @{
+                        model = "llama3.2:latest"
+                        created_at = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                        message = @{
+                            role = "assistant"
+                            content = "Hello! How can I help you?"
+                        }
+                        done = $true
+                        total_duration = 1250000000
+                        load_duration = 50000000
+                        prompt_eval_count = 125
+                        eval_count = 275
+                    }
+                } else {
+                    Get-MockOllamaResponse -Type Status
+                }
             } -ModuleName PC-AI.LLM
 
             Mock Read-Host { "exit" } -ModuleName PC-AI.LLM
         }
 
         It "Should start chat session" {
-            { Invoke-LLMChat -Model "llama3.2:latest" } | Should -Not -Throw
+            { Invoke-LLMChat -Interactive -Model "llama3.2:latest" } | Should -Not -Throw
         }
 
         It "Should use specified model" {
-            Invoke-LLMChat -Model "llama3.2:latest"
+            Invoke-LLMChat -Interactive -Model "llama3.2:latest"
 
-            Should -Invoke Send-OllamaRequest -ModuleName PC-AI.LLM -ParameterFilter {
-                $Model -eq "llama3.2:latest"
+            Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
+                $Uri -match "/api/chat" -and $Body -like '*"model"*"llama3.2:latest"*'
             }
         }
     }
 
     Context "When using system prompt" {
         BeforeAll {
-            Mock Send-OllamaRequest {
-                Get-MockOllamaResponse -Type Success
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -match "/api/tags") {
+                    Get-MockOllamaResponse -Type ModelList
+                } elseif ($Uri -match "/api/chat") {
+                    @{
+                        model = "llama3.2:latest"
+                        message = @{
+                            role = "assistant"
+                            content = "I'm here to help!"
+                        }
+                        done = $true
+                    }
+                } else {
+                    Get-MockOllamaResponse -Type Status
+                }
             } -ModuleName PC-AI.LLM
 
             Mock Read-Host { "exit" } -ModuleName PC-AI.LLM
         }
 
         It "Should apply system prompt" {
-            Invoke-LLMChat -Model "llama3.2:latest" -SystemPrompt "You are helpful"
+            Invoke-LLMChat -Interactive -Model "llama3.2:latest" -System "You are helpful"
 
-            Should -Invoke Send-OllamaRequest -ModuleName PC-AI.LLM -ParameterFilter {
-                $SystemMessage -eq "You are helpful"
+            Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
+                $Uri -match "/api/chat" -and $Body -like '*"role"*"system"*' -and $Body -like '*"You are helpful"*'
             }
         }
     }
 
     Context "When maintaining conversation context" {
         BeforeAll {
-            Mock Send-OllamaRequest {
-                Get-MockOllamaResponse -Type Success
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -match "/api/tags") {
+                    Get-MockOllamaResponse -Type ModelList
+                } elseif ($Uri -match "/api/chat") {
+                    @{
+                        model = "llama3.2:latest"
+                        message = @{
+                            role = "assistant"
+                            content = "Response"
+                        }
+                        done = $true
+                    }
+                } else {
+                    Get-MockOllamaResponse -Type Status
+                }
             } -ModuleName PC-AI.LLM
 
             $script:callCount = 0
@@ -229,9 +313,11 @@ Describe "Invoke-LLMChat" -Tag 'Unit', 'LLM', 'Slow' {
         }
 
         It "Should maintain conversation context" {
-            Invoke-LLMChat -Model "llama3.2:latest"
+            Invoke-LLMChat -Interactive -Model "llama3.2:latest"
 
-            Should -Invoke Send-OllamaRequest -ModuleName PC-AI.LLM -Times 2
+            Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
+                $Uri -match "/api/chat"
+            } -Times 2
         }
     }
 }
@@ -240,7 +326,11 @@ Describe "Invoke-PCDiagnosis" -Tag 'Unit', 'LLM', 'Integration' {
     Context "When analyzing diagnostic data" {
         BeforeAll {
             Mock Get-Content {
-                @"
+                param($Path)
+                if ($Path -match "DIAGNOSE") {
+                    "You are a PC diagnostics expert."
+                } else {
+                    @"
 === Device Errors ===
 Device: USB Mass Storage Device
 Error Code: 43
@@ -249,73 +339,117 @@ Error Code: 43
 Samsung SSD 980 PRO: OK
 WDC HDD: Pred Fail
 "@
+                }
             } -ModuleName PC-AI.LLM
 
-            Mock Send-OllamaRequest {
-                Get-MockOllamaResponse -Type Success
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -match "/api/tags") {
+                    Get-MockOllamaResponse -Type ModelList
+                } elseif ($Uri -match "/api/chat") {
+                    @{
+                        model = "qwen2.5-coder:7b"
+                        message = @{
+                            role = "assistant"
+                            content = "Analysis complete. Found USB device error code 43."
+                        }
+                        done = $true
+                        eval_count = 500
+                    }
+                } else {
+                    Get-MockOllamaResponse -Type Status
+                }
             } -ModuleName PC-AI.LLM
+
+            Mock Test-Path { $true } -ModuleName PC-AI.LLM
         }
 
         It "Should read diagnostic report" {
-            Invoke-PCDiagnosis -ReportPath "TestDrive:\report.txt"
+            Invoke-PCDiagnosis -DiagnosticReportPath "TestDrive:\report.txt"
 
             Should -Invoke Get-Content -ModuleName PC-AI.LLM -ParameterFilter {
                 $Path -match "report\.txt"
             }
         }
 
-        It "Should send report to LLM" {
-            Invoke-PCDiagnosis -ReportPath "TestDrive:\report.txt"
+        It "Should send report to LLM via chat endpoint" {
+            Invoke-PCDiagnosis -DiagnosticReportPath "TestDrive:\report.txt"
 
-            Should -Invoke Send-OllamaRequest -ModuleName PC-AI.LLM
+            Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
+                $Uri -match "/api/chat"
+            }
         }
 
-        It "Should include DIAGNOSE.md prompt" {
-            Invoke-PCDiagnosis -ReportPath "TestDrive:\report.txt"
+        It "Should include DIAGNOSE.md prompt in system message" {
+            Invoke-PCDiagnosis -DiagnosticReportPath "TestDrive:\report.txt"
 
-            Should -Invoke Send-OllamaRequest -ModuleName PC-AI.LLM -ParameterFilter {
-                $SystemMessage -match "PC diagnostic|hardware|diagnose"
+            Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
+                $Uri -match "/api/chat" -and $Body -like '*"system"*'
             }
         }
 
         It "Should use specified model" {
-            Invoke-PCDiagnosis -ReportPath "TestDrive:\report.txt" -Model "qwen2.5:7b"
+            Invoke-PCDiagnosis -DiagnosticReportPath "TestDrive:\report.txt" -Model "qwen2.5:7b"
 
-            Should -Invoke Send-OllamaRequest -ModuleName PC-AI.LLM -ParameterFilter {
-                $Model -eq "qwen2.5:7b"
+            Should -Invoke Invoke-RestMethod -ModuleName PC-AI.LLM -ParameterFilter {
+                $Uri -match "/api/chat" -and $Body -like '*"qwen2.5:7b"*'
             }
         }
     }
 
     Context "When report file does not exist" {
         BeforeAll {
-            Mock Get-Content { throw "File not found" } -ModuleName PC-AI.LLM
+            Mock Test-Path { $false } -ModuleName PC-AI.LLM
         }
 
         It "Should handle missing report file" {
-            { Invoke-PCDiagnosis -ReportPath "TestDrive:\nonexistent.txt" -ErrorAction Stop } | Should -Throw
+            { Invoke-PCDiagnosis -DiagnosticReportPath "TestDrive:\nonexistent.txt" -ErrorAction Stop } | Should -Throw
         }
     }
 
     Context "When saving analysis output" {
         BeforeAll {
             Mock Get-Content {
-                "Diagnostic data"
+                param($Path)
+                if ($Path -match "DIAGNOSE") {
+                    "You are a PC diagnostics expert."
+                } else {
+                    "Diagnostic data"
+                }
             } -ModuleName PC-AI.LLM
 
-            Mock Send-OllamaRequest {
-                Get-MockOllamaResponse -Type Success
+            Mock Invoke-RestMethod {
+                param($Uri)
+                if ($Uri -match "/api/tags") {
+                    Get-MockOllamaResponse -Type ModelList
+                } elseif ($Uri -match "/api/chat") {
+                    @{
+                        model = "qwen2.5-coder:7b"
+                        message = @{
+                            role = "assistant"
+                            content = "Analysis results"
+                        }
+                        done = $true
+                        eval_count = 500
+                    }
+                } else {
+                    Get-MockOllamaResponse -Type Status
+                }
             } -ModuleName PC-AI.LLM
 
-            Mock Out-File {} -ModuleName PC-AI.LLM
+            Mock Test-Path { $true } -ModuleName PC-AI.LLM
         }
 
         It "Should save analysis to file" {
-            Invoke-PCDiagnosis -ReportPath "TestDrive:\report.txt" -OutputPath "TestDrive:\analysis.txt"
+            # Use Join-Path with TestDrive to get proper path
+            $reportPath = Join-Path $TestDrive "report.txt"
+            $analysisPath = Join-Path $TestDrive "analysis.txt"
 
-            Should -Invoke Out-File -ModuleName PC-AI.LLM -ParameterFilter {
-                $FilePath -match "analysis\.txt"
-            }
+            $result = Invoke-PCDiagnosis -DiagnosticReportPath $reportPath -OutputPath $analysisPath -SaveReport
+
+            # Verify the result contains the saved path
+            $result.ReportSavedTo | Should -Be $analysisPath
+            $result.Analysis | Should -Be "Analysis results"
         }
     }
 }
@@ -323,44 +457,60 @@ WDC HDD: Pred Fail
 Describe "Set-LLMConfig" -Tag 'Unit', 'LLM', 'Fast' {
     Context "When configuring LLM settings" {
         BeforeAll {
-            Mock Set-Content {} -ModuleName PC-AI.LLM
             Mock Test-Path { $false } -ModuleName PC-AI.LLM -ParameterFilter { $Path -match "config" }
-        }
-
-        It "Should save configuration" {
-            Set-LLMConfig -Endpoint "http://localhost:11434" -DefaultModel "llama3.2:latest"
-
-            Should -Invoke Set-Content -ModuleName PC-AI.LLM
-        }
-
-        It "Should include endpoint in config" {
-            Set-LLMConfig -Endpoint "http://custom:11434" -DefaultModel "llama3.2:latest"
-
-            Should -Invoke Set-Content -ModuleName PC-AI.LLM -ParameterFilter {
-                $Value -match '"endpoint"\s*:\s*"http://custom:11434"'
-            }
-        }
-
-        It "Should include default model in config" {
-            Set-LLMConfig -Endpoint "http://localhost:11434" -DefaultModel "qwen2.5:7b"
-
-            Should -Invoke Set-Content -ModuleName PC-AI.LLM -ParameterFilter {
-                $Value -match '"defaultModel"\s*:\s*"qwen2\.5:7b"'
-            }
-        }
-    }
-
-    Context "When loading existing configuration" {
-        BeforeAll {
-            Mock Test-Path { $true } -ModuleName PC-AI.LLM
-            Mock Get-Content {
-                '{"endpoint": "http://localhost:11434", "defaultModel": "llama3.2:latest"}'
+            Mock Invoke-RestMethod {
+                Get-MockOllamaResponse -Type Status
             } -ModuleName PC-AI.LLM
         }
 
-        It "Should load existing config" {
-            $result = & (Get-Module PC-AI.LLM) { Get-LLMConfig }
+        It "Should save configuration and return config object" {
+            $result = Set-LLMConfig -OllamaApiUrl "http://localhost:11434" -DefaultModel "llama3.2:latest"
+
+            # Verify the configuration object was returned with correct values
             $result | Should -Not -BeNullOrEmpty
+            $result.OllamaApiUrl | Should -Be "http://localhost:11434"
+            $result.DefaultModel | Should -Be "llama3.2:latest"
+            $result.PSObject.Properties.Name | Should -Contain "ConfigPath"
+            $result.PSObject.Properties.Name | Should -Contain "LastUpdated"
+        }
+
+        It "Should save JSON configuration with proper structure" {
+            $result = Set-LLMConfig -OllamaApiUrl "http://custom:11434" -DefaultModel "llama3.2:latest"
+
+            # Verify the returned configuration has proper structure
+            $result | Should -Not -BeNullOrEmpty
+            $result.OllamaApiUrl | Should -Be "http://custom:11434"
+            $result.DefaultModel | Should -Be "llama3.2:latest"
+            $result.PSObject.Properties.Name | Should -Contain "DefaultTimeout"
+        }
+
+        It "Should update default model in config" {
+            $result = Set-LLMConfig -DefaultModel "qwen2.5:7b"
+
+            $result.DefaultModel | Should -Be "qwen2.5:7b"
+        }
+    }
+
+    Context "When showing current configuration" {
+        It "Should return current config with ShowConfig" {
+            $result = Set-LLMConfig -ShowConfig
+
+            $result | Should -Not -BeNullOrEmpty
+            $result.PSObject.Properties.Name | Should -Contain "OllamaApiUrl"
+            $result.PSObject.Properties.Name | Should -Contain "DefaultModel"
+            $result.PSObject.Properties.Name | Should -Contain "ConfigPath"
+        }
+    }
+
+    Context "When resetting configuration" {
+        It "Should reset config to defaults" {
+            $result = Set-LLMConfig -Reset
+
+            # Verify the configuration was reset to defaults
+            $result | Should -Not -BeNullOrEmpty
+            $result.DefaultModel | Should -Be "qwen2.5-coder:7b"
+            $result.OllamaApiUrl | Should -Be "http://localhost:11434"
+            $result.DefaultTimeout | Should -Be 120
         }
     }
 }

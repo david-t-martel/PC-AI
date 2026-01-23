@@ -1,0 +1,8 @@
+﻿{
+    "DefaultTimeout":  120,
+    "LMStudioApiUrl":  "http://localhost:1234",
+    "ConfigPath":  "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\llm-config.json",
+    "DefaultModel":  "qwen2.5-coder:7b",
+    "OllamaApiUrl":  "http://localhost:11434",
+    "OllamaPath":  "C:\\Users\\david\\AppData\\Local\\Programs\\Ollama\\ollama.exe"
+}

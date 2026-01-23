@@ -104,7 +104,8 @@ function Set-LLMConfig {
 
             # Save to file
             try {
-                $script:ModuleConfig | ConvertTo-Json -Depth 10 | Out-File -FilePath $configPath -Encoding UTF8 -Force
+                $jsonContent = $script:ModuleConfig | ConvertTo-Json -Depth 10
+                [System.IO.File]::WriteAllText($configPath, $jsonContent, [System.Text.Encoding]::UTF8)
                 Write-Host "Configuration reset successfully" -ForegroundColor Green
             }
             catch {
@@ -172,7 +173,8 @@ function Set-LLMConfig {
             # Save configuration if anything was updated
             if ($updated) {
                 try {
-                    $script:ModuleConfig | ConvertTo-Json -Depth 10 | Out-File -FilePath $configPath -Encoding UTF8 -Force
+                    $jsonContent = $script:ModuleConfig | ConvertTo-Json -Depth 10
+                    [System.IO.File]::WriteAllText($configPath, $jsonContent, [System.Text.Encoding]::UTF8)
                     Write-Verbose "Configuration saved to: $configPath"
                 }
                 catch {
