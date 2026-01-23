@@ -49,9 +49,61 @@ Search-ContentFast -Path "C:\Scripts" -Pattern "function" -FilePattern "*.ps1"
 | **PC-AI.LLM** | Ollama/LM Studio integration for AI analysis |
 | **PC-AI.Acceleration** | Rust tools integration with PS7+ parallelism |
 
-## Acceleration Module
+## Native Acceleration (Rust DLL + C# Hybrid)
 
-The `PC-AI.Acceleration` module provides significant performance improvements by leveraging Rust CLI tools with automatic fallback to PowerShell:
+PC-AI includes a high-performance native layer built with Rust and C#:
+
+### Architecture
+
+```
+Rust DLLs (pcai_core_lib.dll, pcai_search.dll)
+         ↓
+C# P/Invoke Wrapper (PcaiNative.dll, .NET 8)
+         ↓
+PowerShell 7 Modules (PC-AI.Acceleration)
+         ↓
+Ollama LLM Analysis (qwen2.5-coder:7b)
+```
+
+### Native Operations
+
+| Operation | Speedup | Technology |
+|-----------|---------|------------|
+| Duplicate Detection | 5-10x | Parallel SHA-256 with rayon |
+| File Search | 5-10x | Parallel glob with ignore crate |
+| Content Search | 3-8x | Parallel regex matching |
+
+### Quick Start (Native)
+
+```powershell
+# Build native DLLs (requires Rust + .NET 8 SDK)
+.\Native\build.ps1
+
+# Run all tests (requires PowerShell 7)
+pwsh .\test-all.ps1 -Suite All
+
+# Use native duplicate detection
+Import-Module .\Modules\PC-AI.Acceleration\PC-AI.Acceleration.psd1
+Get-PcaiNativeStatus
+Invoke-PcaiNativeDuplicates -Path "D:\Downloads" -MinimumSize 1MB
+
+# Smart diagnosis with LLM
+Import-Module .\Modules\PC-AI.LLM\PC-AI.LLM.psd1
+Invoke-SmartDiagnosis -Path "C:\Temp" -AnalysisType Quick
+```
+
+### Test Results
+
+| Suite | Passed | Failed | Duration |
+|-------|--------|--------|----------|
+| Rust | 40 | 0 | ~1s |
+| Pester | 37 | 0 | ~7s |
+| Module | 199 | 0 | ~88s |
+| **Total** | **276** | **0** | **~98s** |
+
+## Rust CLI Tools Integration
+
+The `PC-AI.Acceleration` module also supports external Rust CLI tools with automatic fallback to PowerShell:
 
 ### Supported Rust Tools
 
@@ -66,9 +118,10 @@ The `PC-AI.Acceleration` module provides significant performance improvements by
 ### Performance Pattern
 
 All acceleration functions follow a consistent fallback:
-1. **Rust tool** (fastest) - if available
-2. **PS7+ parallel** - ForEach-Object -Parallel
-3. **Sequential PS** - compatible fallback
+1. **Native DLL** (fastest) - Rust via C# P/Invoke
+2. **Rust CLI tool** - if native DLLs unavailable
+3. **PS7+ parallel** - ForEach-Object -Parallel
+4. **Sequential PS** - compatible fallback
 
 ### Example: Content Search Performance
 
