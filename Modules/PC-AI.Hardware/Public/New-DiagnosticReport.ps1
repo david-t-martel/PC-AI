@@ -56,19 +56,49 @@ function New-DiagnosticReport {
     }
 
     Write-Verbose "Collecting device errors..."
-    $reportData.DeviceErrors = @(Get-DeviceErrors)
+    try {
+        $reportData.DeviceErrors = @(Get-DeviceErrors -ErrorAction Stop)
+    }
+    catch {
+        Write-Warning "Failed to collect device errors: $_"
+        $reportData.DeviceErrors = @()
+    }
 
     Write-Verbose "Collecting disk health..."
-    $reportData.DiskHealth = @(Get-DiskHealth)
+    try {
+        $reportData.DiskHealth = @(Get-DiskHealth -ErrorAction Stop)
+    }
+    catch {
+        Write-Warning "Failed to collect disk health: $_"
+        $reportData.DiskHealth = @()
+    }
 
     Write-Verbose "Collecting system events..."
-    $reportData.SystemEvents = @(Get-SystemEvents)
+    try {
+        $reportData.SystemEvents = @(Get-SystemEvents -ErrorAction Stop)
+    }
+    catch {
+        Write-Warning "Failed to collect system events: $_"
+        $reportData.SystemEvents = @()
+    }
 
     Write-Verbose "Collecting USB status..."
-    $reportData.UsbStatus = @(Get-UsbStatus)
+    try {
+        $reportData.UsbStatus = @(Get-UsbStatus -ErrorAction Stop)
+    }
+    catch {
+        Write-Warning "Failed to collect USB status: $_"
+        $reportData.UsbStatus = @()
+    }
 
     Write-Verbose "Collecting network adapters..."
-    $reportData.NetworkAdapters = @(Get-NetworkAdapters)
+    try {
+        $reportData.NetworkAdapters = @(Get-NetworkAdapters -ErrorAction Stop)
+    }
+    catch {
+        Write-Warning "Failed to collect network adapters: $_"
+        $reportData.NetworkAdapters = @()
+    }
 
     # Calculate summary counts
     $allItems = @(
@@ -91,7 +121,7 @@ function New-DiagnosticReport {
 
     if ($Format -eq 'json') {
         $json = $reportData | ConvertTo-Json -Depth 10
-        $json | Out-File -FilePath $OutputPath -Encoding UTF8 -Force
+        [System.IO.File]::WriteAllText($OutputPath, $json, [System.Text.Encoding]::UTF8)
         Write-Host "JSON report created: $OutputPath" -ForegroundColor Green
         return $OutputPath
     }
@@ -178,7 +208,8 @@ function New-DiagnosticReport {
 
     $report += "=== End of Report ==="
 
-    $report -join "`r`n" | Out-File -FilePath $OutputPath -Encoding UTF8 -Force
+    $reportText = $report -join "`r`n"
+    [System.IO.File]::WriteAllText($OutputPath, $reportText, [System.Text.Encoding]::UTF8)
 
     Write-Host ""
     Write-Host "Hardware diagnostics report created:" -ForegroundColor Cyan

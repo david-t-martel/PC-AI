@@ -189,7 +189,7 @@ function Backup-EnvironmentVariable {
     }
 
     try {
-        $value | Out-File -FilePath $BackupPath -Encoding UTF8 -Force -ErrorAction Stop
+        [System.IO.File]::WriteAllText($BackupPath, $value, [System.Text.Encoding]::UTF8)
         Write-CleanupLog -Message "Backed up $Name ($Target) to: $BackupPath" -Level Info
         return $BackupPath
     }

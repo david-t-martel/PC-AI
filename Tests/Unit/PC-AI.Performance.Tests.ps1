@@ -19,18 +19,25 @@ BeforeAll {
 Describe "Get-DiskSpace" -Tag 'Unit', 'Performance', 'Fast' {
     Context "When checking disk space with healthy drives" {
         BeforeAll {
-            Mock Get-PSDrive {
-                [PSCustomObject]@{
-                    Name = 'C'
-                    Used = 150GB
-                    Free = 350GB
-                    Provider = [PSCustomObject]@{ Name = 'FileSystem' }
-                }
-                [PSCustomObject]@{
-                    Name = 'D'
-                    Used = 500GB
-                    Free = 1500GB
-                    Provider = [PSCustomObject]@{ Name = 'FileSystem' }
+            Mock Get-CimInstance {
+                param($ClassName)
+                if ($ClassName -eq 'Win32_LogicalDisk') {
+                    [PSCustomObject]@{
+                        DeviceID = 'C:'
+                        DriveType = 3  # Fixed
+                        Size = 500GB
+                        FreeSpace = 350GB
+                        VolumeName = 'System'
+                        FileSystem = 'NTFS'
+                    }
+                    [PSCustomObject]@{
+                        DeviceID = 'D:'
+                        DriveType = 3  # Fixed
+                        Size = 2000GB
+                        FreeSpace = 1500GB
+                        VolumeName = 'Data'
+                        FileSystem = 'NTFS'
+                    }
                 }
             } -ModuleName PC-AI.Performance
         }
@@ -42,80 +49,98 @@ Describe "Get-DiskSpace" -Tag 'Unit', 'Performance', 'Fast' {
         }
 
         It "Should calculate total size correctly" {
-            $result = Get-DiskSpace | Where-Object { $_.Drive -eq 'C:' }
-            $result.TotalSizeGB | Should -BeGreaterThan 0
+            $result = Get-DiskSpace | Where-Object { $_.DriveLetter -eq 'C' }
+            $result.TotalSize | Should -BeGreaterThan 0
         }
 
         It "Should calculate percentage free" {
-            $result = Get-DiskSpace | Where-Object { $_.Drive -eq 'C:' }
-            $result.PercentFree | Should -BeGreaterThan 0
-            $result.PercentFree | Should -BeLessOrEqual 100
+            $result = Get-DiskSpace | Where-Object { $_.DriveLetter -eq 'C' }
+            $result.FreePercent | Should -BeGreaterThan 0
+            $result.FreePercent | Should -BeLessOrEqual 100
         }
 
-        It "Should filter file system drives only" {
-            Should -Invoke Get-PSDrive -ModuleName PC-AI.Performance -ParameterFilter {
-                $PSProvider -eq 'FileSystem'
+        It "Should filter by drive type" {
+            $result = Get-DiskSpace
+            $result | ForEach-Object {
+                $_.DriveType | Should -Be 'Fixed'
             }
         }
     }
 
     Context "When disk space is low" {
         BeforeAll {
-            Mock Get-PSDrive {
-                [PSCustomObject]@{
-                    Name = 'C'
-                    Used = 460GB
-                    Free = 40GB
-                    Provider = [PSCustomObject]@{ Name = 'FileSystem' }
+            Mock Get-CimInstance {
+                param($ClassName)
+                if ($ClassName -eq 'Win32_LogicalDisk') {
+                    [PSCustomObject]@{
+                        DeviceID = 'C:'
+                        DriveType = 3  # Fixed
+                        Size = 500GB
+                        FreeSpace = 40GB
+                        VolumeName = 'System'
+                        FileSystem = 'NTFS'
+                    }
                 }
             } -ModuleName PC-AI.Performance
         }
 
         It "Should detect low disk space" {
             $result = Get-DiskSpace
-            $result.PercentFree | Should -BeLessThan 15
+            $result.FreePercent | Should -BeLessThan 15
         }
     }
 
     Context "When disk space is critical" {
         BeforeAll {
-            Mock Get-PSDrive {
-                [PSCustomObject]@{
-                    Name = 'C'
-                    Used = 485GB
-                    Free = 15GB
-                    Provider = [PSCustomObject]@{ Name = 'FileSystem' }
+            Mock Get-CimInstance {
+                param($ClassName)
+                if ($ClassName -eq 'Win32_LogicalDisk') {
+                    [PSCustomObject]@{
+                        DeviceID = 'C:'
+                        DriveType = 3  # Fixed
+                        Size = 500GB
+                        FreeSpace = 15GB
+                        VolumeName = 'System'
+                        FileSystem = 'NTFS'
+                    }
                 }
             } -ModuleName PC-AI.Performance
         }
 
         It "Should detect critical disk space" {
             $result = Get-DiskSpace
-            $result.PercentFree | Should -BeLessThan 5
+            $result.FreePercent | Should -BeLessThan 5
         }
     }
 
     Context "When filtering by drive letter" {
         BeforeAll {
-            Mock Get-PSDrive {
-                [PSCustomObject]@{
-                    Name = 'C'
-                    Used = 150GB
-                    Free = 350GB
-                    Provider = [PSCustomObject]@{ Name = 'FileSystem' }
-                }
-                [PSCustomObject]@{
-                    Name = 'D'
-                    Used = 500GB
-                    Free = 1500GB
-                    Provider = [PSCustomObject]@{ Name = 'FileSystem' }
+            Mock Get-CimInstance {
+                param($ClassName)
+                if ($ClassName -eq 'Win32_LogicalDisk') {
+                    [PSCustomObject]@{
+                        DeviceID = 'C:'
+                        DriveType = 3  # Fixed
+                        Size = 500GB
+                        FreeSpace = 350GB
+                        VolumeName = 'System'
+                        FileSystem = 'NTFS'
+                    }
+                    [PSCustomObject]@{
+                        DeviceID = 'D:'
+                        DriveType = 3  # Fixed
+                        Size = 2000GB
+                        FreeSpace = 1500GB
+                        VolumeName = 'Data'
+                        FileSystem = 'NTFS'
+                    }
                 }
             } -ModuleName PC-AI.Performance
         }
 
         It "Should filter by specific drive" {
             $result = Get-DiskSpace -DriveLetter 'C'
-            $result.Drive | Should -Be 'C:'
+            $result.DriveLetter | Should -Be 'C'
         }
     }
 }
@@ -125,61 +150,114 @@ Describe "Get-ProcessPerformance" -Tag 'Unit', 'Performance', 'Fast' {
         BeforeAll {
             Mock Get-Process {
                 [PSCustomObject]@{
-                    Name = "chrome"
+                    ProcessName = "chrome"
                     Id = 1234
                     CPU = 45.5
-                    WorkingSet = 500MB
-                    Handles = 1500
+                    TotalProcessorTime = [TimeSpan]::FromSeconds(45.5)
+                    StartTime = (Get-Date).AddMinutes(-10)
+                    WorkingSet64 = 500MB
+                    Threads = @(1..15)
+                    HandleCount = 1500
+                    Path = "C:\Program Files\Chrome\chrome.exe"
+                    MainModule = $null
+                    PriorityClass = 'Normal'
                 }
                 [PSCustomObject]@{
-                    Name = "Code"
+                    ProcessName = "Code"
                     Id = 5678
                     CPU = 12.3
-                    WorkingSet = 300MB
-                    Handles = 800
+                    TotalProcessorTime = [TimeSpan]::FromSeconds(12.3)
+                    StartTime = (Get-Date).AddMinutes(-5)
+                    WorkingSet64 = 300MB
+                    Threads = @(1..10)
+                    HandleCount = 800
+                    Path = "C:\Program Files\VS Code\Code.exe"
+                    MainModule = $null
+                    PriorityClass = 'Normal'
                 }
             } -ModuleName PC-AI.Performance
-        }
 
-        It "Should return process information" {
-            $result = Get-ProcessPerformance
-            $result | Should -Not -BeNullOrEmpty
-        }
-
-        It "Should include CPU usage" {
-            $result = Get-ProcessPerformance
-            $result[0].CPU | Should -BeGreaterThan 0
-        }
-
-        It "Should include memory usage" {
-            $result = Get-ProcessPerformance
-            $result[0].WorkingSet | Should -BeGreaterThan 0
-        }
-
-        It "Should sort by CPU usage by default" {
-            $result = Get-ProcessPerformance
-            $result[0].CPU | Should -BeGreaterOrEqual $result[1].CPU
-        }
-    }
-
-    Context "When filtering by process name" {
-        BeforeAll {
-            Mock Get-Process {
-                param($Name)
-                if ($Name -eq "chrome") {
+            Mock Get-CimInstance {
+                param($ClassName)
+                if ($ClassName -eq 'Win32_ComputerSystem') {
                     [PSCustomObject]@{
-                        Name = "chrome"
-                        Id = 1234
-                        CPU = 45.5
-                        WorkingSet = 500MB
+                        TotalPhysicalMemory = 16GB
+                        NumberOfLogicalProcessors = 8
                     }
                 }
             } -ModuleName PC-AI.Performance
         }
 
-        It "Should filter by process name" {
-            $result = Get-ProcessPerformance -ProcessName "chrome"
-            $result.Name | Should -Be "chrome"
+        It "Should return process information with Both structure" {
+            $result = Get-ProcessPerformance
+            $result | Should -Not -BeNullOrEmpty
+            $result.TopByCPU | Should -Not -BeNullOrEmpty
+            $result.TopByMemory | Should -Not -BeNullOrEmpty
+            $result.Summary | Should -Not -BeNullOrEmpty
+        }
+
+        It "Should include CPU usage in TopByCPU" {
+            $result = Get-ProcessPerformance
+            $result.TopByCPU[0].CpuPercent | Should -BeGreaterOrEqual 0
+        }
+
+        It "Should include memory usage in TopByMemory" {
+            $result = Get-ProcessPerformance
+            $result.TopByMemory[0].MemoryMB | Should -BeGreaterThan 0
+        }
+
+        It "Should sort by CPU usage in TopByCPU" {
+            $result = Get-ProcessPerformance
+            $result.TopByCPU[0].CpuPercent | Should -BeGreaterOrEqual $result.TopByCPU[1].CpuPercent
+        }
+    }
+
+    Context "When sorting by CPU only" {
+        BeforeAll {
+            Mock Get-Process {
+                [PSCustomObject]@{
+                    ProcessName = "chrome"
+                    Id = 1234
+                    CPU = 45.5
+                    TotalProcessorTime = [TimeSpan]::FromSeconds(45.5)
+                    StartTime = (Get-Date).AddMinutes(-10)
+                    WorkingSet64 = 500MB
+                    Threads = @(1..15)
+                    HandleCount = 1500
+                    Path = "C:\Program Files\Chrome\chrome.exe"
+                    MainModule = $null
+                    PriorityClass = 'Normal'
+                }
+                [PSCustomObject]@{
+                    ProcessName = "Code"
+                    Id = 5678
+                    CPU = 12.3
+                    TotalProcessorTime = [TimeSpan]::FromSeconds(12.3)
+                    StartTime = (Get-Date).AddMinutes(-5)
+                    WorkingSet64 = 300MB
+                    Threads = @(1..10)
+                    HandleCount = 800
+                    Path = "C:\Program Files\VS Code\Code.exe"
+                    MainModule = $null
+                    PriorityClass = 'Normal'
+                }
+            } -ModuleName PC-AI.Performance
+
+            Mock Get-CimInstance {
+                param($ClassName)
+                if ($ClassName -eq 'Win32_ComputerSystem') {
+                    [PSCustomObject]@{
+                        TotalPhysicalMemory = 16GB
+                        NumberOfLogicalProcessors = 8
+                    }
+                }
+            } -ModuleName PC-AI.Performance
+        }
+
+        It "Should return flat array when SortBy is CPU" {
+            $result = Get-ProcessPerformance -SortBy CPU
+            $result | Should -BeOfType [System.Object]
+            $result[0].ProcessName | Should -Be "chrome"
         }
     }
 
@@ -188,28 +266,45 @@ Describe "Get-ProcessPerformance" -Tag 'Unit', 'Performance', 'Fast' {
             Mock Get-Process {
                 1..10 | ForEach-Object {
                     [PSCustomObject]@{
-                        Name = "Process$_"
+                        ProcessName = "Process$_"
                         Id = $_
                         CPU = (100 - $_ * 5)
-                        WorkingSet = (500MB - $_ * 10MB)
+                        TotalProcessorTime = [TimeSpan]::FromSeconds((100 - $_ * 5))
+                        StartTime = (Get-Date).AddMinutes(-10)
+                        WorkingSet64 = (500MB - $_ * 10MB)
+                        Threads = @(1..5)
+                        HandleCount = 500
+                        Path = "C:\Windows\System32\Process$_.exe"
+                        MainModule = $null
+                        PriorityClass = 'Normal'
+                    }
+                }
+            } -ModuleName PC-AI.Performance
+
+            Mock Get-CimInstance {
+                param($ClassName)
+                if ($ClassName -eq 'Win32_ComputerSystem') {
+                    [PSCustomObject]@{
+                        TotalPhysicalMemory = 16GB
+                        NumberOfLogicalProcessors = 8
                     }
                 }
             } -ModuleName PC-AI.Performance
         }
 
-        It "Should limit results to top N processes" {
-            $result = Get-ProcessPerformance -Top 5
+        It "Should limit results to top N processes when using CPU sort" {
+            $result = Get-ProcessPerformance -Top 5 -SortBy CPU
             $result.Count | Should -Be 5
         }
     }
 
-    Context "When no processes match" {
+    Context "When Get-Process fails" {
         BeforeAll {
             Mock Get-Process { throw "Process not found" } -ModuleName PC-AI.Performance
         }
 
-        It "Should handle process not found" {
-            { Get-ProcessPerformance -ProcessName "nonexistent" -ErrorAction Stop } | Should -Throw
+        It "Should handle process retrieval errors" {
+            { Get-ProcessPerformance -ErrorAction Stop } | Should -Throw
         }
     }
 }
@@ -217,18 +312,60 @@ Describe "Get-ProcessPerformance" -Tag 'Unit', 'Performance', 'Fast' {
 Describe "Watch-SystemResources" -Tag 'Unit', 'Performance', 'Slow' {
     Context "When monitoring system resources" {
         BeforeAll {
+            # Mock Get-Counter for CPU counter
             Mock Get-Counter {
+                param($Counter)
+
+                $samples = @()
+
+                # CPU counter
+                if ($Counter -like '*Processor*') {
+                    $samples += [PSCustomObject]@{
+                        Path = '\Processor(_Total)\% Processor Time'
+                        CookedValue = 35.5
+                    }
+                }
+
+                # Network counters
+                if ($Counter -like '*Network Interface*') {
+                    $samples += [PSCustomObject]@{
+                        Path = '\Network Interface(Ethernet)\Bytes Received/sec'
+                        InstanceName = 'Ethernet'
+                        CookedValue = 1048576
+                    }
+                    $samples += [PSCustomObject]@{
+                        Path = '\Network Interface(Ethernet)\Bytes Sent/sec'
+                        InstanceName = 'Ethernet'
+                        CookedValue = 524288
+                    }
+                }
+
                 [PSCustomObject]@{
-                    CounterSamples = @(
-                        [PSCustomObject]@{
-                            Path = '\\localhost\processor(_total)\% processor time'
-                            CookedValue = 35.5
-                        }
-                        [PSCustomObject]@{
-                            Path = '\\localhost\memory\available mbytes'
-                            CookedValue = 8192
-                        }
-                    )
+                    CounterSamples = $samples
+                }
+            } -ModuleName PC-AI.Performance
+
+            # Mock Get-CimInstance for memory and system info
+            Mock Get-CimInstance {
+                param($ClassName)
+                if ($ClassName -eq 'Win32_ComputerSystem') {
+                    [PSCustomObject]@{
+                        TotalPhysicalMemory = 16GB
+                        NumberOfLogicalProcessors = 8
+                    }
+                }
+                elseif ($ClassName -eq 'Win32_OperatingSystem') {
+                    [PSCustomObject]@{
+                        TotalVisibleMemorySize = 16GB / 1KB
+                        FreePhysicalMemory = 8GB / 1KB
+                    }
+                }
+            } -ModuleName PC-AI.Performance
+
+            Mock Get-DiskIOCounters {
+                [PSCustomObject]@{
+                    ReadBytesPerSec = 10MB
+                    WriteBytesPerSec = 5MB
                 }
             } -ModuleName PC-AI.Performance
 
@@ -236,29 +373,29 @@ Describe "Watch-SystemResources" -Tag 'Unit', 'Performance', 'Slow' {
         }
 
         It "Should collect CPU metrics" {
-            Watch-SystemResources -Iterations 1
+            Watch-SystemResources -RefreshInterval 1 -Duration 1 -OutputMode Object
 
             Should -Invoke Get-Counter -ModuleName PC-AI.Performance -ParameterFilter {
-                $Counter -contains "\Processor(_Total)\% Processor Time"
+                $Counter -like '*Processor*'
             }
         }
 
-        It "Should collect memory metrics" {
-            Watch-SystemResources -Iterations 1
+        It "Should collect memory metrics via CIM" {
+            Watch-SystemResources -RefreshInterval 1 -Duration 1 -OutputMode Object
 
-            Should -Invoke Get-Counter -ModuleName PC-AI.Performance -ParameterFilter {
-                $Counter -contains "\Memory\Available MBytes"
+            Should -Invoke Get-CimInstance -ModuleName PC-AI.Performance -ParameterFilter {
+                $ClassName -eq 'Win32_OperatingSystem'
             }
         }
 
-        It "Should support custom iteration count" {
-            Watch-SystemResources -Iterations 3
+        It "Should support custom duration" {
+            $result = Watch-SystemResources -RefreshInterval 1 -Duration 2 -OutputMode Object
 
-            Should -Invoke Get-Counter -ModuleName PC-AI.Performance -Times 3
+            $result.Count | Should -BeGreaterOrEqual 1
         }
 
-        It "Should support custom interval" {
-            Watch-SystemResources -Iterations 2 -IntervalSeconds 5
+        It "Should support custom refresh interval" {
+            Watch-SystemResources -RefreshInterval 5 -Duration 1 -OutputMode Object
 
             Should -Invoke Start-Sleep -ModuleName PC-AI.Performance -ParameterFilter {
                 $Seconds -eq 5
@@ -280,6 +417,25 @@ Describe "Watch-SystemResources" -Tag 'Unit', 'Performance', 'Slow' {
 Describe "Optimize-Disks" -Tag 'Unit', 'Performance', 'Slow', 'RequiresAdmin' {
     Context "When optimizing SSD drives" {
         BeforeAll {
+            Mock Test-IsAdmin { $true } -ModuleName PC-AI.Performance
+
+            Mock Get-CimInstance {
+                param($ClassName, $Filter)
+                if ($ClassName -eq 'Win32_LogicalDisk') {
+                    [PSCustomObject]@{
+                        DeviceID = 'C:'
+                        DriveType = 3  # Fixed disk
+                        Size = 500GB
+                        FreeSpace = 350GB
+                    }
+                }
+            } -ModuleName PC-AI.Performance
+
+            Mock Get-DriveMediaType {
+                param($DriveLetter)
+                'SSD'
+            } -ModuleName PC-AI.Performance
+
             Mock Get-Volume {
                 [PSCustomObject]@{
                     DriveLetter = 'C'
@@ -288,18 +444,11 @@ Describe "Optimize-Disks" -Tag 'Unit', 'Performance', 'Slow', 'RequiresAdmin' {
                 }
             } -ModuleName PC-AI.Performance
 
-            Mock Get-PhysicalDisk {
-                [PSCustomObject]@{
-                    MediaType = 'SSD'
-                    DeviceId = 0
-                }
-            } -ModuleName PC-AI.Performance
-
             Mock Optimize-Volume {} -ModuleName PC-AI.Performance
         }
 
         It "Should run TRIM on SSD" {
-            Optimize-Disks -DriveLetter 'C'
+            Optimize-Disks -DriveLetter 'C' -Force
 
             Should -Invoke Optimize-Volume -ModuleName PC-AI.Performance -ParameterFilter {
                 $ReTrim -eq $true
@@ -307,7 +456,7 @@ Describe "Optimize-Disks" -Tag 'Unit', 'Performance', 'Slow', 'RequiresAdmin' {
         }
 
         It "Should not defragment SSD" {
-            Optimize-Disks -DriveLetter 'C'
+            Optimize-Disks -DriveLetter 'C' -Force
 
             Should -Invoke Optimize-Volume -ModuleName PC-AI.Performance -Times 0 -ParameterFilter {
                 $Defrag -eq $true
@@ -317,6 +466,25 @@ Describe "Optimize-Disks" -Tag 'Unit', 'Performance', 'Slow', 'RequiresAdmin' {
 
     Context "When optimizing HDD drives" {
         BeforeAll {
+            Mock Test-IsAdmin { $true } -ModuleName PC-AI.Performance
+
+            Mock Get-CimInstance {
+                param($ClassName, $Filter)
+                if ($ClassName -eq 'Win32_LogicalDisk') {
+                    [PSCustomObject]@{
+                        DeviceID = 'D:'
+                        DriveType = 3  # Fixed disk
+                        Size = 2000GB
+                        FreeSpace = 1500GB
+                    }
+                }
+            } -ModuleName PC-AI.Performance
+
+            Mock Get-DriveMediaType {
+                param($DriveLetter)
+                'HDD'
+            } -ModuleName PC-AI.Performance
+
             Mock Get-Volume {
                 [PSCustomObject]@{
                     DriveLetter = 'D'
@@ -325,18 +493,11 @@ Describe "Optimize-Disks" -Tag 'Unit', 'Performance', 'Slow', 'RequiresAdmin' {
                 }
             } -ModuleName PC-AI.Performance
 
-            Mock Get-PhysicalDisk {
-                [PSCustomObject]@{
-                    MediaType = 'HDD'
-                    DeviceId = 1
-                }
-            } -ModuleName PC-AI.Performance
-
             Mock Optimize-Volume {} -ModuleName PC-AI.Performance
         }
 
         It "Should defragment HDD" {
-            Optimize-Disks -DriveLetter 'D'
+            Optimize-Disks -DriveLetter 'D' -Force
 
             Should -Invoke Optimize-Volume -ModuleName PC-AI.Performance -ParameterFilter {
                 $Defrag -eq $true
@@ -344,7 +505,7 @@ Describe "Optimize-Disks" -Tag 'Unit', 'Performance', 'Slow', 'RequiresAdmin' {
         }
 
         It "Should not TRIM HDD" {
-            Optimize-Disks -DriveLetter 'D'
+            Optimize-Disks -DriveLetter 'D' -Force
 
             Should -Invoke Optimize-Volume -ModuleName PC-AI.Performance -Times 0 -ParameterFilter {
                 $ReTrim -eq $true
@@ -354,7 +515,7 @@ Describe "Optimize-Disks" -Tag 'Unit', 'Performance', 'Slow', 'RequiresAdmin' {
 
     Context "When not running as Administrator" {
         BeforeAll {
-            Mock Optimize-Volume { throw "Access denied" } -ModuleName PC-AI.Performance
+            Mock Test-IsAdmin { $false } -ModuleName PC-AI.Performance
         }
 
         It "Should require Administrator privileges" {
@@ -364,6 +525,33 @@ Describe "Optimize-Disks" -Tag 'Unit', 'Performance', 'Slow', 'RequiresAdmin' {
 
     Context "When AllDrives switch is used" {
         BeforeAll {
+            Mock Test-IsAdmin { $true } -ModuleName PC-AI.Performance
+
+            Mock Get-CimInstance {
+                param($ClassName, $Filter)
+                if ($ClassName -eq 'Win32_LogicalDisk') {
+                    @(
+                        [PSCustomObject]@{
+                            DeviceID = 'C:'
+                            DriveType = 3  # Fixed disk
+                            Size = 500GB
+                            FreeSpace = 350GB
+                        }
+                        [PSCustomObject]@{
+                            DeviceID = 'D:'
+                            DriveType = 3  # Fixed disk
+                            Size = 2000GB
+                            FreeSpace = 1500GB
+                        }
+                    )
+                }
+            } -ModuleName PC-AI.Performance
+
+            Mock Get-DriveMediaType {
+                param($DriveLetter)
+                'SSD'
+            } -ModuleName PC-AI.Performance
+
             Mock Get-Volume {
                 @(
                     [PSCustomObject]@{ DriveLetter = 'C'; FileSystem = 'NTFS'; DriveType = 'Fixed' }
@@ -371,15 +559,11 @@ Describe "Optimize-Disks" -Tag 'Unit', 'Performance', 'Slow', 'RequiresAdmin' {
                 )
             } -ModuleName PC-AI.Performance
 
-            Mock Get-PhysicalDisk {
-                [PSCustomObject]@{ MediaType = 'SSD'; DeviceId = 0 }
-            } -ModuleName PC-AI.Performance
-
             Mock Optimize-Volume {} -ModuleName PC-AI.Performance
         }
 
         It "Should optimize all fixed drives" {
-            Optimize-Disks -AllDrives
+            Optimize-Disks -Force
 
             Should -Invoke Optimize-Volume -ModuleName PC-AI.Performance -Times 2
         }

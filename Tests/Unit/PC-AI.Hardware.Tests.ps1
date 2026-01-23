@@ -31,17 +31,17 @@ Describe "Get-DeviceErrors" -Tag 'Unit', 'Hardware', 'Fast' {
         It "Should include device name and error code" {
             $result = Get-DeviceErrors
             $result[0].Name | Should -Not -BeNullOrEmpty
-            $result[0].ConfigManagerErrorCode | Should -BeGreaterThan 0
+            $result[0].ErrorCode | Should -BeGreaterThan 0
         }
 
         It "Should include error description" {
             $result = Get-DeviceErrors
-            $result[0] | Should -HaveProperty ConfigManagerErrorDescription
+            $result[0].PSObject.Properties.Name | Should -Contain 'ErrorDescription'
         }
 
         It "Should filter out devices with error code 0" {
             $result = Get-DeviceErrors
-            $result | Where-Object { $_.ConfigManagerErrorCode -eq 0 } | Should -BeNullOrEmpty
+            $result | Where-Object { $_.ErrorCode -eq 0 } | Should -BeNullOrEmpty
         }
     }
 
@@ -52,7 +52,7 @@ Describe "Get-DeviceErrors" -Tag 'Unit', 'Hardware', 'Fast' {
 
         It "Should return empty result" {
             $result = Get-DeviceErrors
-            $result | Where-Object { $_.ConfigManagerErrorCode -ne 0 } | Should -BeNullOrEmpty
+            $result | Where-Object { $_.ErrorCode -ne 0 } | Should -BeNullOrEmpty
         }
     }
 
@@ -70,50 +70,116 @@ Describe "Get-DeviceErrors" -Tag 'Unit', 'Hardware', 'Fast' {
 Describe "Get-DiskHealth" -Tag 'Unit', 'Hardware', 'Fast' {
     Context "When all disks are healthy" {
         BeforeAll {
-            Mock Invoke-Expression { Get-MockDiskSmartOutput -Health Healthy } -ModuleName PC-AI.Hardware
+            Mock Get-CimInstance {
+                @(
+                    [PSCustomObject]@{
+                        Model = "Samsung SSD 980 PRO 1TB"
+                        Status = "OK"
+                        MediaType = "Fixed hard disk media"
+                        InterfaceType = "NVMe"
+                        Size = 1000GB * 1GB
+                        Partitions = 3
+                        Index = 0
+                        DeviceID = "\\.\PHYSICALDRIVE0"
+                        SerialNumber = "S5GXNX0T123456"
+                    }
+                    [PSCustomObject]@{
+                        Model = "WDC WD40EZRZ-00GXCB0"
+                        Status = "OK"
+                        MediaType = "Fixed hard disk media"
+                        InterfaceType = "SATA"
+                        Size = 4000GB * 1GB
+                        Partitions = 1
+                        Index = 1
+                        DeviceID = "\\.\PHYSICALDRIVE1"
+                        SerialNumber = "WD-WCC7K1234567"
+                    }
+                )
+            } -ModuleName PC-AI.Hardware
         }
 
         It "Should return disk status information" {
             $result = Get-DiskHealth
             $result | Should -Not -BeNullOrEmpty
+            $result.Count | Should -BeGreaterThan 0
+        }
+
+        It "Should include disk properties" {
+            $result = Get-DiskHealth
+            $result[0].PSObject.Properties.Name | Should -Contain 'Model'
+            $result[0].PSObject.Properties.Name | Should -Contain 'Status'
+            $result[0].PSObject.Properties.Name | Should -Contain 'Severity'
         }
 
         It "Should not contain 'Bad' status" {
             $result = Get-DiskHealth
-            $result | Should -Not -Match 'Bad'
+            $result | Where-Object { $_.Status -match 'Bad' } | Should -BeNullOrEmpty
         }
 
         It "Should not contain 'Pred Fail' status" {
             $result = Get-DiskHealth
-            $result | Should -Not -Match 'Pred Fail'
+            $result | Where-Object { $_.Status -match 'Pred Fail' } | Should -BeNullOrEmpty
         }
     }
 
     Context "When disks have warnings" {
         BeforeAll {
-            Mock Invoke-Expression { Get-MockDiskSmartOutput -Health Warning } -ModuleName PC-AI.Hardware
+            Mock Get-CimInstance {
+                @(
+                    [PSCustomObject]@{
+                        Model = "WDC WD40EZRZ-00GXCB0"
+                        Status = "Pred Fail"
+                        MediaType = "Fixed hard disk media"
+                        InterfaceType = "SATA"
+                        Size = 4000GB * 1GB
+                        Partitions = 1
+                        Index = 0
+                        DeviceID = "\\.\PHYSICALDRIVE0"
+                        SerialNumber = "WD-WCC7K1234567"
+                    }
+                )
+            } -ModuleName PC-AI.Hardware
         }
 
         It "Should contain 'Pred Fail' status" {
             $result = Get-DiskHealth
-            $result | Should -Match 'Pred Fail'
+            $result | Where-Object { $_.Status -match 'Pred Fail' } | Should -Not -BeNullOrEmpty
+        }
+
+        It "Should have Critical severity" {
+            $result = Get-DiskHealth
+            $result[0].Severity | Should -Be 'Critical'
         }
     }
 
     Context "When disks have failures" {
         BeforeAll {
-            Mock Invoke-Expression { Get-MockDiskSmartOutput -Health Failed } -ModuleName PC-AI.Hardware
+            Mock Get-CimInstance {
+                @(
+                    [PSCustomObject]@{
+                        Model = "WDC WD40EZRZ-00GXCB0"
+                        Status = "Bad"
+                        MediaType = "Fixed hard disk media"
+                        InterfaceType = "SATA"
+                        Size = 4000GB * 1GB
+                        Partitions = 1
+                        Index = 0
+                        DeviceID = "\\.\PHYSICALDRIVE0"
+                        SerialNumber = "WD-WCC7K1234567"
+                    }
+                )
+            } -ModuleName PC-AI.Hardware
         }
 
-        It "Should contain 'Bad' status" {
+        It "Should detect failed disk status" {
             $result = Get-DiskHealth
-            $result | Should -Match 'Bad'
+            $result | Where-Object { $_.Status -eq 'Bad' } | Should -Not -BeNullOrEmpty
         }
     }
 
-    Context "When wmic command fails" {
+    Context "When Get-CimInstance fails" {
         BeforeAll {
-            Mock Invoke-Expression { throw "Command not found" } -ModuleName PC-AI.Hardware
+            Mock Get-CimInstance { throw "Access denied" } -ModuleName PC-AI.Hardware
         }
 
         It "Should handle errors gracefully" {
@@ -159,7 +225,7 @@ Describe "Get-UsbStatus" -Tag 'Unit', 'Hardware', 'Fast' {
 
         It "Should detect controller errors" {
             $result = Get-UsbStatus
-            $result | Where-Object { $_.ConfigManagerErrorCode -ne 0 } | Should -Not -BeNullOrEmpty
+            $result | Where-Object { $_.ErrorCode -ne 0 } | Should -Not -BeNullOrEmpty
         }
     }
 }
@@ -233,7 +299,7 @@ Describe "Get-SystemEvents" -Tag 'Unit', 'Hardware', 'Slow' {
 
         It "Should include error level" {
             $result = Get-SystemEvents -Days 3
-            $result[0] | Should -HaveProperty Level
+            $result[0].PSObject.Properties.Name | Should -Contain 'Level'
         }
 
         It "Should include timestamp" {
@@ -268,22 +334,33 @@ Describe "New-DiagnosticReport" -Tag 'Unit', 'Hardware', 'Integration' {
     BeforeAll {
         # Mock all dependent functions
         Mock Get-DeviceErrors { Get-MockDevicesWithErrors } -ModuleName PC-AI.Hardware
-        Mock Get-DiskHealth { Get-MockDiskSmartOutput -Health Healthy } -ModuleName PC-AI.Hardware
+        Mock Get-DiskHealth {
+            @(
+                [PSCustomObject]@{
+                    Model = "Samsung SSD 980 PRO 1TB"
+                    Status = "OK"
+                    MediaType = "Fixed hard disk media"
+                    InterfaceType = "NVMe"
+                    SizeGB = 1000
+                    Partitions = 3
+                    Severity = "OK"
+                    DeviceID = "\\.\PHYSICALDRIVE0"
+                    SerialNumber = "S5GXNX0T123456"
+                }
+            )
+        } -ModuleName PC-AI.Hardware
         Mock Get-SystemEvents { Get-MockDiskUsbEvents -ErrorType Mixed } -ModuleName PC-AI.Hardware
         Mock Get-UsbStatus { @(New-MockPnPEntity -Name "USB Device" -DeviceID "USB\VID_1234") } -ModuleName PC-AI.Hardware
         Mock Get-NetworkAdapters { Get-MockNetworkAdapters } -ModuleName PC-AI.Hardware
-
-        # Mock file operations
-        Mock Out-File {} -ModuleName PC-AI.Hardware
     }
 
     Context "When generating a full report" {
         It "Should create a diagnostic report without errors" {
-            { New-DiagnosticReport -OutputPath "TestDrive:\report.txt" } | Should -Not -Throw
+            { New-DiagnosticReport -OutputPath "$TestDrive\report.txt" } | Should -Not -Throw
         }
 
         It "Should call all diagnostic functions" {
-            New-DiagnosticReport -OutputPath "TestDrive:\report.txt"
+            New-DiagnosticReport -OutputPath "$TestDrive\report.txt"
 
             Should -Invoke Get-DeviceErrors -ModuleName PC-AI.Hardware -Times 1
             Should -Invoke Get-DiskHealth -ModuleName PC-AI.Hardware -Times 1
@@ -293,9 +370,12 @@ Describe "New-DiagnosticReport" -Tag 'Unit', 'Hardware', 'Integration' {
         }
 
         It "Should write output to file" {
-            New-DiagnosticReport -OutputPath "TestDrive:\report.txt"
+            $reportPath = "$TestDrive\report.txt"
+            New-DiagnosticReport -OutputPath $reportPath
 
-            Should -Invoke Out-File -ModuleName PC-AI.Hardware -Times 1
+            # Verify file was created and has content
+            Test-Path $reportPath | Should -Be $true
+            (Get-Content $reportPath -Raw).Length | Should -BeGreaterThan 0
         }
     }
 
@@ -305,7 +385,7 @@ Describe "New-DiagnosticReport" -Tag 'Unit', 'Hardware', 'Integration' {
         }
 
         It "Should continue with other sections" {
-            { New-DiagnosticReport -OutputPath "TestDrive:\report.txt" -ErrorAction SilentlyContinue } | Should -Not -Throw
+            { New-DiagnosticReport -OutputPath "$TestDrive\report.txt" -ErrorAction SilentlyContinue } | Should -Not -Throw
         }
     }
 }
