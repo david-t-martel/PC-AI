@@ -1,0 +1,171 @@
+=== Hardware & Device Diagnostics Report (01/23/2026 03:44:24) ===
+
+== Summary ==
+Critical Issues: 2
+Warnings: 19
+Errors: 30
+
+== 1. Devices with Errors in Device Manager ==
+
+Name                                                  PNPClass Manufacturer                   ErrorCode ErrorDescription
+----                                                  -------- ------------                   --------- ----------------
+Integrated Camera                                     Camera   Realtek                               22 Device is disab…
+Integrated IR Camera                                  Camera   Realtek                               22 Device is disab…
+NVIDIA High Definition Audio                          MEDIA    NVIDIA                                32 Driver service …
+Unknown USB Device (Device Descriptor Request Failed) USB      (Standard USB Host Controller)        43 Device stopped …
+
+== 2. Disk SMART Overall Status ==
+
+Model                               Status  SizeGB InterfaceType Severity
+-----                               ------  ------ ------------- --------
+Generic MassStorageClass USB Device OK           0 USB           OK
+Generic MassStorageClass USB Device OK           0 USB           OK
+Microsoft Virtual Disk              OK      255.99 SCSI          OK
+Microsoft Virtual Disk              OK      255.99 SCSI          OK
+Microsoft Virtual Disk              OK     1500.00 SCSI          OK
+WD_BLACK SN850X 4000GB              OK     3726.02 SCSI          OK
+WD_BLACK SN850X 4000GB              OK     3726.02 SCSI          OK
+
+== 3. Recent System Errors/Warnings (disk / storage / USB) - last 3 days ==
+
+TimeCreated           ProviderName  Id Level   Message
+-----------           ------------  -- -----   -------
+1/23/2026 12:40:37 AM disk         158 Warning Disk 6 has the same disk identifiers as one or more disks connected to t…
+1/23/2026 12:31:20 AM disk         158 Warning Disk 3 has the same disk identifiers as one or more disks connected to t…
+1/22/2026 11:14:09 PM disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR5.
+1/22/2026 8:59:27 PM  usbaudio2     37 Error   The driver could not find a feedback endpoint for an asynchronous data O…
+1/22/2026 8:59:26 PM  disk         158 Warning Disk 3 has the same disk identifiers as one or more disks connected to t…
+1/22/2026 8:47:23 PM  disk          51 Warning An error was detected on device \Device\Harddisk7\DR5 during a paging op…
+1/22/2026 8:47:23 PM  disk          51 Warning An error was detected on device \Device\Harddisk7\DR5 during a paging op…
+1/22/2026 8:47:23 PM  disk          51 Warning An error was detected on device \Device\Harddisk7\DR5 during a paging op…
+1/22/2026 8:47:23 PM  disk          51 Warning An error was detected on device \Device\Harddisk7\DR5 during a paging op…
+1/22/2026 8:46:34 PM  disk         158 Warning Disk 3 has the same disk identifiers as one or more disks connected to t…
+1/22/2026 4:49:54 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR38.
+1/22/2026 4:17:14 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR33.
+1/22/2026 3:56:54 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR32.
+1/22/2026 3:12:34 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR30.
+1/22/2026 2:52:37 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR28.
+1/22/2026 2:42:54 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR27.
+1/22/2026 2:12:39 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR25.
+1/22/2026 2:05:34 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR21.
+1/22/2026 1:23:21 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR15.
+1/22/2026 1:19:03 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR13.
+1/22/2026 1:05:56 AM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR11.
+1/22/2026 12:26:57 AM disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR7.
+1/21/2026 9:36:31 PM  disk         158 Warning Disk 6 has the same disk identifiers as one or more disks connected to t…
+1/21/2026 9:36:15 PM  BTHUSB        16 Error   The mutual authentication between the local Bluetooth adapter and a devi…
+1/21/2026 9:20:47 PM  disk         158 Warning Disk 6 has the same disk identifiers as one or more disks connected to t…
+1/21/2026 9:20:32 PM  BTHUSB        16 Error   The mutual authentication between the local Bluetooth adapter and a devi…
+1/21/2026 8:30:34 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR42.
+1/21/2026 8:29:26 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR41.
+1/21/2026 8:19:33 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR37.
+1/21/2026 8:17:25 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR35.
+1/21/2026 8:16:13 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR33.
+1/21/2026 8:13:57 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR30.
+1/21/2026 8:08:24 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR28.
+1/21/2026 8:02:22 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk7\DR25.
+1/21/2026 6:54:54 PM  disk         158 Warning Disk 3 has the same disk identifiers as one or more disks connected to t…
+1/21/2026 4:15:58 PM  BTHUSB        16 Error   The mutual authentication between the local Bluetooth adapter and a devi…
+1/21/2026 4:15:21 PM  disk         158 Warning Disk 3 has the same disk identifiers as one or more disks connected to t…
+1/21/2026 3:29:15 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk4\DR29.
+1/21/2026 3:18:59 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk4\DR25.
+1/21/2026 6:56:31 AM  disk         158 Warning Disk 3 has the same disk identifiers as one or more disks connected to t…
+1/21/2026 6:44:13 AM  disk         158 Warning Disk 3 has the same disk identifiers as one or more disks connected to t…
+1/21/2026 12:41:54 AM disk          11 Error   The driver detected a controller error on \Device\Harddisk4\DR8.
+1/20/2026 8:28:40 PM  disk         158 Warning Disk 3 has the same disk identifiers as one or more disks connected to t…
+1/20/2026 6:50:47 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk4\DR12.
+1/20/2026 4:33:25 PM  disk          11 Error   The driver detected a controller error on \Device\Harddisk4\DR6.
+1/20/2026 2:01:41 PM  disk         158 Warning Disk 3 has the same disk identifiers as one or more disks connected to t…
+
+== 4. USB Controllers and USB Devices Status ==
+
+Name                                                            PNPClass        Status ErrorCode Severity
+----                                                            --------        ------ --------- --------
+Unknown USB Device (Device Descriptor Request Failed)           USB             Error         43 Critical
+Focusrite USB Audio Root                                        Focusrite Audio OK             0 OK
+Generic MassStorageClass USB Device                             DiskDrive       OK             0 OK
+Generic MassStorageClass USB Device                             DiskDrive       OK             0 OK
+Generic SuperSpeed USB Hub                                      USB             OK             0 OK
+Generic SuperSpeed USB Hub                                      USB             OK             0 OK
+Generic SuperSpeed USB Hub                                      USB             OK             0 OK
+Generic SuperSpeed USB Hub                                      USB             OK             0 OK
+Generic SuperSpeed USB Hub                                      USB             OK             0 OK
+Generic SuperSpeed USB Hub                                      USB             OK             0 OK
+Generic SuperSpeed USB Hub                                      USB             OK             0 OK
+Generic SuperSpeed USB Hub                                      USB             OK             0 OK
+Generic SuperSpeed USB Hub                                      USB             OK             0 OK
+Generic USB Hub                                                 USB             OK             0 OK
+Generic USB Hub                                                 USB             OK             0 OK
+Generic USB Hub                                                 USB             OK             0 OK
+Generic USB Hub                                                 USB             OK             0 OK
+Generic USB Hub                                                 USB             OK             0 OK
+Generic USB Hub                                                 USB             OK             0 OK
+Generic USB Hub                                                 USB             OK             0 OK
+Generic USB Hub                                                 USB             OK             0 OK
+Generic USB Hub                                                 USB             OK             0 OK
+Headphones (2- Realtek USB2.0 Audio)                            AudioEndpoint   OK             0 OK
+Intel(R) USB 3.1 eXtensible Host Controller - 1.10 (Microsoft)  USB             OK             0 OK
+Intel(R) USB 3.20 eXtensible Host Controller - 1.20 (Microsoft) USB             OK             0 OK
+Intel(R) USB 3.20 eXtensible Host Controller - 1.20 (Microsoft) USB             OK             0 OK
+J-Link driver                                                   USB             OK             0 OK
+Logitech USB Input Device                                       HIDClass        OK             0 OK
+Logitech USB Input Device                                       HIDClass        OK             0 OK
+Microphone (2- Realtek USB2.0 Audio)                            AudioEndpoint   OK             0 OK
+Microsoft Usbccid Smartcard Reader (WUDF)                       SmartCardReader OK             0 OK
+Microsoft Usbccid Smartcard Reader (WUDF)                       SmartCardReader OK             0 OK
+Parsec Virtual USB Adapter                                      USB             OK             0 OK
+Realtek Gaming USB 2.5GbE Family Controller                     Net             OK             0 OK
+Realtek USB 5GbE Family Controller                              Net             OK             0 OK
+Realtek USB2.0 Audio                                            MEDIA           OK             0 OK
+Remote Desktop USB Hub                                          System          OK             0 OK
+Thunderbolt 3(TM) Router, Intel - Module 2  PD 85W              USB             OK             0 OK
+USB Composite Device                                            USB             OK             0 OK
+USB Composite Device                                            USB             OK             0 OK
+USB Composite Device                                            USB             OK             0 OK
+USB Composite Device                                            USB             OK             0 OK
+USB Composite Device                                            USB             OK             0 OK
+USB Composite Device                                            USB             OK             0 OK
+USB Composite Device                                            USB             OK             0 OK
+USB Composite Device                                            USB             OK             0 OK
+USB Composite Device                                            USB             OK             0 OK
+USB Composite Device                                            USB             OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Input Device                                                HIDClass        OK             0 OK
+USB Mass Storage Device                                         USB             OK             0 OK
+USB Root Hub (USB 3.0)                                          USB             OK             0 OK
+USB Root Hub (USB 3.0)                                          USB             OK             0 OK
+USB Root Hub (USB 3.0)                                          USB             OK             0 OK
+USB Root Hub (USB 3.0)                                          USB             OK             0 OK
+USB4 Root Router (1.0)                                          USB             OK             0 OK
+USB4 Router (2.0), Cable Matters Inc. - 107064                  USB             OK             0 OK
+USB4 Virtual power coordination device                                          OK             0 OK
+USB4(TM) Host Router (Microsoft)                                USB             OK             0 OK
+
+== 5. Physical Network Adapters Status ==
+
+Name                                        NetEnabled Status MACAddress               SpeedMbps
+----                                        ---------- ------ ----------               ---------
+Bluetooth Device (Personal Area Network)         False        6C:2F:80:8E:80:9A             3.00
+Hyper-V Virtual Ethernet Adapter #2               True        00:15:5D:15:20:07         10000.00
+Intel(R) Wi-Fi 7 BE200 320MHz                     True        D2:49:31:D6:87:1D          2882.00
+Realtek Gaming USB 2.5GbE Family Controller      False        F4:4D:AD:04:95:C9 9223372036855.00
+Realtek USB 5GbE Family Controller                True        84:BA:59:36:9E:6C          5000.00
+
+== 6. How to Read This Report (Quick Hints) ==
+- Section 1: Any devices with non-zero ConfigManagerErrorCode may have driver/hardware issues.
+- Section 2: Disk status should ideally show 'OK' for all drives.
+- Section 3: Repeated disk/USB errors can indicate unstable hardware, cabling, or failing drives.
+- Section 4: USB devices with non-zero ConfigManagerErrorCode or non-OK status are suspect.
+- Section 5: Network adapters that are not NetEnabled but should be, or show unusual Status, may be misconfigured or failing.
+
+=== End of Report ===

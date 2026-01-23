@@ -162,7 +162,7 @@ try {
                 Select-Object -First 5 |
                 ForEach-Object {
                     $fileName = Split-Path $_.Name -Leaf
-                    Write-Host "  $fileName: $($_.Count) missed" -ForegroundColor Gray
+                    Write-Host "  ${fileName}: $($_.Count) missed" -ForegroundColor Gray
                 }
         }
 

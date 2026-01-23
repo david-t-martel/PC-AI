@@ -227,7 +227,7 @@ function New-MockNetworkAdapter {
         [string]$NetConnectionStatus = "Connected",
         [bool]$PhysicalAdapter = $true,
         [string]$MACAddress = "00:11:22:33:44:55",
-        [string]$Speed = "1 Gbps"
+        [long]$Speed = 1000000000  # 1 Gbps in bits per second
     )
 
     [PSCustomObject]@{
@@ -236,6 +236,8 @@ function New-MockNetworkAdapter {
         PhysicalAdapter = $PhysicalAdapter
         MACAddress = $MACAddress
         Speed = $Speed
+        NetEnabled = $true
+        Status = "OK"
         AdapterType = if ($PhysicalAdapter) { "Ethernet 802.3" } else { "Virtual" }
         DeviceID = if ($PhysicalAdapter) { "1" } else { "100" }
     }
@@ -254,17 +256,17 @@ function Get-MockNetworkAdapters {
     $adapters = @(
         New-MockNetworkAdapter -Name "Intel(R) Ethernet Connection I219-V" `
             -NetConnectionStatus "Connected" -PhysicalAdapter $true `
-            -MACAddress "00:D8:61:12:34:56" -Speed "1 Gbps"
+            -MACAddress "00:D8:61:12:34:56" -Speed 1000000000  # 1 Gbps
     )
 
     if ($IncludeVirtual) {
         $adapters += New-MockNetworkAdapter -Name "Hyper-V Virtual Ethernet Adapter" `
             -NetConnectionStatus "Connected" -PhysicalAdapter $false `
-            -MACAddress "00:15:5D:AB:CD:EF" -Speed "10 Gbps"
+            -MACAddress "00:15:5D:AB:CD:EF" -Speed 10000000000  # 10 Gbps
 
         $adapters += New-MockNetworkAdapter -Name "WSL (vEthernet)" `
             -NetConnectionStatus "Connected" -PhysicalAdapter $false `
-            -MACAddress "00:15:5D:12:34:56" -Speed "10 Gbps"
+            -MACAddress "00:15:5D:12:34:56" -Speed 10000000000  # 10 Gbps
     }
 
     return $adapters
