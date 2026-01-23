@@ -235,7 +235,14 @@ public static class PcaiCoreTest
                 $ptr | Should -Not -Be ([IntPtr]::Zero)
 
                 try {
-                    $result = [System.Runtime.InteropServices.Marshal]::PtrToStringUTF8($ptr)
+                    # PtrToStringUTF8 is only available in .NET Core / .NET 5+
+                    # PowerShell 7+ uses .NET Core, PowerShell 5.1 uses .NET Framework
+                    if ($PSVersionTable.PSVersion.Major -ge 7) {
+                        $result = [System.Runtime.InteropServices.Marshal]::PtrToStringUTF8($ptr)
+                    }
+                    else {
+                        $result = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($ptr)
+                    }
                     $result | Should -Be ""
                 }
                 finally {
