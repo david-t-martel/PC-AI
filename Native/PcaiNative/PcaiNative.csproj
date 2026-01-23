@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Target .NET 8 for modern performance with PowerShell 7 -->
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>PcaiNative</RootNamespace>
+    <AssemblyName>PcaiNative</AssemblyName>
+
+    <!-- Enable nullable reference types for safer code -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Platform Configuration -->
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+
+    <!-- Optimization Settings -->
+    <Optimize>true</Optimize>
+
+    <!-- Generate XML documentation -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- Version Info -->
+    <Version>0.1.0</Version>
+    <Authors>David Martel</Authors>
+    <Description>C# P/Invoke wrapper for PC_AI native Rust libraries</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- System.Text.Json for JSON operations -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ensure Rust DLLs are copied to output directory -->
+    <None Include="pcai_core_lib.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_core_lib.dll')" />
+    <None Include="pcai_search.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_search.dll')" />
+    <None Include="pcai_performance.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_performance.dll')" />
+    <None Include="pcai_system.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_system.dll')" />
+  </ItemGroup>
+
+</Project>
