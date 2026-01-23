@@ -6,7 +6,7 @@
     CompanyName = 'PC_AI'
     Copyright = '(c) 2025 PC_AI Framework. All rights reserved.'
     Description = 'USB device management for WSL integration in PC-AI framework.'
-    PowerShellVersion = '7.0'
+    PowerShellVersion = '5.1'
     FunctionsToExport = @(
         'Get-UsbDeviceList',
         'Mount-UsbToWSL',
