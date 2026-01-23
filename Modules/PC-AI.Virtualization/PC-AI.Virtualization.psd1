@@ -14,7 +14,8 @@
         'Repair-WSLNetworking',
         'Get-HyperVStatus',
         'Get-DockerStatus',
-        'Backup-WSLConfig'
+        'Backup-WSLConfig',
+        'Get-WSLEnvironmentHealth'
     )
     CmdletsToExport = @()
     VariablesToExport = @()

@@ -1,5 +1,4 @@
 #Requires -Version 5.1
-#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Adds Windows Defender exclusions for WSL
@@ -24,6 +23,13 @@ function Set-WSLDefenderExclusions {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     param()
+
+    # Check for Administrator privileges
+    $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        Write-Error "This function requires Administrator privileges. Please run PowerShell as Administrator."
+        return
+    }
 
     $result = [PSCustomObject]@{
         PathExclusions    = @()

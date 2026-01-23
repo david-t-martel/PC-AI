@@ -141,7 +141,7 @@ bestEffortDnsParsing=true
         }
 
         # Write new config
-        $config | Out-File -FilePath $wslConfigPath -Encoding UTF8 -Force
+        [System.IO.File]::WriteAllText($wslConfigPath, $config, [System.Text.Encoding]::UTF8)
         $result.Applied = $true
 
         Write-Host "[*] .wslconfig updated successfully" -ForegroundColor Green
