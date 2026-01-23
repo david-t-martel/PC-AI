@@ -71,6 +71,8 @@ Export-ModuleMember -Function @(
     'Invoke-LLMChat'
     'Invoke-PCDiagnosis'
     'Set-LLMConfig'
+    'Invoke-SmartDiagnosis'
+    'Invoke-NativeSearch'
 )
 
 Write-Verbose "PC-AI.LLM module loaded successfully"

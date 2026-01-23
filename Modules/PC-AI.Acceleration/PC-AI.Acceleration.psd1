@@ -25,6 +25,14 @@
         # Benchmarking
         'Measure-CommandPerformance'
         'Compare-ToolPerformance'
+
+        # PCAI Native (Rust DLL + C# P/Invoke)
+        'Initialize-PcaiNative'
+        'Test-PcaiNativeAvailable'
+        'Get-PcaiNativeStatus'
+        'Invoke-PcaiNativeDuplicates'
+        'Invoke-PcaiNativeFileSearch'
+        'Invoke-PcaiNativeContentSearch'
     )
 
     PrivateData = @{

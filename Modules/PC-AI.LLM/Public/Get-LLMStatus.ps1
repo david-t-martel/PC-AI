@@ -66,10 +66,9 @@ function Get-LLMStatus {
             $status.Ollama.ServiceStatus = $serviceStatus
 
             # Test API connectivity
-            if ($TestConnection -or $serviceStatus.Running) {
-                $status.Ollama.ApiConnected = Test-OllamaConnection
-                Write-Verbose "Ollama API connectivity: $($status.Ollama.ApiConnected)"
-            }
+            # Always test API since Ollama can run as a process without a Windows service
+            $status.Ollama.ApiConnected = Test-OllamaConnection
+            Write-Verbose "Ollama API connectivity: $($status.Ollama.ApiConnected)"
 
             # Get available models if API is connected
             if ($status.Ollama.ApiConnected) {

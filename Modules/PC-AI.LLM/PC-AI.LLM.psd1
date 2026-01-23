@@ -18,6 +18,8 @@
         'Invoke-LLMChat'
         'Invoke-PCDiagnosis'
         'Set-LLMConfig'
+        'Invoke-SmartDiagnosis'
+        'Invoke-NativeSearch'
     )
 
     # Cmdlets to export
