@@ -6,8 +6,8 @@ resolver = "2"
 members = [
     "pcai_core_lib",
     "pcai_search",
+    "pcai_performance",
     # Future modules (uncomment as implemented):
-    # "pcai_performance",
     # "pcai_system",
 ]
 
@@ -57,6 +57,9 @@ sysinfo = "0.32"
 
 # Directory walking
 walkdir = "2.5"
+
+# Concurrency primitives
+parking_lot = "0.12"
 
 [profile.release]
 opt-level = 3           # Maximum optimization

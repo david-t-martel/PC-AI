@@ -27,7 +27,7 @@ pub mod string;
 pub use error::PcaiStatus;
 pub use path::{normalize_path, parse_path_ffi, PathStyle};
 pub use result::PcaiResult;
-pub use string::PcaiStringBuffer;
+pub use string::{json_to_buffer_pretty, PcaiStringBuffer};
 
 /// Library version string
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
