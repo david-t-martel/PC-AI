@@ -55,6 +55,11 @@ function Initialize-PcaiNative {
             $coreDll = Join-Path $resolved.Path 'pcai_core_lib.dll'
             $wrapperDll = Join-Path $resolved.Path 'PcaiNative.dll'
 
+            # Specialized DLLs
+            $fsDll = Join-Path $resolved.Path 'pcai_fs.dll'
+            $perfDll = Join-Path $resolved.Path 'pcai_performance.dll'
+            $sysDll = Join-Path $resolved.Path 'pcai_system.dll'
+
             if ((Test-Path $coreDll) -and (Test-Path $wrapperDll)) {
                 $dllPath = $resolved.Path
                 break
@@ -63,7 +68,7 @@ function Initialize-PcaiNative {
     }
 
     if (-not $dllPath) {
-        Write-Verbose 'PCAI Native DLLs not found in search paths'
+        Write-Verbose 'PCAI Native DLLs (Core or Wrapper) not found in search paths'
         $script:PcaiNativeLoaded = $false
         return $false
     }
@@ -73,7 +78,7 @@ function Initialize-PcaiNative {
 
     try {
         # CRITICAL: Add the DLL directory to the process PATH so native DLLs can be found
-        # This allows the C# wrapper to locate pcai_core_lib.dll
+        # This allows the C# wrapper to locate specialized Rust DLLs
         $currentPath = [System.Environment]::GetEnvironmentVariable('PATH', 'Process')
         if ($currentPath -notlike "*$dllPath*") {
             [System.Environment]::SetEnvironmentVariable('PATH', "$dllPath;$currentPath", 'Process')
@@ -98,6 +103,12 @@ function Initialize-PcaiNative {
         if ([PcaiNative.PcaiCore]::IsAvailable) {
             $script:PcaiNativeVersion = [PcaiNative.PcaiCore]::Version
             Write-Verbose "PCAI System version: $($script:PcaiNativeVersion)"
+
+            # Check specialized modules if available
+            $fsAvailable = Test-Path (Join-Path $dllPath 'pcai_fs.dll')
+            $perfAvailable = Test-Path (Join-Path $dllPath 'pcai_performance.dll')
+            Write-Verbose "Specialized Modules: FS=$fsAvailable, Performance=$perfAvailable"
+
             $script:PcaiNativeLoaded = $true
             return $true
         } else {
@@ -140,12 +151,20 @@ function Get-PcaiNativeStatus {
 
     # Ensure initialized
     $available = Test-PcaiNativeAvailable
+    $dllPath = $script:PcaiNativeDllPath
 
     [PSCustomObject]@{
         Available       = $available
         Version         = $script:PcaiNativeVersion
-        DllPath         = $script:PcaiNativeDllPath
+        DllPath         = $dllPath
         CoreAvailable   = if ($available) { [PcaiNative.PcaiCore]::IsAvailable } else { $false }
+        Modules         = if ($available) {
+            [PSCustomObject]@{
+                FS          = Test-Path (Join-Path $dllPath 'pcai_fs.dll')
+                Performance = Test-Path (Join-Path $dllPath 'pcai_performance.dll')
+                System      = Test-Path (Join-Path $dllPath 'pcai_system.dll')
+            }
+        } else { $null }
     }
 }
 

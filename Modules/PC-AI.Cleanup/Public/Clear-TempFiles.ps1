@@ -242,7 +242,17 @@ function Clear-TempFiles {
             if ($PSCmdlet.ShouldProcess($file.FullName, 'Delete')) {
                 try {
                     $fileSize = $file.Length
-                    Remove-Item -Path $file.FullName -Force -ErrorAction Stop
+
+                    # Use native high-performance delete if available
+                    if ([PcaiNative.PcaiCore]::IsAvailable) {
+                        $status = [PcaiNative.PcaiCore]::DeleteFsItem($file.FullName, $false)
+                        if ($status -ne 'Success') {
+                            throw "Native delete failed with status $status"
+                        }
+                    } else {
+                        Remove-Item -Path $file.FullName -Force -ErrorAction Stop
+                    }
+
                     $locationResult.FilesDeleted++
                     $locationResult.BytesReclaimed += $fileSize
                 }

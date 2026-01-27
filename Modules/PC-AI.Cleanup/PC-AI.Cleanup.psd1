@@ -65,5 +65,8 @@
 - Clear-TempFiles: Safe temp file cleanup with space reclamation reporting
 '@
         }
+        PCAI = @{
+            Commands = @('cleanup')
+        }
     }
 }

@@ -41,5 +41,8 @@
             # Tags applied to this module. These help with module discovery in online galleries.
             Tags = @('Performance', 'Rust', 'Diagnostics', 'AI')
         }
+        PCAI = @{
+            Commands = @('optimize', 'perf')
+        }
     }
 }

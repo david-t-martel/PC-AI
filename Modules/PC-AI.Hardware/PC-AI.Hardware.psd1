@@ -14,5 +14,8 @@
         PSData = @{
             Tags = @('Hardware', 'Diagnostics', 'WMI', 'CIM')
         }
+        PCAI = @{
+            Commands = @('diagnose')
+        }
     }
 }
