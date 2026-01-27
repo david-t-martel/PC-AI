@@ -40,6 +40,9 @@
 
 .PARAMETER Temperature
     Final LLM temperature.
+
+.PARAMETER BypassRouter
+    Skip the FunctionGemma router and proceed directly to final LLM.
 #>
 function Invoke-LLMChatRouted {
     [CmdletBinding()]
@@ -81,10 +84,13 @@ function Invoke-LLMChatRouted {
 
         [Parameter()]
         [ValidateRange(0.0, 2.0)]
-        [double]$Temperature = 0.4
-        ,
+        [double]$Temperature = 0.4,
+
         [Parameter()]
-        [switch]$EnforceJson
+        [switch]$EnforceJson,
+
+        [Parameter()]
+        [switch]$BypassRouter
     )
 
     $systemPrompt = Get-EnrichedSystemPrompt -Mode $Mode
@@ -104,15 +110,40 @@ $systemPrompt
 $Message
 "@
 
-    $routerResult = Invoke-FunctionGemmaReAct `
-        -Prompt $routerPrompt `
-        -BaseUrl $RouterBaseUrl `
-        -Model $RouterModel `
-        -ToolsPath $ToolsPath `
-        -ExecuteTools:$ExecuteTools `
-        -ReturnFinal:$false `
-        -MaxToolCalls $MaxToolCalls `
-        -TimeoutSeconds $TimeoutSeconds
+    # Initialize router state tracking
+    $routerAvailable = $false
+    $degradedMode = $false
+    $routerResult = $null
+
+    # Try to use router unless explicitly bypassed
+    if (-not $BypassRouter) {
+        try {
+            $routerResult = Invoke-FunctionGemmaReAct `
+                -Prompt $routerPrompt `
+                -BaseUrl $RouterBaseUrl `
+                -Model $RouterModel `
+                -ToolsPath $ToolsPath `
+                -ExecuteTools:$ExecuteTools `
+                -ReturnFinal:$false `
+                -MaxToolCalls $MaxToolCalls `
+                -TimeoutSeconds $TimeoutSeconds
+            $routerAvailable = $true
+        } catch {
+            Write-Warning "FunctionGemma router unavailable, proceeding without tool routing: $_"
+            $degradedMode = $true
+            $routerResult = [PSCustomObject]@{
+                ToolCalls = @()
+                ToolResults = @()
+            }
+        }
+    } else {
+        # Router explicitly bypassed
+        $degradedMode = $true
+        $routerResult = [PSCustomObject]@{
+            ToolCalls = @()
+            ToolResults = @()
+        }
+    }
 
     $toolResults = $routerResult.ToolResults
     $toolSummary = ''
@@ -167,6 +198,8 @@ $toolSummary
         Model = $Model
         RouterModel = $RouterModel
         RouterBaseUrl = $RouterBaseUrl
+        RouterAvailable = $routerAvailable
+        DegradedMode = $degradedMode
         Timestamp = Get-Date
     }
 }
