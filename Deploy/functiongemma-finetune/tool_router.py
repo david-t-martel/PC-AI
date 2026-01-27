@@ -1,7 +1,9 @@
 import argparse
+# DEPRECATED: prefer native C# routing via PcaiOpenAiClient + Invoke-FunctionGemmaReAct.
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -54,6 +56,7 @@ class RouterConfig(BaseModel):
     model: str = "functiongemma-270m-it"
     tools: str = r"C:\Users\david\PC_AI\Config\pcai-tools.json"
     timeout: int = 120
+    system_prompt: Optional[str] = None
 
 
 class RouterHandler(BaseHTTPRequestHandler):
@@ -61,6 +64,7 @@ class RouterHandler(BaseHTTPRequestHandler):
     base_url = "http://127.0.0.1:8000"
     model = "functiongemma-270m-it"
     timeout = 120
+    system_prompt = None
 
     def do_POST(self):
         if self.path != "/route":
@@ -75,7 +79,10 @@ class RouterHandler(BaseHTTPRequestHandler):
             prompt = payload.get("prompt", "")
             messages = payload.get("messages")
             if not messages:
-                messages = [{"role": "user", "content": prompt}]
+                messages = []
+                if self.system_prompt:
+                    messages.append({"role": "developer", "content": self.system_prompt})
+                messages.append({"role": "user", "content": prompt})
 
             result = chat_completion(
                 self.base_url,
@@ -109,6 +116,7 @@ def main() -> None:
     parser.add_argument("--model", default="functiongemma-270m-it")
     parser.add_argument("--tools", default=r"C:\Users\david\PC_AI\Config\pcai-tools.json")
     parser.add_argument("--timeout", type=int, default=120)
+    parser.add_argument("--system-prompt", default=None)
     args = parser.parse_args()
 
     try:
@@ -119,6 +127,7 @@ def main() -> None:
             model=args.model,
             tools=args.tools,
             timeout=args.timeout,
+            system_prompt=args.system_prompt,
         )
     except ValidationError as exc:
         raise SystemExit(str(exc))
@@ -127,6 +136,8 @@ def main() -> None:
     RouterHandler.base_url = cfg.base_url
     RouterHandler.model = cfg.model
     RouterHandler.timeout = cfg.timeout
+    if cfg.system_prompt and Path(cfg.system_prompt).exists():
+        RouterHandler.system_prompt = Path(cfg.system_prompt).read_text(encoding="utf-8")
 
     server = ThreadingHTTPServer((cfg.host, cfg.port), RouterHandler)
     print(f"PC_AI Tool Router listening on http://{cfg.host}:{cfg.port}/route")

@@ -1,7 +1,7 @@
 import argparse
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -25,6 +25,8 @@ class GeneratorConfig(BaseModel):
     output: str
     test_vectors: str
     max_cases: int = 24
+    system_prompt: Optional[str] = None
+    scenarios: Optional[str] = None
 
 
 def main() -> None:
@@ -33,6 +35,8 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--test-vectors", required=True)
     parser.add_argument("--max-cases", type=int, default=24)
+    parser.add_argument("--system-prompt", default=None)
+    parser.add_argument("--scenarios", default=None, help="Optional scenarios JSON for NO_TOOL examples")
     args = parser.parse_args()
 
     try:
@@ -41,6 +45,8 @@ def main() -> None:
             output=args.output,
             test_vectors=args.test_vectors,
             max_cases=args.max_cases,
+            system_prompt=args.system_prompt,
+            scenarios=args.scenarios,
         )
     except ValidationError as exc:
         raise SystemExit(str(exc))
@@ -50,6 +56,9 @@ def main() -> None:
     dataset_items = []
     test_vectors = []
     default_system_msg = "You are a model that can do function calling with the following functions"
+    if cfg.system_prompt and Path(cfg.system_prompt).exists():
+        system_prompt_text = Path(cfg.system_prompt).read_text(encoding="utf-8")
+        default_system_msg = f"{system_prompt_text}\n\nYou are a tool-calling router. Use only the provided tools."
 
     for tool in tools:
         fn = tool["function"]
@@ -81,6 +90,23 @@ def main() -> None:
                 }
             )
             test_vectors.append({"tool": name, "arguments": args})
+
+    if cfg.scenarios and Path(cfg.scenarios).exists():
+        raw = json.loads(Path(cfg.scenarios).read_text(encoding="utf-8"))
+        items = raw.get("scenarios", raw)
+        for scenario in items:
+            if scenario.get("tool_name"):
+                continue
+            dataset_items.append(
+                {
+                    "messages": [
+                        {"role": "developer", "content": default_system_msg},
+                        {"role": "user", "content": scenario.get("user_content", "")},
+                        {"role": "assistant", "content": scenario.get("assistant_content", "NO_TOOL")},
+                    ],
+                    "tools": tools,
+                }
+            )
 
     output_path = Path(cfg.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)

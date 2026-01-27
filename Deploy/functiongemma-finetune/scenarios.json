@@ -1,0 +1,91 @@
+{
+  "scenarios": [
+    {
+      "mode": "diagnose",
+      "user_content": "Run a WSL network diagnosis and summarize any failures.",
+      "tool_name": "pcai_run_wsl_network_tool",
+      "tool_arguments": {"mode": "diagnose"}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Restart WSL because networking is stuck.",
+      "tool_name": "pcai_restart_wsl",
+      "tool_arguments": {}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Check WSL and Docker health quickly.",
+      "tool_name": "pcai_get_wsl_health",
+      "tool_arguments": {}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Tune model host GPU usage to 60 percent.",
+      "tool_name": "pcai_optimize_model_host",
+      "tool_arguments": {"gpu_limit": 0.6}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Check Docker Desktop health and return a summary.",
+      "tool_name": "pcai_get_docker_status",
+      "tool_arguments": {}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Start the PC_AI vLLM service.",
+      "tool_name": "pcai_start_service",
+      "tool_arguments": {"service": "PC_AI-VLLM"}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Stop the PC_AI HVSock proxy service.",
+      "tool_name": "pcai_stop_service",
+      "tool_arguments": {"service": "PC_AI-HVSockProxy"}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Restart the PC_AI vLLM service.",
+      "tool_name": "pcai_restart_service",
+      "tool_arguments": {"service": "PC_AI-VLLM"}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Switch LLM provider order to vllm,ollama,lmstudio.",
+      "tool_name": "pcai_set_provider_order",
+      "tool_arguments": {"order": "vllm,ollama,lmstudio"}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Look up ConfigManagerErrorCode 31 in Microsoft docs.",
+      "tool_name": "SearchDocs",
+      "tool_arguments": {"query": "ConfigManagerErrorCode 31", "source": "Microsoft"}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Check network adapter driver versions.",
+      "tool_name": "GetSystemInfo",
+      "tool_arguments": {"category": "Network", "detail": "DriverVersion"}
+    },
+    {
+      "mode": "diagnose",
+      "user_content": "Search logs for USB errors.",
+      "tool_name": "SearchLogs",
+      "tool_arguments": {"pattern": "USB|usbhub|xHCI", "rootPath": "C:\\\\Windows\\\\System32\\\\LogFiles"}
+    },
+    {
+      "mode": "chat",
+      "user_content": "Explain what WSL is and when to use it.",
+      "assistant_content": "NO_TOOL"
+    },
+    {
+      "mode": "chat",
+      "user_content": "How does vLLM differ from Ollama?",
+      "assistant_content": "NO_TOOL"
+    },
+    {
+      "mode": "chat",
+      "user_content": "What is the safest order to diagnose Docker + WSL issues?",
+      "assistant_content": "NO_TOOL"
+    }
+  ]
+}

@@ -5,6 +5,7 @@ from typing import Optional
 from datasets import load_dataset
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
+import inspect
 from trl import SFTConfig, SFTTrainer
 from peft import LoraConfig
 import torch
@@ -132,28 +133,42 @@ def main() -> None:
         task_type="CAUSAL_LM",
     )
 
-    cfg = SFTConfig(
-        output_dir=args.output,
-        max_seq_length=args.max_seq_len,
-        per_device_train_batch_size=args.batch_size,
-        gradient_accumulation_steps=args.grad_accum,
-        num_train_epochs=args.epochs,
-        learning_rate=args.lr,
-        logging_steps=10,
-        save_steps=200,
-        save_total_limit=2,
-        bf16=torch_dtype == torch.bfloat16,
-        fp16=torch_dtype == torch.float16,
-        packing=args.packing,
-    )
+    cfg_kwargs = {
+        "output_dir": args.output,
+        "per_device_train_batch_size": args.batch_size,
+        "gradient_accumulation_steps": args.grad_accum,
+        "num_train_epochs": args.epochs,
+        "learning_rate": args.lr,
+        "logging_steps": 10,
+        "save_steps": 200,
+        "save_total_limit": 2,
+        "bf16": torch_dtype == torch.bfloat16,
+        "fp16": torch_dtype == torch.float16,
+        "packing": args.packing,
+    }
+    sig = inspect.signature(SFTConfig)
+    if "max_seq_length" in sig.parameters:
+        cfg_kwargs["max_seq_length"] = args.max_seq_len
+    else:
+        cfg_kwargs["max_length"] = args.max_seq_len
 
-    trainer = SFTTrainer(
-        model=model,
-        tokenizer=tokenizer,
-        train_dataset=dataset,
-        peft_config=lora,
-        args=cfg,
-    )
+    cfg = SFTConfig(**cfg_kwargs)
+
+    trainer_kwargs = {
+        "model": model,
+        "train_dataset": dataset,
+        "peft_config": lora,
+        "args": cfg,
+    }
+    trainer_sig = inspect.signature(SFTTrainer)
+    if "tokenizer" in trainer_sig.parameters:
+        trainer_kwargs["tokenizer"] = tokenizer
+    elif "processing_class" in trainer_sig.parameters:
+        trainer_kwargs["processing_class"] = tokenizer
+    if "dataset_text_field" in trainer_sig.parameters:
+        trainer_kwargs["dataset_text_field"] = "text"
+
+    trainer = SFTTrainer(**trainer_kwargs)
 
     trainer.train()
     trainer.save_model(args.output)

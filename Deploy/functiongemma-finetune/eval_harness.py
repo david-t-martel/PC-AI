@@ -1,6 +1,7 @@
 import argparse
 import json
 import time
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -76,6 +77,7 @@ class EvalConfig(BaseModel):
     prompt: str
     timeout: int = 120
     show_metrics: bool = False
+    system_prompt: Optional[str] = None
 
 
 def main() -> None:
@@ -86,6 +88,7 @@ def main() -> None:
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--timeout", type=int, default=120)
     parser.add_argument("--show-metrics", action="store_true")
+    parser.add_argument("--system-prompt", default=None)
     args = parser.parse_args()
 
     try:
@@ -96,12 +99,17 @@ def main() -> None:
             prompt=args.prompt,
             timeout=args.timeout,
             show_metrics=args.show_metrics,
+            system_prompt=args.system_prompt,
         )
     except ValidationError as exc:
         raise SystemExit(str(exc))
 
     tools = load_tools(cfg.tools)
-    messages = [{"role": "user", "content": cfg.prompt}]
+    messages = []
+    if cfg.system_prompt and Path(cfg.system_prompt).exists():
+        system_text = Path(cfg.system_prompt).read_text(encoding="utf-8")
+        messages.append({"role": "developer", "content": system_text})
+    messages.append({"role": "user", "content": cfg.prompt})
 
     metrics_before = fetch_metrics(cfg.base_url) if cfg.show_metrics else None
     start = time.time()
