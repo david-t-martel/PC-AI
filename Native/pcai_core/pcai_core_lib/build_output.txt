@@ -1,0 +1,5 @@
+[31;1merror: unexpected argument 'h' found[0m
+[31;1m[0m
+[31;1mUsage: check [OPTIONS][0m
+[31;1m[0m
+[31;1mFor more information, try '--help'.[0m

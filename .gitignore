@@ -21,6 +21,10 @@ Hardware-Diagnostics-Report.txt
 
 # IDE
 .vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+!.vscode/launch.json
 .idea/
 *.code-workspace
 .vs/
@@ -54,6 +58,14 @@ obj/
 *.exe
 *.pdb
 
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock
+
+# Sccache
+.sccache/
+
 # Temporary files
 *.swp
 *.swo
@@ -68,6 +80,7 @@ logs/
 # Coverage reports
 coverage/
 htmlcov/
+*.lcov
 
 # Node modules (if any)
 node_modules/
@@ -85,3 +98,23 @@ venv/
 *.tar.gz
 *.7z
 *.rar
+# Models / weights (local only)
+Models/
+**/*.safetensors
+**/*.gguf
+**/*.bin
+**/*.pt
+**/*.pth
+**/*.ckpt
+**/*.onnx
+**/*.tflite
+**/*.litertlm
+
+# FunctionGemma finetune outputs
+Deploy/functiongemma-finetune/data/
+Deploy/functiongemma-finetune/output/
+
+# Hugging Face / model caches
+**/.cache/huggingface/
+**/.cache/vllm/
+**/.cache/torch/

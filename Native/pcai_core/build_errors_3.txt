@@ -1,0 +1,115 @@
+[31;1m    Checking pcai_core_lib v0.1.0 (C:\Users\david\PC_AI\Native\pcai_core\pcai_core_lib)[0m
+[31;1m    Building [======================>  ] 100/105: pcai_core_lib               [0m
+[31;1mwarning: unused import: `std::ffi::CStr`[0m
+[31;1m --> pcai_core_lib\src\hash.rs:6:5[0m
+[31;1m  |[0m
+[31;1m6 | use std::ffi::CStr;[0m
+[31;1m  |     ^^^^^^^^^^^^^^[0m
+[31;1m  |[0m
+[31;1m  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default[0m
+[31;1m[0m
+[31;1mwarning: type `search::SearchResult<FileMatch>` is more private than the item `find_files`[0m
+[31;1m  --> pcai_core_lib\src\search.rs:41:1[0m
+[31;1m   |[0m
+[31;1m41 | / pub fn find_files([0m
+[31;1m42 | |     root: &Path,[0m
+[31;1m43 | |     pattern: &str,[0m
+[31;1m44 | |     max_results: usize,[0m
+[31;1m45 | | ) -> Result<SearchResult<FileMatch>, PcaiStatus> {[0m
+[31;1m   | |________________________________________________^ function `find_files` is reachable at visibility `pub`[0m
+[31;1m   |[0m
+[31;1mnote: but type `search::SearchResult<FileMatch>` is only usable at visibility `pub(self)`[0m
+[31;1m  --> pcai_core_lib\src\search.rs:31:1[0m
+[31;1m   |[0m
+[31;1m31 | struct SearchResult<T> {[0m
+[31;1m   | ^^^^^^^^^^^^^^^^^^^^^^[0m
+[31;1m   = note: `#[warn(private_interfaces)]` on by default[0m
+[31;1m[0m
+[31;1mwarning: type `FileMatch` is more private than the item `find_files`[0m
+[31;1m  --> pcai_core_lib\src\search.rs:41:1[0m
+[31;1m   |[0m
+[31;1m41 | / pub fn find_files([0m
+[31;1m42 | |     root: &Path,[0m
+[31;1m43 | |     pattern: &str,[0m
+[31;1m44 | |     max_results: usize,[0m
+[31;1m45 | | ) -> Result<SearchResult<FileMatch>, PcaiStatus> {[0m
+[31;1m   | |________________________________________________^ function `find_files` is reachable at visibility `pub`[0m
+[31;1m   |[0m
+[31;1mnote: but type `FileMatch` is only usable at visibility `pub(self)`[0m
+[31;1m  --> pcai_core_lib\src\search.rs:15:1[0m
+[31;1m   |[0m
+[31;1m15 | struct FileMatch {[0m
+[31;1m   | ^^^^^^^^^^^^^^^^[0m
+[31;1m[0m
+[31;1mwarning: type `search::SearchResult<ContentMatch>` is more private than the item `search_content`[0m
+[31;1m  --> pcai_core_lib\src\search.rs:89:1[0m
+[31;1m   |[0m
+[31;1m89 | / pub fn search_content([0m
+[31;1m90 | |     root: &Path,[0m
+[31;1m91 | |     regex_pattern: &str,[0m
+[31;1m92 | |     file_pattern: Option<&str>,[0m
+[31;1m93 | |     max_results: usize,[0m
+[31;1m94 | |     context_lines: usize,[0m
+[31;1m95 | | ) -> Result<SearchResult<ContentMatch>, PcaiStatus> {[0m
+[31;1m   | |___________________________________________________^ function `search_content` is reachable at visibility `pub`[0m
+[31;1m   |[0m
+[31;1mnote: but type `search::SearchResult<ContentMatch>` is only usable at visibility `pub(self)`[0m
+[31;1m  --> pcai_core_lib\src\search.rs:31:1[0m
+[31;1m   |[0m
+[31;1m31 | struct SearchResult<T> {[0m
+[31;1m   | ^^^^^^^^^^^^^^^^^^^^^^[0m
+[31;1m[0m
+[31;1mwarning: type `ContentMatch` is more private than the item `search_content`[0m
+[31;1m  --> pcai_core_lib\src\search.rs:89:1[0m
+[31;1m   |[0m
+[31;1m89 | / pub fn search_content([0m
+[31;1m90 | |     root: &Path,[0m
+[31;1m91 | |     regex_pattern: &str,[0m
+[31;1m92 | |     file_pattern: Option<&str>,[0m
+[31;1m93 | |     max_results: usize,[0m
+[31;1m94 | |     context_lines: usize,[0m
+[31;1m95 | | ) -> Result<SearchResult<ContentMatch>, PcaiStatus> {[0m
+[31;1m   | |___________________________________________________^ function `search_content` is reachable at visibility `pub`[0m
+[31;1m   |[0m
+[31;1mnote: but type `ContentMatch` is only usable at visibility `pub(self)`[0m
+[31;1m  --> pcai_core_lib\src\search.rs:22:1[0m
+[31;1m   |[0m
+[31;1m22 | struct ContentMatch {[0m
+[31;1m   | ^^^^^^^^^^^^^^^^^^^[0m
+[31;1m[0m
+[31;1mwarning: type `hash::DuplicateResult` is more private than the item `find_duplicates`[0m
+[31;1m  --> pcai_core_lib\src\hash.rs:39:1[0m
+[31;1m   |[0m
+[31;1m39 | / pub fn find_duplicates([0m
+[31;1m40 | |     root: &Path,[0m
+[31;1m41 | |     min_size: u64,[0m
+[31;1m42 | | ) -> Result<DuplicateResult, PcaiStatus> {[0m
+[31;1m   | |________________________________________^ function `find_duplicates` is reachable at visibility `pub`[0m
+[31;1m   |[0m
+[31;1mnote: but type `hash::DuplicateResult` is only usable at visibility `pub(self)`[0m
+[31;1m  --> pcai_core_lib\src\hash.rs:28:1[0m
+[31;1m   |[0m
+[31;1m28 | struct DuplicateResult {[0m
+[31;1m   | ^^^^^^^^^^^^^^^^^^^^^^[0m
+[31;1mwarning: type `SystemSummary` is more private than the item `get_system_summary`[0m
+[31;1m  --> pcai_core_lib\src\system.rs:47:1[0m
+[31;1m   |[0m
+[31;1m47 | pub fn get_system_summary() -> SystemSummary {[0m
+[31;1m   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ function `get_system_summary` is reachable at visibility `pub`[0m
+[31;1m   |[0m
+[31;1mnote: but type `SystemSummary` is only usable at visibility `pub(self)`[0m
+[31;1m  --> pcai_core_lib\src\system.rs:11:1[0m
+[31;1m   |[0m
+[31;1m11 | struct SystemSummary {[0m
+[31;1m   | ^^^^^^^^^^^^^^^^^^^^[0m
+[31;1m[0m
+[31;1mwarning: `pcai_core_lib` (lib) generated 7 warnings (run `cargo fix --lib -p pcai_core_lib` to apply 1 suggestion)[0m
+[31;1m    Checking pcai_performance v0.1.0 (C:\Users\david\PC_AI\Native\pcai_core\pcai_performance)[0m
+[31;1m    Checking pcai_search v0.1.0 (C:\Users\david\PC_AI\Native\pcai_core\pcai_search)[0m
+[31;1m    Checking pcai_system v0.1.0 (C:\Users\david\PC_AI\Native\pcai_core\pcai_system)[0m
+[31;1m    Checking pcai_fs v0.1.0 (C:\Users\david\PC_AI\Native\pcai_core\pcai_fs)[0m
+[31;1m    Building [=======================> ] 101/105: pcai_performance, pcai_sear…[0m
+[31;1m    Building [=======================> ] 102/105: pcai_performance, pcai_sear…[0m
+[31;1m    Building [=======================> ] 103/105: pcai_search, pcai_system    [0m
+[31;1m    Building [=======================> ] 104/105: pcai_search                 [0m
+[31;1m    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.87s[0m

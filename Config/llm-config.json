@@ -4,7 +4,7 @@
   "providers": {
     "ollama": {
       "enabled": true,
-      "baseUrl": "http://localhost:11434",
+      "baseUrl": "http://127.0.0.1:11434",
       "defaultModel": "qwen2.5-coder:7b",
       "fallbackModels": [
         "mistral:7b",
@@ -16,8 +16,15 @@
     },
     "lmstudio": {
       "enabled": true,
-      "baseUrl": "http://localhost:1234",
+      "baseUrl": "http://127.0.0.1:1234",
       "priority": 2,
+      "timeout": 120000
+    },
+    "vllm": {
+      "enabled": true,
+      "baseUrl": "http://127.0.0.1:8000",
+      "defaultModel": "functiongemma-270m-it",
+      "priority": 1,
       "timeout": 120000
     }
   },
@@ -43,5 +50,10 @@
     "includeReasoningSteps": true,
     "structuredOutput": true,
     "markdownFormatting": true
-  }
+  },
+  "fallbackOrder": [
+    "ollama",
+    "vllm",
+    "lmstudio"
+  ]
 }

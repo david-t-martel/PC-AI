@@ -1,0 +1,23 @@
+# Ignore large model artifacts and caches
+Models/**
+**/*.safetensors
+**/*.gguf
+**/*.bin
+**/*.pt
+**/*.pth
+**/*.ckpt
+**/*.onnx
+**/*.tflite
+**/*.litertlm
+Deploy/functiongemma-finetune/data/**
+Deploy/functiongemma-finetune/output/**
+**/.cache/huggingface/**
+**/.cache/vllm/**
+**/.cache/torch/**
+
+# Keep build artifacts searchable for analysis
+!bin/**
+!**/*.dll
+!**/*.exe
+!**/*.pdb
+!**/*.lib

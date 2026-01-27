@@ -1,0 +1,27 @@
+[31;1m    Checking pcai_core_lib v0.1.0 (C:\Users\david\PC_AI\Native\pcai_core\pcai_core_lib)[0m
+[31;1m    Building [=========================> ] 28/29: pcai_core_lib               [0m
+[31;1merror: expected a literal[0m
+[31;1m  --> pcai_core_lib\src\lib.rs:38:41[0m
+[31;1m   |[0m
+[31;1m38 |     const VERSION_CSTR: &[u8] = concat!(option_env!("PCAI_BUILD_VERSION").unwrap_or("0.1.0-dev"), "\0").as_bytes();[0m
+[31;1m   |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31;1m   |[0m
+[31;1m   = note: only literals (like `"foo"`, `-42` and `3.14`) can be passed to `concat!()`[0m
+[31;1m[0m
+[31;1merror[E0658]: cannot call conditionally-const method `std::option::Option::<&str>::unwrap_or` in constants[0m
+[31;1m  --> pcai_core_lib\src\lib.rs:27:61[0m
+[31;1m   |[0m
+[31;1m27 | pub const VERSION: &str = option_env!("PCAI_BUILD_VERSION").unwrap_or("0.1.0-dev");[0m
+[31;1m   |                                                             ^^^^^^^^^^^^^^^^^^^^^^[0m
+[31;1m   |[0m
+[31;1m   = note: calls in constants are limited to constant functions, tuple structs and tuple variants[0m
+[31;1m   = note: see issue #143874 <https://github.com/rust-lang/rust/issues/143874> for more information[0m
+[31;1m[0m
+[31;1merror: `std::option::Option::<T>::unwrap_or` is not yet stable as a const fn[0m
+[31;1m  --> pcai_core_lib\src\lib.rs:27:27[0m
+[31;1m   |[0m
+[31;1m27 | pub const VERSION: &str = option_env!("PCAI_BUILD_VERSION").unwrap_or("0.1.0-dev");[0m
+[31;1m   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31;1m[0m
+[31;1mFor more information about this error, try `rustc --explain E0658`.[0m
+[31;1merror: could not compile `pcai_core_lib` (lib) due to 3 previous errors[0m

@@ -1,0 +1,10 @@
+# AST-Grep: documentation/status markers
+id: doc-status
+language: yaml
+message: Documentation/status marker
+rule:
+  any:
+    - pattern: "TODO"
+    - pattern: "FIXME"
+    - pattern: "INCOMPLETE"
+    - pattern: "DEPRECATED"

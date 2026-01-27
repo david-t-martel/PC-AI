@@ -103,8 +103,14 @@ if ($IncludeGlobalAstGrep) {
             if ($fileInfo -and $fileInfo.Length -gt 0) {
                 try {
                     $json = Get-Content -Path $globalOut -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
-                    if ($json.matches) {
-                        foreach ($m in $json.matches) {
+                    $sgMatches = $null
+                    if ($json -is [System.Collections.IEnumerable] -and -not ($json -is [string]) -and -not ($json.PSObject.Properties.Name -contains 'matches')) {
+                        $sgMatches = $json
+                    } elseif ($json.matches) {
+                        $sgMatches = $json.matches
+                    }
+                    if ($sgMatches) {
+                        foreach ($m in $sgMatches) {
                             $rid = if ($m.ruleId) { $m.ruleId } elseif ($m.rule -and $m.rule.id) { $m.rule.id } else { 'unknown' }
                             if (-not $counts.ContainsKey($rid)) { $counts[$rid] = 0 }
                             $counts[$rid]++
@@ -122,7 +128,25 @@ if ($IncludeGlobalAstGrep) {
             $null = $md.AppendLine("Config: $globalConfig")
             $null = $md.AppendLine('')
             if ($counts -eq $null) {
-                $null = $md.AppendLine('Failed to parse JSON output. See ASTGREP_GLOBAL.json for raw results.')
+                $counts = @{}
+                $rulePattern = '"ruleId"\\s*:\\s*"(?<id>[^"]+)"'
+                $ruleMatches = Select-String -Path $globalOut -Pattern $rulePattern -AllMatches -ErrorAction SilentlyContinue
+                foreach ($match in $ruleMatches) {
+                    foreach ($m in $match.Matches) {
+                        $rid = $m.Groups['id'].Value
+                        if ($rid) {
+                            if (-not $counts.ContainsKey($rid)) { $counts[$rid] = 0 }
+                            $counts[$rid]++
+                        }
+                    }
+                }
+                if ($counts.Count -eq 0) {
+                    $null = $md.AppendLine('Failed to parse JSON output. See ASTGREP_GLOBAL.json for raw results.')
+                } else {
+                    foreach ($k in ($counts.Keys | Sort-Object)) {
+                        $null = $md.AppendLine("- ${k}: $($counts[$k])")
+                    }
+                }
             } elseif ($counts.Count -eq 0) {
                 $null = $md.AppendLine('No matches found.')
             } else {

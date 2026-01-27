@@ -1,0 +1,35 @@
+[31;1m    Checking pcai_core_lib v0.1.0 (C:\Users\david\PC_AI\Native\pcai_core\pcai_core_lib)[0m
+[31;1m    Building [=========================> ] 28/29: pcai_core_lib               [0m
+[31;1merror: environment variable `PCAI_BUILD_VERSION` not defined at compile time[0m
+[31;1m  --> pcai_core_lib\src\lib.rs:35:27[0m
+[31;1m   |[0m
+[31;1m35 | pub const VERSION: &str = env!("PCAI_BUILD_VERSION");[0m
+[31;1m   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31;1m   |[0m
+[31;1m   = help: use `std::env::var("PCAI_BUILD_VERSION")` to read the variable at run time[0m
+[31;1m[0m
+[31;1merror: environment variable `PCAI_BUILD_VERSION` not defined at compile time[0m
+[31;1m  --> pcai_core_lib\src\lib.rs:62:41[0m
+[31;1m   |[0m
+[31;1m62 |     const VERSION_CSTR: &[u8] = concat!(env!("PCAI_BUILD_VERSION"), "\0").as_bytes();[0m
+[31;1m   |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31;1m   |[0m
+[31;1m   = help: use `std::env::var("PCAI_BUILD_VERSION")` to read the variable at run time[0m
+[31;1m[0m
+[31;1merror[E0432]: unresolved import `crate::string::rust_str_to_c`[0m
+[31;1m --> pcai_core_lib\src\json.rs:2:5[0m
+[31;1m  |[0m
+[31;1m2 | use crate::string::rust_str_to_c;[0m
+[31;1m  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `rust_str_to_c` in `string`[0m
+[31;1m[0m
+[31;1mwarning: unused import: `crate::error::PcaiStatus`[0m
+[31;1m --> pcai_core_lib\src\json.rs:1:5[0m
+[31;1m  |[0m
+[31;1m1 | use crate::error::PcaiStatus;[0m
+[31;1m  |     ^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[31;1m  |[0m
+[31;1m  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default[0m
+[31;1m[0m
+[31;1mFor more information about this error, try `rustc --explain E0432`.[0m
+[31;1mwarning: `pcai_core_lib` (lib) generated 1 warning[0m
+[31;1merror: could not compile `pcai_core_lib` (lib) due to 3 previous errors; 1 warning emitted[0m

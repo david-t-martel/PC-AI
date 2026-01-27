@@ -1,0 +1,99 @@
+[31;1m    Checking pcai_core_lib v0.1.0 (C:\Users\david\PC_AI\Native\pcai_core\pcai_core_lib)[0m
+[31;1m    Building [======================>  ] 100/105: pcai_core_lib               [0m
+[31;1merror[E0433]: failed to resolve: use of undeclared type `WalkBuilder`[0m
+[31;1m  --> pcai_core_lib\src\search.rs:51:18[0m
+[31;1m   |[0m
+[31;1m51 |     let walker = WalkBuilder::new(root)[0m
+[31;1m   |                  ^^^^^^^^^^^ use of undeclared type `WalkBuilder`[0m
+[31;1m   |[0m
+[31;1mhelp: consider importing this struct[0m
+[31;1m   |[0m
+[31;1m 5 + use ignore::WalkBuilder;[0m
+[31;1m   |[0m
+[31;1m[0m
+[31;1merror[E0433]: failed to resolve: use of undeclared type `WalkBuilder`[0m
+[31;1m   --> pcai_core_lib\src\search.rs:107:18[0m
+[31;1m    |[0m
+[31;1m107 |     let walker = WalkBuilder::new(root)[0m
+[31;1m    |                  ^^^^^^^^^^^ use of undeclared type `WalkBuilder`[0m
+[31;1m    |[0m
+[31;1mhelp: consider importing this struct[0m
+[31;1m    |[0m
+[31;1m  5 + use ignore::WalkBuilder;[0m
+[31;1m    |[0m
+[31;1m[0m
+[31;1mwarning: unused import: `std::ffi::CStr`[0m
+[31;1m --> pcai_core_lib\src\hash.rs:6:5[0m
+[31;1m  |[0m
+[31;1m6 | use std::ffi::CStr;[0m
+[31;1m  |     ^^^^^^^^^^^^^^[0m
+[31;1m  |[0m
+[31;1m  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default[0m
+[31;1m[0m
+[31;1merror[E0282]: type annotations needed[0m
+[31;1m  --> pcai_core_lib\src\search.rs:59:16[0m
+[31;1m   |[0m
+[31;1m59 |             if entry.file_type().map_or(false, |ft| ft.is_file()) {[0m
+[31;1m   |                ^^^^^ cannot infer type[0m
+[31;1m[0m
+[31;1merror[E0282]: type annotations needed[0m
+[31;1m  --> pcai_core_lib\src\search.rs:59:49[0m
+[31;1m   |[0m
+[31;1m59 |             if entry.file_type().map_or(false, |ft| ft.is_file()) {[0m
+[31;1m   |                                                 ^^  -- type must be known at this point[0m
+[31;1m   |[0m
+[31;1mhelp: consider giving this closure parameter an explicit type[0m
+[31;1m   |[0m
+[31;1m59 |             if entry.file_type().map_or(false, |ft: /* Type */| ft.is_file()) {[0m
+[31;1m   |                                                   ++++++++++++[0m
+[31;1merror[E0282]: type annotations needed[0m
+[31;1m  --> pcai_core_lib\src\search.rs:64:60[0m
+[31;1m   |[0m
+[31;1m64 |                         size: metadata.as_ref().map_or(0, |m| m.len()),[0m
+[31;1m   |                                                            ^  - type must be known at this point[0m
+[31;1m   |[0m
+[31;1mhelp: consider giving this closure parameter an explicit type[0m
+[31;1m   |[0m
+[31;1m64 |                         size: metadata.as_ref().map_or(0, |m: /* Type */| m.len()),[0m
+[31;1m   |                                                             ++++++++++++[0m
+[31;1m[0m
+[31;1merror[E0282]: type annotations needed[0m
+[31;1m  --> pcai_core_lib\src\search.rs:65:71[0m
+[31;1m   |[0m
+[31;1m65 |                         is_readonly: metadata.as_ref().map_or(false, |m| m.permissions().readonly()),[0m
+[31;1m   |                                                                       ^  - type must be known at this point[0m
+[31;1m   |[0m
+[31;1mhelp: consider giving this closure parameter an explicit type[0m
+[31;1m   |[0m
+[31;1m65 |                         is_readonly: metadata.as_ref().map_or(false, |m: /* Type */| m.permissions().readonly()),[0m
+[31;1m   |                                                                        ++++++++++++[0m
+[31;1m[0m
+[31;1merror[E0282]: type annotations needed[0m
+[31;1m   --> pcai_core_lib\src\search.rs:121:17[0m
+[31;1m    |[0m
+[31;1m121 |             let entry = match entry {[0m
+[31;1m    |                 ^^^^^[0m
+[31;1m...[0m
+[31;1m126 |             if !entry.file_type().map_or(false, |ft| ft.is_file()) {[0m
+[31;1m    |                 ----- type must be known at this point[0m
+[31;1m    |[0m
+[31;1mhelp: consider giving `entry` an explicit type[0m
+[31;1m    |[0m
+[31;1m121 |             let entry: /* Type */ = match entry {[0m
+[31;1m    |                      ++++++++++++[0m
+[31;1m[0m
+[31;1merror[E0282]: type annotations needed[0m
+[31;1m   --> pcai_core_lib\src\search.rs:126:50[0m
+[31;1m    |[0m
+[31;1m126 |             if !entry.file_type().map_or(false, |ft| ft.is_file()) {[0m
+[31;1m    |                                                  ^^  -- type must be known at this point[0m
+[31;1m    |[0m
+[31;1mhelp: consider giving this closure parameter an explicit type[0m
+[31;1m    |[0m
+[31;1m126 |             if !entry.file_type().map_or(false, |ft: /* Type */| ft.is_file()) {[0m
+[31;1m    |                                                    ++++++++++++[0m
+[31;1m[0m
+[31;1mSome errors have detailed explanations: E0282, E0433.[0m
+[31;1mFor more information about an error, try `rustc --explain E0282`.[0m
+[31;1mwarning: `pcai_core_lib` (lib) generated 1 warning[0m
+[31;1merror: could not compile `pcai_core_lib` (lib) due to 8 previous errors; 1 warning emitted[0m
