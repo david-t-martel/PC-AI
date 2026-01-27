@@ -4,7 +4,7 @@
     Initializes and caches Rust tool paths
 #>
 
-function Initialize-RustTools {
+function Initialize-RustTool {
     [CmdletBinding()]
     param()
 
@@ -33,8 +33,8 @@ function Find-RustTool {
         "$env:USERPROFILE\bin"
         "$env:USERPROFILE\.local\bin"
         "$env:LOCALAPPDATA\Microsoft\WinGet\Links"
-        "C:\Program Files\ripgrep"
-        "C:\Program Files\fd"
+        'C:\Program Files\ripgrep'
+        'C:\Program Files\fd'
     )
 
     foreach ($searchPath in $searchPaths) {
@@ -52,9 +52,8 @@ function Find-RustTool {
             $script:RustToolCache[$ToolName] = $result
             return $result
         }
-    }
-    catch {
-        # Ignore errors
+    } catch {
+        Write-Verbose "where.exe failed to find $ToolName : $_"
     }
 
     return $null

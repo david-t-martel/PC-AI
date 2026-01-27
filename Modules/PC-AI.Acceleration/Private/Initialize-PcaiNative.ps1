@@ -5,9 +5,8 @@
 
 .DESCRIPTION
     Loads the native Rust DLLs and C# P/Invoke wrapper for:
-    - pcai_core_lib.dll - Core FFI utilities and string management
-    - pcai_search.dll - Duplicate detection, file search, content search
-    - PcaiNative.dll - C# wrapper with type-safe interfaces
+    - pcai_core_lib.dll - Unified Core engine (Search, Duplicates, System)
+    - PcaiNative.dll    - Managed C# bridge
 
     These provide 5-15x speedup over PowerShell equivalents.
 
@@ -17,7 +16,6 @@
 # Module-level state for native tools
 $script:PcaiNativeLoaded = $false
 $script:PcaiNativeVersion = $null
-$script:PcaiSearchVersion = $null
 $script:PcaiNativeDllPath = $null
 
 function Initialize-PcaiNative {
@@ -29,7 +27,7 @@ function Initialize-PcaiNative {
     )
 
     if ($script:PcaiNativeLoaded -and -not $Force) {
-        Write-Verbose "PCAI Native already loaded, skipping initialization"
+        Write-Verbose 'PCAI Native already loaded, skipping initialization'
         return $true
     }
 
@@ -40,7 +38,7 @@ function Initialize-PcaiNative {
         return $false
     }
 
-    Write-Verbose "Initializing PCAI Native tools..."
+    Write-Verbose 'Initializing PCAI Native tools...'
 
     # Find DLL locations
     $searchPaths = @(
@@ -55,10 +53,9 @@ function Initialize-PcaiNative {
         $resolved = Resolve-Path -Path $searchPath -ErrorAction SilentlyContinue
         if ($resolved) {
             $coreDll = Join-Path $resolved.Path 'pcai_core_lib.dll'
-            $searchDll = Join-Path $resolved.Path 'pcai_search.dll'
             $wrapperDll = Join-Path $resolved.Path 'PcaiNative.dll'
 
-            if ((Test-Path $coreDll) -and (Test-Path $searchDll) -and (Test-Path $wrapperDll)) {
+            if ((Test-Path $coreDll) -and (Test-Path $wrapperDll)) {
                 $dllPath = $resolved.Path
                 break
             }
@@ -66,7 +63,7 @@ function Initialize-PcaiNative {
     }
 
     if (-not $dllPath) {
-        Write-Verbose "PCAI Native DLLs not found in search paths"
+        Write-Verbose 'PCAI Native DLLs not found in search paths'
         $script:PcaiNativeLoaded = $false
         return $false
     }
@@ -76,7 +73,7 @@ function Initialize-PcaiNative {
 
     try {
         # CRITICAL: Add the DLL directory to the process PATH so native DLLs can be found
-        # This allows the C# wrapper to locate pcai_core_lib.dll and pcai_search.dll
+        # This allows the C# wrapper to locate pcai_core_lib.dll
         $currentPath = [System.Environment]::GetEnvironmentVariable('PATH', 'Process')
         if ($currentPath -notlike "*$dllPath*") {
             [System.Environment]::SetEnvironmentVariable('PATH', "$dllPath;$currentPath", 'Process')
@@ -92,39 +89,23 @@ function Initialize-PcaiNative {
 
         if (-not $loadedAssembly) {
             Add-Type -Path $wrapperPath -ErrorAction Stop
-            Write-Verbose "Loaded PcaiNative.dll assembly"
-        }
-        else {
-            Write-Verbose "PcaiNative assembly already loaded"
+            Write-Verbose 'Loaded PcaiNative.dll assembly'
+        } else {
+            Write-Verbose 'PcaiNative assembly already loaded'
         }
 
         # Test core availability
         if ([PcaiNative.PcaiCore]::IsAvailable) {
             $script:PcaiNativeVersion = [PcaiNative.PcaiCore]::Version
-            Write-Verbose "PCAI Core version: $($script:PcaiNativeVersion)"
-        }
-        else {
-            Write-Warning "PCAI Core DLL loaded but not functional"
+            Write-Verbose "PCAI System version: $($script:PcaiNativeVersion)"
+            $script:PcaiNativeLoaded = $true
+            return $true
+        } else {
+            Write-Warning 'PCAI Core DLL loaded but not functional'
             $script:PcaiNativeLoaded = $false
             return $false
         }
-
-        # Test search availability
-        if ([PcaiNative.PcaiSearch]::IsAvailable) {
-            $script:PcaiSearchVersion = [PcaiNative.PcaiSearch]::Version
-            Write-Verbose "PCAI Search version: $($script:PcaiSearchVersion)"
-        }
-        else {
-            Write-Warning "PCAI Search DLL loaded but not functional"
-            $script:PcaiNativeLoaded = $false
-            return $false
-        }
-
-        $script:PcaiNativeLoaded = $true
-        Write-Verbose "PCAI Native initialization complete"
-        return $true
-    }
-    catch {
+    } catch {
         Write-Warning "Failed to load PCAI Native: $_"
         $script:PcaiNativeLoaded = $false
         return $false
@@ -152,9 +133,6 @@ function Get-PcaiNativeStatus {
     <#
     .SYNOPSIS
         Gets detailed status of PCAI Native tools
-
-    .OUTPUTS
-        PSCustomObject with native tool status and versions
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
@@ -165,46 +143,16 @@ function Get-PcaiNativeStatus {
 
     [PSCustomObject]@{
         Available       = $available
-        CoreVersion     = $script:PcaiNativeVersion
-        SearchVersion   = $script:PcaiSearchVersion
+        Version         = $script:PcaiNativeVersion
         DllPath         = $script:PcaiNativeDllPath
         CoreAvailable   = if ($available) { [PcaiNative.PcaiCore]::IsAvailable } else { $false }
-        SearchAvailable = if ($available) { [PcaiNative.PcaiSearch]::IsAvailable } else { $false }
     }
 }
 
-function Invoke-PcaiNativeDuplicates {
+function Invoke-PcaiNativeDuplicate {
     <#
     .SYNOPSIS
         Finds duplicate files using native parallel SHA-256 hashing
-
-    .DESCRIPTION
-        Uses the high-performance Rust implementation for 5-10x faster
-        duplicate detection compared to PowerShell.
-
-    .PARAMETER Path
-        Root directory to search
-
-    .PARAMETER MinimumSize
-        Minimum file size in bytes (default: 0)
-
-    .PARAMETER IncludePattern
-        Glob pattern for files to include (e.g., "*.txt")
-
-    .PARAMETER ExcludePattern
-        Glob pattern for files to exclude (e.g., "*.tmp")
-
-    .PARAMETER StatsOnly
-        Return only statistics without the full file list
-
-    .EXAMPLE
-        Invoke-PcaiNativeDuplicates -Path "D:\Downloads"
-
-    .EXAMPLE
-        Invoke-PcaiNativeDuplicates -Path "C:\Photos" -IncludePattern "*.jpg" -MinimumSize 1MB
-
-    .OUTPUTS
-        DuplicateResult object with groups of duplicate files
     #>
     [CmdletBinding()]
     param(
@@ -226,45 +174,26 @@ function Invoke-PcaiNativeDuplicates {
     )
 
     if (-not (Test-PcaiNativeAvailable)) {
-        throw "PCAI Native tools not available. Build with: Native\build.ps1"
+        throw 'PCAI Native tools not available.'
     }
 
     $resolvedPath = Resolve-Path $Path | Select-Object -ExpandProperty Path
 
     if ($StatsOnly) {
-        return [PcaiNative.PcaiSearch]::FindDuplicatesStats(
-            $resolvedPath,
-            [uint64]$MinimumSize,
-            $IncludePattern,
-            $ExcludePattern
-        )
+        throw "StatsOnly not supported in consolidated NativeDuplicate implementation"
     }
-    else {
-        return [PcaiNative.PcaiSearch]::FindDuplicates(
-            $resolvedPath,
-            [uint64]$MinimumSize,
-            $IncludePattern,
-            $ExcludePattern
-        )
+
+    $json = [PcaiNative.PcaiCore]::FindDuplicates($resolvedPath, [uint64]$MinimumSize)
+    if ($json) {
+        return ($json | ConvertFrom-Json)
     }
+    return $null
 }
 
 function Invoke-PcaiNativeFileSearch {
     <#
     .SYNOPSIS
         Fast file search using native parallel directory walking
-
-    .PARAMETER Path
-        Root directory to search
-
-    .PARAMETER Pattern
-        Glob pattern to match (e.g., "*.txt", "**/*.rs")
-
-    .PARAMETER MaxResults
-        Maximum number of results (0 = unlimited)
-
-    .PARAMETER StatsOnly
-        Return only statistics without the file list
     #>
     [CmdletBinding()]
     param(
@@ -282,7 +211,7 @@ function Invoke-PcaiNativeFileSearch {
     )
 
     if (-not (Test-PcaiNativeAvailable)) {
-        throw "PCAI Native tools not available. Build with: Native\build.ps1"
+        throw 'PCAI Native tools not available.'
     }
 
     $resolvedPath = if ($Path) {
@@ -292,43 +221,20 @@ function Invoke-PcaiNativeFileSearch {
     }
 
     if ($StatsOnly) {
-        return [PcaiNative.PcaiSearch]::FindFilesStats(
-            $Pattern,
-            $resolvedPath,
-            [uint64]$MaxResults
-        )
+        throw "StatsOnly not supported in consolidated NativeFileSearch implementation"
     }
-    else {
-        return [PcaiNative.PcaiSearch]::FindFiles(
-            $Pattern,
-            $resolvedPath,
-            [uint64]$MaxResults
-        )
+
+    $json = [PcaiNative.PcaiCore]::FindFiles($resolvedPath, $Pattern, [uint32]$MaxResults)
+    if ($json) {
+        return ($json | ConvertFrom-Json)
     }
+    return $null
 }
 
 function Invoke-PcaiNativeContentSearch {
     <#
     .SYNOPSIS
         Fast content search using native parallel regex matching
-
-    .PARAMETER Pattern
-        Regex pattern to search for
-
-    .PARAMETER Path
-        Root directory to search
-
-    .PARAMETER FilePattern
-        Glob pattern for files to search (e.g., "*.log")
-
-    .PARAMETER MaxResults
-        Maximum number of matches (0 = unlimited)
-
-    .PARAMETER ContextLines
-        Number of context lines around matches
-
-    .PARAMETER StatsOnly
-        Return only statistics without match details
     #>
     [CmdletBinding()]
     param(
@@ -352,7 +258,7 @@ function Invoke-PcaiNativeContentSearch {
     )
 
     if (-not (Test-PcaiNativeAvailable)) {
-        throw "PCAI Native tools not available. Build with: Native\build.ps1"
+        throw 'PCAI Native tools not available.'
     }
 
     $resolvedPath = if ($Path) {
@@ -362,20 +268,82 @@ function Invoke-PcaiNativeContentSearch {
     }
 
     if ($StatsOnly) {
-        return [PcaiNative.PcaiSearch]::SearchContentStats(
-            $Pattern,
-            $resolvedPath,
-            $FilePattern,
-            [uint64]$MaxResults
-        )
+        throw "StatsOnly not supported in consolidated NativeContentSearch implementation"
     }
-    else {
-        return [PcaiNative.PcaiSearch]::SearchContent(
-            $Pattern,
-            $resolvedPath,
-            $FilePattern,
-            [uint64]$MaxResults,
-            [uint32]$ContextLines
-        )
+
+    $json = [PcaiNative.PcaiCore]::SearchContent($resolvedPath, $Pattern, $FilePattern, [uint32]$MaxResults, [uint32]$ContextLines)
+    if ($json) {
+        return ($json | ConvertFrom-Json)
     }
+    return $null
+}
+
+function Invoke-PcaiNativeSystemInfo {
+    <#
+    .SYNOPSIS
+        Native system interrogation for hardware and OS telemetry
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [switch]$MetricsOnly,
+
+        [Parameter()]
+        [switch]$HighFidelity
+    )
+
+    if (-not (Test-PcaiNativeAvailable)) { return $null }
+
+    if ($HighFidelity) {
+        $json = [PcaiNative.PcaiCore]::GetSystemTelemetryJson()
+        if ($json) { return ($json | ConvertFrom-Json) }
+        return $null
+    }
+
+    $json = if ($MetricsOnly) {
+        [PcaiNative.PcaiCore]::QueryHardwareMetrics()
+    } else {
+        [PcaiNative.PcaiCore]::QuerySystemInfo()
+    }
+
+    if ($json) {
+        return ($json | ConvertFrom-Json)
+    }
+    return $null
+}
+
+function Test-PcaiResourceSafety {
+    <#
+    .SYNOPSIS
+        Checks if system resources are within safety limits (e.g. 80% load)
+    #>
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter()]
+        [float]$GpuLimit = 0.8
+    )
+
+    if (-not (Test-PcaiNativeAvailable)) { return $true }
+    return [PcaiNative.PcaiCore]::CheckResourceSafety($GpuLimit)
+}
+
+function Get-PcaiTokenEstimate {
+    <#
+    .SYNOPSIS
+        Estimates the number of tokens in a string for Gemma-like models natively
+    #>
+    [CmdletBinding()]
+    [OutputType([uint64])]
+    param(
+        [Parameter(Mandatory, Position = 0)]
+        [AllowEmptyString()]
+        [string]$Text
+    )
+
+    if (-not (Test-PcaiNativeAvailable)) {
+        # Fallback to simple words + 20% if native is unavailable
+        return [uint64](($Text.Split(' ') | Where-Object { $_ }).Count * 1.2 + 1)
+    }
+    return [PcaiNative.PcaiCore]::EstimateTokens($Text)
 }

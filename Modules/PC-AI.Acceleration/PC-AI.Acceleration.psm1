@@ -47,7 +47,7 @@ if (Test-Path $PublicPath) {
 }
 
 # Initialize tool paths on module load
-Initialize-RustTools
+Initialize-RustTool
 
 # Initialize PCAI Native DLLs (silent on failure - falls back to PowerShell)
 $null = Initialize-PcaiNative -ErrorAction SilentlyContinue

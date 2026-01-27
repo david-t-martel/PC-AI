@@ -1,59 +1,130 @@
 #Requires -Version 5.1
+
 <#
 .SYNOPSIS
-    PC-AI Performance Module Loader
+    PC-AI Performance Module
+    Bridges PowerShell to Rust/C# native modules for high-performance diagnostics.
 
 .DESCRIPTION
-    This module provides performance monitoring and optimization functions for Windows systems.
-    It includes disk space analysis, process performance monitoring, disk optimization,
-    and real-time system resource monitoring capabilities.
-
-.NOTES
-    Module: PC-AI.Performance
-    Version: 1.0.0
-    Author: PC_AI Project
+    Provides cmdlets for:
+    - Fast disk usage analysis
+    - Low-overhead process monitoring
+    - System memory statistics
 #>
 
-# Get the module root path
-$ModuleRoot = $PSScriptRoot
+$script:DllPath = $null
 
-# Define paths for public and private functions
-$PublicPath = Join-Path -Path $ModuleRoot -ChildPath 'Public'
-$PrivatePath = Join-Path -Path $ModuleRoot -ChildPath 'Private'
+function Initialize-PcaiNative {
+    [CmdletBinding()]
+    param()
 
-# Import private functions first (helpers used by public functions)
-$PrivateFunctions = @()
-if (Test-Path -Path $PrivatePath) {
-    $PrivateFunctions = Get-ChildItem -Path $PrivatePath -Filter '*.ps1' -ErrorAction SilentlyContinue
-    foreach ($Function in $PrivateFunctions) {
-        try {
-            Write-Verbose "Importing private function: $($Function.BaseName)"
-            . $Function.FullName
+    if ($script:DllPath -and (Test-Path $script:DllPath)) {
+        return
+    }
+
+    # Search paths for the DLL:
+    # 1. ../../../bin (Standard project layout: Modules/PC-AI.Performance -> Root -> bin)
+    # 2. $PSScriptRoot/bin (Module-local bin)
+    $PossiblePaths = @(
+        (Join-Path $PSScriptRoot '..\..\bin\PcaiNative.dll'),
+        (Join-Path $PSScriptRoot 'bin\PcaiNative.dll')
+    )
+
+    foreach ($path in $PossiblePaths) {
+        $fullPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($path)
+        if (Test-Path $fullPath) {
+            try {
+                Add-Type -Path $fullPath -ErrorAction Stop
+                $script:DllPath = $fullPath
+                Write-Verbose "Loaded PcaiNative.dll from $fullPath"
+                return
+            } catch {
+                Write-Warning "Found DLL at $fullPath but failed to load: $_"
+            }
         }
-        catch {
-            Write-Error "Failed to import private function $($Function.BaseName): $_"
-        }
+    }
+
+    Write-Warning 'PcaiNative.dll not found. Ensure the project is built (Native/build.ps1).'
+}
+
+function Get-PcaiDiskUsage {
+    <#
+    .SYNOPSIS
+        Gets disk usage statistics for a directory.
+    .DESCRIPTION
+        Uses native Rust traversal for high-performance analysis.
+    .PARAMETER Path
+        Directory to analyze. Defaults to current location.
+    .PARAMETER Top
+        Number of top subdirectories to return.
+    #>
+    [CmdletBinding()]
+    param(
+        [string]$Path = $PWD,
+        [int]$Top = 10
+    )
+
+    Initialize-PcaiNative
+    if (-not $script:DllPath) { return }
+
+    $Json = [PcaiNative.PerformanceModule]::GetDiskUsageJson($Path, $Top)
+    if ($Json) {
+        return $Json | ConvertFrom-Json
     }
 }
 
-# Import public functions
-$PublicFunctions = @()
-if (Test-Path -Path $PublicPath) {
-    $PublicFunctions = Get-ChildItem -Path $PublicPath -Filter '*.ps1' -ErrorAction SilentlyContinue
-    foreach ($Function in $PublicFunctions) {
-        try {
-            Write-Verbose "Importing public function: $($Function.BaseName)"
-            . $Function.FullName
-        }
-        catch {
-            Write-Error "Failed to import public function $($Function.BaseName): $_"
-        }
+function Get-PcaiTopProcess {
+    <#
+    .SYNOPSIS
+        Gets top resource-consuming processes.
+    .DESCRIPTION
+        Returns a snapshot of processes sorted by CPU or Memory.
+    #>
+    [CmdletBinding()]
+    param(
+        [ValidateSet('memory', 'cpu')]
+        [string]$SortBy = 'memory',
+        [int]$Top = 20
+    )
+
+    Initialize-PcaiNative
+    if (-not $script:DllPath) { return }
+
+    $Json = [PcaiNative.PerformanceModule]::GetTopProcessesJson($Top, $SortBy)
+    if ($Json) {
+        return $Json | ConvertFrom-Json
     }
 }
 
-# Export public functions
-$FunctionsToExport = $PublicFunctions | ForEach-Object { $_.BaseName }
-Export-ModuleMember -Function $FunctionsToExport
+function Get-PcaiMemoryStat {
+    <#
+    .SYNOPSIS
+        Gets system memory statistics.
+    #>
+    [CmdletBinding()]
+    param()
 
-# Module initialization message
-Write-Verbose "PC-AI.Performance module loaded. Imported $($PrivateFunctions.Count) private and $($PublicFunctions.Count) public functions."
+    Initialize-PcaiNative
+    if (-not $script:DllPath) { return }
+
+    $Json = [PcaiNative.PerformanceModule]::GetMemoryStatsJson()
+    if ($Json) {
+        return $Json | ConvertFrom-Json
+    }
+}
+
+function Test-PcaiNative {
+    <#
+    .SYNOPSIS
+        Verifies native DLL is loaded and working.
+    #>
+    [CmdletBinding()]
+    param()
+
+    Initialize-PcaiNative
+    if (-not $script:DllPath) { return $false }
+
+    return [PcaiNative.PerformanceModule]::Test()
+}
+
+Export-ModuleMember -Function Get-PcaiDiskUsage, Get-PcaiTopProcess, Get-PcaiMemoryStat, Test-PcaiNative
