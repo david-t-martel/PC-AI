@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Analyze event logs, SMART status, and device configurations
 - Propose optimizations for disk, network, WSL2, virtualization, and system performance
 - Clean up duplicates, PATH entries, and unnecessary system artifacts
+- Route tool execution via FunctionGemma (vLLM) before final LLM analysis
 
 The agent operates on **Windows 10/11** with WSL2 integration, targeting development workstations with Docker, Hyper-V, and cross-platform tooling.
 
@@ -18,7 +19,9 @@ The agent operates on **Windows 10/11** with WSL2 integration, targeting develop
 PC_AI/
 ├── DIAGNOSE.md           # LLM system prompt defining assistant behavior
 ├── DIAGNOSE_LOGIC.md     # Branched reasoning decision tree for analysis
+├── CHAT.md               # General chat system prompt
 ├── Get-PcDiagnostics.ps1 # Core hardware/device diagnostics script
+├── Deploy/functiongemma-finetune/ # FunctionGemma training + router
 └── CLAUDE.md             # This file
 ```
 
@@ -28,7 +31,7 @@ PC_AI/
 2. **DIAGNOSE_LOGIC.md** - Branched reasoning logic for analyzing diagnostic output
 3. **Get-PcDiagnostics.ps1** - Read-only PowerShell script that collects system data
 
-The agent follows a **collect → parse → reason → recommend** workflow where diagnostics output is structured into categories and analyzed using decision trees.
+The agent follows a **collect → parse → route → reason → recommend** workflow where diagnostics output is structured into categories, optional tool routing is executed via FunctionGemma, and the main LLM produces recommendations.
 
 ## Commands
 
@@ -135,6 +138,12 @@ wsl -l -v
 wsl ip addr show
 wsl ip route show
 ```
+
+### FunctionGemma Router
+- Tool schema: `Config/pcai-tools.json`
+- Router interface: `Invoke-FunctionGemmaReAct` / `Invoke-LLMChatRouted`
+- Training data: `Deploy/functiongemma-finetune/`
+- HVSocket aliases: `Config/hvsock-proxy.conf` with `hvsock://ollama` style URLs
 
 ## Expected Output Format
 

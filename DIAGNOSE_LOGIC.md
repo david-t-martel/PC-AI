@@ -245,10 +245,9 @@ Response:
 - Verify WSL status/version and networking mode.
 - Check HNS/Hyper-V services state.
 - Run:
-  - `C:\Scripts\wsl-network-recovery.ps1 -Diagnose`
-  - `C:\Scripts\Startup\wsl-docker-health-check.ps1`
-  - `Get-WSLEnvironmentHealth`
+  - `Invoke-WSLNetworkToolkit -Diagnose`
   - `Invoke-WSLDockerHealthCheck`
+  - `Get-WSLEnvironmentHealth`
 - If Docker Desktop returns 500 errors for the Linux engine:
   - Confirm WSL is healthy first, then restart Docker Desktop.
 - For local LLM services:

@@ -7,13 +7,14 @@ A comprehensive PowerShell 7+ framework for Windows PC diagnostics, optimization
 - **Hardware Diagnostics**: Device errors, SMART status, USB controllers, network adapters
 - **Virtualization Support**: WSL2 optimization, Hyper-V status, Docker diagnostics
 - **Performance Acceleration**: Rust tool integration (ripgrep, fd, procs) with PS7+ parallelism
-- **LLM Analysis**: Local AI-powered diagnostic interpretation via Ollama
+- **LLM Analysis**: Local AI-powered diagnostic interpretation via Ollama/vLLM/LM Studio
+- **Tool-Calling Router**: FunctionGemma (vLLM) selects and executes PC-AI tools before analysis
 - **Unified CLI**: Single entry point for all diagnostic and optimization tasks
 
 ## Requirements
 
 - **Windows 10/11** with PowerShell 7.0+
-- **Optional**: Ollama or LM Studio for LLM features
+- **Optional**: Ollama, vLLM, or LM Studio for LLM features
 - **Optional**: Rust CLI tools for acceleration (fd, ripgrep, procs, bat, etc.)
 
 ## Quick Start
@@ -160,7 +161,7 @@ Speedup:            44.6x
 
 ## LLM Integration
 
-PC-AI integrates with local LLM providers for intelligent diagnostic analysis:
+PC-AI integrates with local LLM providers for intelligent diagnostic analysis and tool routing:
 
 ### Ollama (Default)
 ```powershell
@@ -180,6 +181,29 @@ Set-LLMConfig -Provider lmstudio -BaseUrl "http://localhost:1234"
 Invoke-PCDiagnosis -ReportPath ".\report.txt"
 ```
 
+### vLLM + FunctionGemma (Tool Router)
+FunctionGemma is used as a **tool-calling router** to choose and execute PC-AI tools,
+then the primary LLM produces the final narrative response.
+
+```powershell
+# Route a request through FunctionGemma, then answer with the main LLM
+Invoke-LLMChatRouted -Message "Check WSL networking and summarize issues." -Mode diagnose
+
+# Or use routed chat (non-interactive)
+Invoke-LLMChat -Message "Explain WSL vs Docker." -UseRouter -RouterMode chat
+```
+
+### HVSocket / VSock Endpoints
+`Config/llm-config.json` supports HVSocket aliases for local routing. Use the `hvsock://` scheme
+to resolve endpoints through `Config/hvsock-proxy.conf`, e.g. `hvsock://ollama`, `hvsock://vllm`.
+
+### TUI Modes
+`PcaiChatTui.exe` supports single-shot, multi-turn, streaming, and tool-routing modes:
+```
+PcaiChatTui.exe --provider ollama --mode stream
+PcaiChatTui.exe --provider vllm --mode react --tools C:\Users\david\PC_AI\Config\pcai-tools.json
+```
+
 ### Recommended Models
 
 | Model | Size | Best For |
@@ -188,6 +212,11 @@ Invoke-PCDiagnosis -ReportPath ".\report.txt"
 | deepseek-r1:8b | 5GB | Complex reasoning |
 | mistral:7b | 4GB | Fast general analysis |
 | gemma3:12b | 7GB | High-quality responses |
+
+### Router Inputs
+- `DIAGNOSE.md` + `DIAGNOSE_LOGIC.md` define diagnostic routing behavior
+- `CHAT.md` defines general chat behavior
+- `Config/pcai-tools.json` defines tool schema and mappings
 
 ## Testing
 
@@ -210,6 +239,7 @@ PC_AI/
 ├── Get-PcDiagnostics.ps1     # Core diagnostics script
 ├── DIAGNOSE.md               # LLM system prompt
 ├── DIAGNOSE_LOGIC.md         # Decision tree for analysis
+├── CHAT.md                   # Chat system prompt
 ├── Modules/
 │   ├── PC-AI.Hardware/       # Hardware diagnostics
 │   ├── PC-AI.Virtualization/ # WSL2, Hyper-V, Docker
@@ -219,6 +249,8 @@ PC_AI/
 │   ├── PC-AI.Cleanup/        # System cleanup
 │   ├── PC-AI.LLM/            # LLM integration
 │   └── PC-AI.Acceleration/   # Rust tools + parallelism
+├── Deploy/
+│   └── functiongemma-finetune/ # FunctionGemma training + router tools
 ├── Tests/                    # Pester test suites
 ├── Config/                   # Configuration files
 └── Reports/                  # Generated diagnostic reports
