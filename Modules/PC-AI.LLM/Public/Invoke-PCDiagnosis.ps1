@@ -71,7 +71,11 @@ function Invoke-PCDiagnosis {
         [switch]$SaveReport,
 
         [Parameter()]
-        [string]$OutputPath = (Join-Path -Path ([Environment]::GetFolderPath('Desktop')) -ChildPath 'PC-Diagnosis-Analysis.txt')
+        [string]$OutputPath = (Join-Path -Path ([Environment]::GetFolderPath('Desktop')) -ChildPath 'PC-Diagnosis-Analysis.txt'),
+
+        [Parameter()]
+        [ValidateRange(30, 1800)]
+        [int]$TimeoutSeconds = ([math]::Max(300, ($script:ModuleConfig.DefaultTimeout * 2)))
     )
 
     begin {
@@ -122,15 +126,13 @@ Format your response with clear sections:
 - Priority Issues
 - Recommended Next Steps
 
+Follow the Response Template in DIAGNOSE.md section 4.2 exactly. Do not add extra sections.
 Be concise, technical, and safety-conscious. Warn about destructive operations.
 "@
 
         Write-Verbose "System prompt loaded: $($systemPrompt.Length) characters"
 
-        # Verify Ollama connectivity
-        if (-not (Test-OllamaConnection)) {
-            throw "Cannot connect to Ollama API. Ensure Ollama is running."
-        }
+        # Connectivity checks are handled by Invoke-LLMChatWithFallback
     }
 
     process {
@@ -179,7 +181,7 @@ Provide a comprehensive analysis with severity-based prioritization and actionab
                 }
             )
 
-            $response = Invoke-OllamaChat -Messages $messages -Model $Model -Temperature $Temperature -TimeoutSeconds 180
+            $response = Invoke-LLMChatWithFallback -Messages $messages -Model $Model -Temperature $Temperature -TimeoutSeconds $TimeoutSeconds
 
             $endTime = Get-Date
             $duration = ($endTime - $startTime).TotalSeconds

@@ -183,3 +183,4 @@ Set-LLMConfig -DefaultTimeout 300
 **You're now ready to use PC-AI.LLM!** 🚀
 
 Start with `Get-LLMStatus -TestConnection` to verify everything is working.
+

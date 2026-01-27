@@ -16,8 +16,11 @@
         'Get-LLMStatus'
         'Send-OllamaRequest'
         'Invoke-LLMChat'
+        'Invoke-LLMChatTui'
+        'Invoke-FunctionGemmaReAct'
         'Invoke-PCDiagnosis'
         'Set-LLMConfig'
+        'Set-LLMProviderOrder'
         'Invoke-SmartDiagnosis'
         'Invoke-NativeSearch'
     )

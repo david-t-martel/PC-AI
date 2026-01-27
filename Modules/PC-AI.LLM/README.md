@@ -487,3 +487,4 @@ For issues or questions:
 1. Check `Get-Help <FunctionName> -Full`
 2. Run `USAGE_EXAMPLES.ps1` for working examples
 3. Verify Ollama status with `Get-LLMStatus -TestConnection`
+

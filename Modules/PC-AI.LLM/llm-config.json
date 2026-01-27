@@ -1,4 +1,4 @@
-﻿{
+{
   "DefaultModel": "qwen2.5-coder:7b",
   "LMStudioApiUrl": "http://localhost:1234",
   "DefaultTimeout": 120,

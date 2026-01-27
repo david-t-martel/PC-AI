@@ -82,6 +82,7 @@ function Set-LLMConfig {
         Write-Verbose "Configuring LLM module settings..."
 
         $configPath = $script:ModuleConfig.ConfigPath
+        $projectConfigPath = $script:ModuleConfig.ProjectConfigPath
 
         # Default configuration
         $defaultConfig = @{
@@ -180,6 +181,32 @@ function Set-LLMConfig {
                 catch {
                     Write-Error "Failed to save configuration: $_"
                 }
+
+                # Also update project-level config if available
+                if ($projectConfigPath -and (Test-Path $projectConfigPath)) {
+                    try {
+                        $projectConfig = Get-Content -Path $projectConfigPath -Raw | ConvertFrom-Json
+                        if ($PSBoundParameters.ContainsKey('DefaultModel')) {
+                            $projectConfig.providers.ollama.defaultModel = $DefaultModel
+                        }
+                        if ($PSBoundParameters.ContainsKey('OllamaApiUrl')) {
+                            $projectConfig.providers.ollama.baseUrl = $OllamaApiUrl
+                        }
+                        if ($PSBoundParameters.ContainsKey('LMStudioApiUrl')) {
+                            $projectConfig.providers.lmstudio.baseUrl = $LMStudioApiUrl
+                        }
+                        if ($PSBoundParameters.ContainsKey('DefaultTimeout')) {
+                            $projectConfig.providers.ollama.timeout = ($DefaultTimeout * 1000)
+                        }
+
+                        $projectJson = $projectConfig | ConvertTo-Json -Depth 10
+                        [System.IO.File]::WriteAllText($projectConfigPath, $projectJson, [System.Text.Encoding]::UTF8)
+                        Write-Verbose "Project configuration saved to: $projectConfigPath"
+                    }
+                    catch {
+                        Write-Warning "Failed to update project configuration: $_"
+                    }
+                }
             }
             else {
                 Write-Warning "No configuration changes specified. Use -ShowConfig to view current settings."
@@ -202,3 +229,4 @@ function Set-LLMConfig {
         Write-Verbose "LLM configuration completed"
     }
 }
+
