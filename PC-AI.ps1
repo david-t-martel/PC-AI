@@ -214,61 +214,27 @@ function Warn-NonAdministrator {
 #endregion
 
 #region Argument Parsing Functions
-function Parse-Arguments {
+function Get-ParsedArguments {
     param(
         [string[]]$InputArgs,
         [hashtable]$Defaults = @{}
     )
 
-    $parsed = @{
-        SubCommand = $null
-        Flags = @{}
-        Values = @{}
-        Positional = @()
+    if (-not (Ensure-Module 'PC-AI.CLI')) {
+        Write-Error "CLI module unavailable; cannot parse arguments."
+        $fallback = @{
+            SubCommand = $null
+            Flags = @{}
+            Values = @{}
+            Positional = @()
+        }
+        foreach ($key in $Defaults.Keys) {
+            $fallback.Values[$key] = $Defaults[$key]
+        }
+        return $fallback
     }
 
-    # Initialize defaults
-    foreach ($key in $Defaults.Keys) {
-        $parsed.Values[$key] = $Defaults[$key]
-    }
-
-    $i = 0
-    while ($i -lt $InputArgs.Count) {
-        $arg = $InputArgs[$i]
-
-        if ($arg -match '^--(.+)=(.+)$') {
-            # --key=value format
-            $parsed.Values[$Matches[1]] = $Matches[2]
-        }
-        elseif ($arg -match '^--(.+)$') {
-            $key = $Matches[1]
-            if ($i + 1 -lt $InputArgs.Count -and $InputArgs[$i + 1] -notmatch '^-') {
-                # --key value format
-                $parsed.Values[$key] = $InputArgs[$i + 1]
-                $i++
-            }
-            else {
-                # --flag (boolean)
-                $parsed.Flags[$key] = $true
-            }
-        }
-        elseif ($arg -match '^-([a-zA-Z])$') {
-            # Short flag
-            $parsed.Flags[$Matches[1]] = $true
-        }
-        elseif ($null -eq $parsed.SubCommand -and $arg -notmatch '^-') {
-            # First positional is subcommand
-            $parsed.SubCommand = $arg
-        }
-        else {
-            # Additional positional arguments
-            $parsed.Positional += $arg
-        }
-
-        $i++
-    }
-
-    return $parsed
+    return Resolve-PCArguments -InputArgs $InputArgs -Defaults $Defaults
 }
 #endregion
 
@@ -281,257 +247,166 @@ function Show-MainHelp {
     Write-Host ""
 
     Write-Host "COMMANDS:" -ForegroundColor Yellow
-    Write-Host "    diagnose    Hardware and system diagnostics" -ForegroundColor White
-    Write-Host "    optimize    System optimization operations" -ForegroundColor White
-    Write-Host "    usb         USB device and WSL passthrough management" -ForegroundColor White
-    Write-Host "    analyze     LLM-powered diagnostic analysis" -ForegroundColor White
-    Write-Host "    chat        Interactive LLM chat interface" -ForegroundColor White
-    Write-Host "    llm         LLM configuration and status" -ForegroundColor White
-    Write-Host "    cleanup     System cleanup operations" -ForegroundColor White
-    Write-Host "    perf        Performance monitoring and analysis" -ForegroundColor White
-    Write-Host "    status      Overall system status summary" -ForegroundColor White
-    Write-Host "    version     Show framework version" -ForegroundColor White
-    Write-Host "    help        Show this help or help for specific command" -ForegroundColor White
+    $commandSummaries = @()
+    if (Ensure-Module 'PC-AI.CLI') {
+        $commandSummaries = Get-PCCommandSummary -ProjectRoot $PSScriptRoot
+    }
+    if ($commandSummaries -and $commandSummaries.Count -gt 0) {
+        foreach ($summary in $commandSummaries) {
+            if ($summary.Description) {
+                Write-Host "    $($summary.Command) - $($summary.Description)" -ForegroundColor White
+            } else {
+                Write-Host "    $($summary.Command)" -ForegroundColor White
+            }
+        }
+    } else {
+        $commands = @('diagnose', 'optimize', 'usb', 'analyze', 'chat', 'llm', 'cleanup', 'perf', 'status', 'version', 'help')
+        foreach ($cmd in $commands) {
+            Write-Host "    $cmd" -ForegroundColor White
+        }
+    }
     Write-Host ""
 
     Write-Host "EXAMPLES:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 diagnose all              # Full system diagnostics"
-    Write-Host "    .\PC-AI.ps1 optimize wsl --dry-run    # Preview WSL optimizations"
-    Write-Host "    .\PC-AI.ps1 usb list                  # List USB devices"
-    Write-Host "    .\PC-AI.ps1 analyze                   # Analyze latest report with LLM"
-    Write-Host "    .\PC-AI.ps1 help diagnose             # Help for diagnose command"
+    $examples = @()
+    if (Ensure-Module 'PC-AI.CLI') {
+        $examples = Get-PCModuleHelpIndex -ProjectRoot $PSScriptRoot |
+            Where-Object { $_.Examples -and $_.Examples.Count -gt 0 } |
+            Select-Object -First 6
+    }
+    if ($examples -and $examples.Count -gt 0) {
+        foreach ($entry in $examples) {
+            foreach ($example in ($entry.Examples | Select-Object -First 1)) {
+                $formatted = $example -replace "(`r`n|`n)", "`n    "
+                Write-Host "    $formatted"
+            }
+        }
+    } else {
+        Write-Host "    .\PC-AI.ps1 diagnose all"
+        Write-Host "    .\PC-AI.ps1 optimize wsl --dry-run"
+        Write-Host "    .\PC-AI.ps1 usb list"
+        Write-Host "    .\PC-AI.ps1 analyze"
+        Write-Host "    .\PC-AI.ps1 help diagnose"
+    }
     Write-Host ""
 
-    Write-Host "Run '.\PC-AI.ps1 help <command>' for more information on a command." -ForegroundColor DarkGray
+    Write-Host "Module help is generated dynamically from module implementations." -ForegroundColor DarkGray
+    Write-Host "Run '.\\PC-AI.ps1 help <command>' to see module function help." -ForegroundColor DarkGray
 }
 
-function Show-DiagnoseHelp {
-    Write-Header "diagnose - Hardware and System Diagnostics"
+function Show-ModuleHelp {
+    param(
+        [Parameter(Mandatory)]
+        [string]$CommandName
+    )
 
+    if (-not (Ensure-Module 'PC-AI.CLI')) {
+        Write-Warning "Help module unavailable. Showing basic help."
+        Show-MainHelp
+        return
+    }
+
+    $modules = Get-PCCommandModules -CommandName $CommandName -ProjectRoot $PSScriptRoot
+    if (-not $modules -or $modules.Count -eq 0) {
+        Show-MainHelp
+        return
+    }
+
+    $helpEntries = Get-PCModuleHelpIndex -Modules $modules -ProjectRoot $PSScriptRoot
+    Write-Header "$CommandName - Module Help"
     Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 diagnose <subcommand> [options]"
+    Write-Host "    .\\PC-AI.ps1 $CommandName <subcommand> [options]"
     Write-Host ""
 
-    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
-    Write-Host "    hardware    Device Manager errors, SMART status, USB, network adapters"
-    Write-Host "    wsl         WSL2 status, distributions, networking"
-    Write-Host "    network     Network adapters, connectivity, DNS"
-    Write-Host "    hyperv      Hyper-V status and configuration"
-    Write-Host "    docker      Docker Desktop status and configuration"
-    Write-Host "    events      System event log analysis"
-    Write-Host "    all         Run all diagnostics and generate report"
-    Write-Host ""
-
-    Write-Host "OPTIONS:" -ForegroundColor Yellow
-    Write-Host "    --output <path>     Save report to specified path"
-    Write-Host "    --format <fmt>      Output format: txt, json (default: txt)"
-    Write-Host "    --days <n>          Event log lookback days (default: 3)"
-    Write-Host ""
-
-    Write-Host "EXAMPLES:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 diagnose hardware"
-    Write-Host "    .\PC-AI.ps1 diagnose wsl"
-    Write-Host "    .\PC-AI.ps1 diagnose all --output C:\Reports\diag.txt"
-    Write-Host "    .\PC-AI.ps1 diagnose events --days 7"
+    foreach ($group in ($helpEntries | Group-Object Module)) {
+        Write-SubHeader "$($group.Name)"
+        foreach ($entry in $group.Group | Sort-Object Name) {
+            if ($entry.Synopsis) {
+                Write-Bullet "$($entry.Name) - $($entry.Synopsis)"
+            } else {
+                Write-Bullet "$($entry.Name)"
+            }
+        }
+        Write-Host ""
+    }
 }
 
-function Show-OptimizeHelp {
-    Write-Header "optimize - System Optimization Operations"
+function Show-HelpEntry {
+    param(
+        [Parameter(Mandatory)]
+        [object]$Entry
+    )
 
-    Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 optimize <subcommand> [options]"
-    Write-Host ""
-
-    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
-    Write-Host "    wsl         Optimize WSL2 configuration (.wslconfig, Defender exclusions)"
-    Write-Host "    disk        Optimize disks (TRIM for SSD, defrag for HDD)"
-    Write-Host "    vsock       Optimize VSock for WSL2 networking"
-    Write-Host "    defender    Set Windows Defender exclusions for dev tools"
-    Write-Host "    network     Repair WSL networking issues"
-    Write-Host ""
-
-    Write-Host "OPTIONS:" -ForegroundColor Yellow
-    Write-Host "    --dry-run           Preview changes without applying"
-    Write-Host "    --profile <name>    Use named profile (for vsock)"
-    Write-Host "    --force             Skip confirmations"
-    Write-Host "    --backup            Create backup before changes (default: true)"
-    Write-Host ""
-
-    Write-Host "EXAMPLES:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 optimize wsl --dry-run"
-    Write-Host "    .\PC-AI.ps1 optimize disk"
-    Write-Host "    .\PC-AI.ps1 optimize vsock --profile performance"
-}
-
-function Show-UsbHelp {
-    Write-Header "usb - USB Device and WSL Passthrough Management"
-
-    Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 usb <subcommand> [options]"
-    Write-Host ""
-
-    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
-    Write-Host "    list        List all USB devices"
-    Write-Host "    attach      Attach USB device to WSL"
-    Write-Host "    detach      Detach USB device from WSL"
-    Write-Host "    status      Show USB/WSL passthrough status"
-    Write-Host "    bind        Bind USB device for WSL passthrough"
-    Write-Host ""
-
-    Write-Host "OPTIONS:" -ForegroundColor Yellow
-    Write-Host "    --busid <id>            USB bus ID (e.g., 1-2)"
-    Write-Host "    --distribution <name>   WSL distribution name (default: default)"
-    Write-Host "    --unbind                Unbind device after detach"
-    Write-Host ""
-
-    Write-Host "EXAMPLES:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 usb list"
-    Write-Host "    .\PC-AI.ps1 usb attach --busid 1-2"
-    Write-Host "    .\PC-AI.ps1 usb attach --busid 1-2 --distribution Ubuntu"
-    Write-Host "    .\PC-AI.ps1 usb detach --busid 1-2 --unbind"
-}
-
-function Show-AnalyzeHelp {
-    Write-Header "analyze - LLM-Powered Diagnostic Analysis"
-
-    Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 analyze [options]"
-    Write-Host ""
-
-    Write-Host "DESCRIPTION:" -ForegroundColor Yellow
-    Write-Host "    Analyzes diagnostic reports using a local LLM (Ollama) to identify"
-    Write-Host "    issues, prioritize problems, and suggest remediation steps."
-    Write-Host ""
-
-    Write-Host "OPTIONS:" -ForegroundColor Yellow
-    Write-Host "    --report <path>     Path to diagnostic report (default: latest report)"
-    Write-Host "    --model <name>      LLM model to use (default: from config)"
-    Write-Host "    --temperature <n>   Model temperature (default: 0.3)"
-    Write-Host "    --output <path>     Save analysis to file"
-    Write-Host ""
-
-    Write-Host "EXAMPLES:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 analyze"
-    Write-Host "    .\PC-AI.ps1 analyze --report C:\Reports\diag.txt"
-    Write-Host "    .\PC-AI.ps1 analyze --model mistral:7b"
-}
-
-function Show-CleanupHelp {
-    Write-Header "cleanup - System Cleanup Operations"
-
-    Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 cleanup <subcommand> [options]"
-    Write-Host ""
-
-    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
-    Write-Host "    path        Analyze and fix PATH environment variable"
-    Write-Host "    temp        Clear temporary files"
-    Write-Host "    duplicates  Find duplicate files in a directory"
-    Write-Host ""
-
-    Write-Host "OPTIONS:" -ForegroundColor Yellow
-    Write-Host "    --dry-run           Preview changes without applying"
-    Write-Host "    --force             Skip confirmations"
-    Write-Host "    --recursive         Search recursively (for duplicates)"
-    Write-Host ""
-
-    Write-Host "EXAMPLES:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 cleanup path --dry-run"
-    Write-Host "    .\PC-AI.ps1 cleanup temp"
-    Write-Host "    .\PC-AI.ps1 cleanup duplicates C:\Downloads --recursive"
-}
-
-function Show-PerfHelp {
-    Write-Header "perf - Performance Monitoring and Analysis"
-
-    Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 perf <subcommand> [options]"
-    Write-Host ""
-
-    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
-    Write-Host "    disk        Disk space analysis"
-    Write-Host "    process     Top processes by resource usage"
-    Write-Host "    watch       Real-time system resource monitoring"
-    Write-Host "    vsock       VSock performance monitoring"
-    Write-Host ""
-
-    Write-Host "OPTIONS:" -ForegroundColor Yellow
-    Write-Host "    --top <n>           Number of top processes to show (default: 10)"
-    Write-Host "    --duration <s>      Watch duration in seconds"
-    Write-Host "    --interval <ms>     Update interval in milliseconds"
-    Write-Host "    --sort <field>      Sort by: cpu, memory, io (default: cpu)"
-    Write-Host ""
-
-    Write-Host "EXAMPLES:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 perf disk"
-    Write-Host "    .\PC-AI.ps1 perf process --top 20 --sort memory"
-    Write-Host "    .\PC-AI.ps1 perf watch --duration 60"
-}
-
-function Show-LLMHelp {
-    Write-Header "llm - LLM Configuration and Status"
-
-    Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 llm <subcommand> [options]"
-    Write-Host ""
-
-    Write-Host "SUBCOMMANDS:" -ForegroundColor Yellow
-    Write-Host "    status      Check LLM provider availability"
-    Write-Host "    models      List available models"
-    Write-Host "    config      Show or set LLM configuration"
-    Write-Host "    test        Test LLM connectivity"
-    Write-Host ""
-
-    Write-Host "OPTIONS:" -ForegroundColor Yellow
-    Write-Host "    --provider <name>   Provider: ollama, lmstudio"
-    Write-Host "    --model <name>      Model name for config"
-    Write-Host ""
-
-    Write-Host "EXAMPLES:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 llm status"
-    Write-Host "    .\PC-AI.ps1 llm models --provider ollama"
-    Write-Host "    .\PC-AI.ps1 llm config --model qwen2.5-coder:7b"
-}
-
-function Show-ChatHelp {
-    Write-Header "chat - Interactive LLM Chat Interface"
-
-    Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 chat [options]"
-    Write-Host ""
-
-    Write-Host "DESCRIPTION:" -ForegroundColor Yellow
-    Write-Host "    Start an interactive chat session with the LLM for PC diagnostics"
-    Write-Host "    and troubleshooting assistance."
-    Write-Host ""
-
-    Write-Host "OPTIONS:" -ForegroundColor Yellow
-    Write-Host "    --model <name>      LLM model to use"
-    Write-Host "    --system <path>     Custom system prompt file"
-    Write-Host "    --context           Include diagnostic context"
-    Write-Host ""
-
-    Write-Host "CHAT COMMANDS:" -ForegroundColor Yellow
-    Write-Host "    /quit, /exit        Exit chat session"
-    Write-Host "    /clear              Clear conversation history"
-    Write-Host "    /diag               Run diagnostics and include in context"
-    Write-Host "    /help               Show chat commands"
+    Write-Header "$($Entry.Name) - Help"
+    if ($Entry.Synopsis) {
+        Write-SubHeader "Synopsis"
+        Write-Host $Entry.Synopsis
+        Write-Host ""
+    }
+    if ($Entry.Parameters -and $Entry.Parameters.Count -gt 0) {
+        Write-SubHeader "Parameters"
+        if ($Entry.ParameterHelp -and $Entry.ParameterHelp.Count -gt 0) {
+            foreach ($paramName in $Entry.Parameters) {
+                $paramDesc = $Entry.ParameterHelp[$paramName]
+                if ($paramDesc) {
+                    Write-Host ("  {0} - {1}" -f $paramName, $paramDesc)
+                } else {
+                    Write-Host ("  {0}" -f $paramName)
+                }
+            }
+        } else {
+            Write-Host ($Entry.Parameters -join ', ')
+        }
+        Write-Host ""
+    }
+    if ($Entry.Description) {
+        Write-SubHeader "Description"
+        Write-Host $Entry.Description
+        Write-Host ""
+    }
+    if ($Entry.Examples -and $Entry.Examples.Count -gt 0) {
+        Write-SubHeader "Examples"
+        foreach ($example in $Entry.Examples) {
+            $formatted = $example -replace "(`r`n|`n)", "`n  "
+            Write-Host "  $formatted"
+            Write-Host ""
+        }
+    }
+    if ($Entry.SourcePath) {
+        Write-SubHeader "Source"
+        Write-Host $Entry.SourcePath -ForegroundColor DarkGray
+    }
 }
 
 function Show-Help {
     param([string]$Topic)
 
-    switch ($Topic) {
-        'diagnose' { Show-DiagnoseHelp }
-        'optimize' { Show-OptimizeHelp }
-        'usb' { Show-UsbHelp }
-        'analyze' { Show-AnalyzeHelp }
-        'cleanup' { Show-CleanupHelp }
-        'perf' { Show-PerfHelp }
-        'llm' { Show-LLMHelp }
-        'chat' { Show-ChatHelp }
-        default { Show-MainHelp }
+    $knownCommands = @()
+    if (Ensure-Module 'PC-AI.CLI') {
+        $knownCommands = Get-PCCommandList -ProjectRoot $PSScriptRoot
     }
+    if (-not $knownCommands -or $knownCommands.Count -eq 0) {
+        $knownCommands = @('diagnose', 'optimize', 'usb', 'analyze', 'chat', 'llm', 'cleanup', 'perf', 'status', 'version', 'help')
+    }
+    if (-not $Topic) {
+        Show-MainHelp
+        return
+    }
+
+    if ($knownCommands -contains $Topic) {
+        Show-ModuleHelp -CommandName $Topic
+        return
+    }
+
+    if (Ensure-Module 'PC-AI.CLI') {
+        $entry = Get-PCModuleHelpEntry -Name $Topic -ProjectRoot $PSScriptRoot | Select-Object -First 1
+        if ($entry) {
+            Show-HelpEntry -Entry $entry
+            return
+        }
+    }
+
+    Show-MainHelp
 }
 #endregion
 
@@ -541,7 +416,7 @@ function Show-Help {
 function Invoke-DiagnoseCommand {
     param([string[]]$CmdArgs)
 
-    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         output = $null
         format = 'txt'
         days = 3
@@ -744,7 +619,7 @@ function Invoke-DiagnoseCommand {
             if ($subCommand) {
                 Write-Error "Unknown diagnose subcommand: $subCommand"
             }
-            Show-DiagnoseHelp
+            Show-ModuleHelp -CommandName 'diagnose'
         }
     }
 }
@@ -754,7 +629,7 @@ function Invoke-DiagnoseCommand {
 function Invoke-OptimizeCommand {
     param([string[]]$CmdArgs)
 
-    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         profile = 'default'
         backup = 'true'
     }
@@ -915,7 +790,7 @@ function Invoke-OptimizeCommand {
             if ($subCommand) {
                 Write-Error "Unknown optimize subcommand: $subCommand"
             }
-            Show-OptimizeHelp
+            Show-ModuleHelp -CommandName 'optimize'
         }
     }
 }
@@ -925,7 +800,7 @@ function Invoke-OptimizeCommand {
 function Invoke-UsbCommand {
     param([string[]]$CmdArgs)
 
-    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         distribution = $null
         busid = $null
     }
@@ -1095,7 +970,7 @@ function Invoke-UsbCommand {
             if ($subCommand) {
                 Write-Error "Unknown usb subcommand: $subCommand"
             }
-            Show-UsbHelp
+            Show-ModuleHelp -CommandName 'usb'
         }
     }
 }
@@ -1105,7 +980,7 @@ function Invoke-UsbCommand {
 function Invoke-AnalyzeCommand {
     param([string[]]$CmdArgs)
 
-    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         report = $null
         model = $null
         temperature = '0.3'
@@ -1231,7 +1106,7 @@ function Invoke-AnalyzeCommand {
 function Invoke-ChatCommand {
     param([string[]]$CmdArgs)
 
-    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         model = $null
         system = $null
     }
@@ -1286,7 +1161,7 @@ function Invoke-ChatCommand {
 function Invoke-LLMCommand {
     param([string[]]$CmdArgs)
 
-    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         provider = 'ollama'
         model = $null
     }
@@ -1389,7 +1264,7 @@ function Invoke-LLMCommand {
             if ($subCommand) {
                 Write-Error "Unknown llm subcommand: $subCommand"
             }
-            Show-LLMHelp
+            Show-ModuleHelp -CommandName 'llm'
         }
     }
 }
@@ -1399,7 +1274,7 @@ function Invoke-LLMCommand {
 function Invoke-CleanupCommand {
     param([string[]]$CmdArgs)
 
-    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{}
+    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{}
 
     $subCommand = $parsed.SubCommand
     $dryRun = $parsed.Flags['dry-run'] -or $parsed.Flags['n']
@@ -1545,7 +1420,7 @@ function Invoke-CleanupCommand {
             if ($subCommand) {
                 Write-Error "Unknown cleanup subcommand: $subCommand"
             }
-            Show-CleanupHelp
+            Show-ModuleHelp -CommandName 'cleanup'
         }
     }
 }
@@ -1555,7 +1430,7 @@ function Invoke-CleanupCommand {
 function Invoke-PerfCommand {
     param([string[]]$CmdArgs)
 
-    $parsed = Parse-Arguments -InputArgs $CmdArgs -Defaults @{
+    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         top = 10
         duration = 30
         interval = 1000
@@ -1668,7 +1543,7 @@ function Invoke-PerfCommand {
             if ($subCommand) {
                 Write-Error "Unknown perf subcommand: $subCommand"
             }
-            Show-PerfHelp
+            Show-ModuleHelp -CommandName 'perf'
         }
     }
 }
@@ -1698,7 +1573,8 @@ function Invoke-StatusCommand {
         'PC-AI.Network',
         'PC-AI.Performance',
         'PC-AI.Cleanup',
-        'PC-AI.LLM'
+        'PC-AI.LLM',
+        'PC-AI.CLI'
     )
 
     foreach ($moduleName in $modules) {

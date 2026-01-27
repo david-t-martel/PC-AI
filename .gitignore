@@ -57,6 +57,7 @@ obj/
 *.dll
 *.exe
 *.pdb
+Modules/Archive/
 
 # Rust
 target/
