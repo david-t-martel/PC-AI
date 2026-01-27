@@ -131,6 +131,79 @@ function Test-ArtifactIntegrity {
     return $true
 }
 
+function Resolve-CargoTargetDir {
+    if ($env:CARGO_TARGET_DIR) { return $env:CARGO_TARGET_DIR }
+    $cargoConfigPath = Join-Path $env:USERPROFILE '.cargo\config.toml'
+    if (Test-Path $cargoConfigPath) {
+        $cargoConfig = Get-Content $cargoConfigPath -Raw
+        if ($cargoConfig -match 'target-dir\s*=\s*"([^"]+)"') {
+            return $Matches[1]
+        }
+    }
+    return $null
+}
+
+function Resolve-CargoOutputDir {
+    param(
+        [Parameter(Mandatory)]
+        [string]$ConfigName,
+        [Parameter(Mandatory)]
+        [string]$WorkspacePath
+    )
+    $targetDir = Resolve-CargoTargetDir
+    if ($targetDir) { return (Join-Path $targetDir $ConfigName) }
+    return (Join-Path $WorkspacePath "target\\$ConfigName")
+}
+
+function Resolve-RustDocRoot {
+    param(
+        [Parameter(Mandatory)]
+        [string]$WorkspacePath
+    )
+    $targetDir = Resolve-CargoTargetDir
+    $docRoot = if ($targetDir) { Join-Path $targetDir 'doc' } else { Join-Path $WorkspacePath 'target\\doc' }
+    if (Test-Path $docRoot) { return $docRoot }
+    return $null
+}
+
+function Invoke-RoboCopy {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Source,
+        [Parameter(Mandatory)]
+        [string]$Destination,
+        [string[]]$Arguments = @('/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NC', '/NS')
+    )
+    if (-not (Test-Path $Source)) { return $false }
+    if (-not (Test-Path $Destination)) {
+        New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    }
+    & robocopy $Source $Destination @Arguments | Out-Null
+    return ($LASTEXITCODE -le 7)
+}
+
+function Get-DotNetOutputDir {
+    param(
+        [Parameter(Mandatory)]
+        [string]$ProjectPath,
+        [Parameter(Mandatory)]
+        [string]$Configuration
+    )
+    $projectDir = Split-Path $ProjectPath
+    $projectName = [System.IO.Path]::GetFileNameWithoutExtension($ProjectPath)
+    $binRoot = Join-Path $projectDir "bin\\$Configuration"
+    if (-not (Test-Path $binRoot)) { return $null }
+
+    $candidates = Get-ChildItem -Path $binRoot -Directory -Recurse -ErrorAction SilentlyContinue |
+        Where-Object {
+            (Test-Path (Join-Path $_.FullName "$projectName.exe")) -or
+            (Test-Path (Join-Path $_.FullName "$projectName.dll"))
+        } | Sort-Object LastWriteTime -Descending
+
+    if ($candidates) { return $candidates[0].FullName }
+    return $null
+}
+
 # ============================================================================
 # PHASE 1: PRE-FLIGHT CHECKS
 # ============================================================================
@@ -171,7 +244,9 @@ Write-BuildInfo 'Build acceleration via CargoTools enabled'
 $RootDir = $PSScriptRoot
 $RustWorkspace = Join-Path $RootDir 'pcai_core'
 $CSharpDir = Join-Path $RootDir 'PcaiNative'
+$CSharpRoot = Split-Path $CSharpDir
 $BinDir = Join-Path (Split-Path $RootDir) 'bin'
+$CSharpProjects = Get-ChildItem -Path $CSharpRoot -Filter '*.csproj' -Recurse -ErrorAction SilentlyContinue
 
 # Ensure bin directory exists
 if (-not (Test-Path $BinDir)) {
@@ -309,20 +384,10 @@ if (-not $SkipRust) {
 
         $sw.Stop()
 
-        # Find built DLLs - check user's cargo config for custom target-dir
-        $CargoConfigPath = Join-Path $env:USERPROFILE '.cargo\config.toml'
-        $TargetDir = $null
-        if (Test-Path $CargoConfigPath) {
-            $CargoConfig = Get-Content $CargoConfigPath -Raw
-            if ($CargoConfig -match 'target-dir\s*=\s*"([^"]+)"') {
-                $TargetDir = Join-Path $Matches[1] $RustConfig
-            }
-        }
-        if (-not $TargetDir -or -not (Test-Path $TargetDir)) {
-            $TargetDir = Join-Path $RustWorkspace "target\$RustConfig"
-        }
+        $TargetDir = Resolve-CargoOutputDir -ConfigName $RustConfig -WorkspacePath $RustWorkspace
         Write-BuildInfo "Looking for DLLs in: $TargetDir"
         $DllFiles = Get-ChildItem -Path $TargetDir -Filter '*.dll' -ErrorAction SilentlyContinue
+        $ExeFiles = Get-ChildItem -Path $TargetDir -Filter '*.exe' -ErrorAction SilentlyContinue
 
         foreach ($dll in $DllFiles) {
             if ($dll.Name -like 'pcai_*.dll') {
@@ -340,6 +405,21 @@ if (-not $SkipRust) {
                     Write-BuildInfo "  -> Verified staging: $stagedPath"
                 } else {
                     exit 1
+                }
+            }
+        }
+
+        if ($ExeFiles.Count -gt 0) {
+            $RustAppDir = Join-Path $BinDir 'apps\\rust'
+            if (-not (Test-Path $RustAppDir)) {
+                New-Item -ItemType Directory -Path $RustAppDir -Force | Out-Null
+            }
+            foreach ($exe in $ExeFiles) {
+                $destPath = Join-Path $RustAppDir $exe.Name
+                Copy-Item $exe.FullName $destPath -Force
+                if (Test-ArtifactIntegrity -Path $destPath -StartTime $BuildStartDateTime) {
+                    $StagedArtifacts += $destPath
+                    Write-BuildSuccess "$($exe.Name) (Staged)"
                 }
             }
         }
@@ -374,8 +454,12 @@ if (-not $SkipCSharp) {
         New-Item -ItemType Directory -Path $CSharpDir -Force | Out-Null
         Write-BuildInfo 'C# project directory created. See Phase 5 for next steps.'
     } else {
-        Push-Location $CSharpDir
-        try {
+        $primaryProject = Join-Path $CSharpDir 'PcaiNative.csproj'
+        if (-not (Test-Path $primaryProject) -and $CSharpProjects) {
+            $primaryProject = $CSharpProjects[0].FullName
+        }
+
+        if ($primaryProject -and (Test-Path $primaryProject)) {
             $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
             # Copy Rust DLLs to C# project
@@ -385,7 +469,7 @@ if (-not $SkipCSharp) {
                 Write-BuildInfo "Staged $($dll.Name) for C# build"
             }
 
-            $BuildArgs = @('build', '-c', $Configuration, '--nologo')
+            $BuildArgs = @('build', $primaryProject, '-c', $Configuration, '--nologo')
             Write-Host "    dotnet $($BuildArgs -join ' ')" -ForegroundColor $Colors.Dim
 
             $BuildOutput = & dotnet @BuildArgs 2>&1
@@ -397,10 +481,10 @@ if (-not $SkipCSharp) {
 
             $sw.Stop()
 
-            # Find and copy output
-            $OutputDir = Join-Path $CSharpDir "bin\$Configuration\net8.0\win-x64"
-            if (Test-Path $OutputDir) {
-                Get-ChildItem -Path $OutputDir -Filter 'PcaiNative.*' -ErrorAction SilentlyContinue |
+            $outputDir = Get-DotNetOutputDir -ProjectPath $primaryProject -Configuration $Configuration
+            if ($outputDir) {
+                Get-ChildItem -Path $outputDir -File -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -like 'PcaiNative.*' } |
                     ForEach-Object {
                         $destPath = Join-Path $BinDir $_.Name
                         Copy-Item $_.FullName $destPath -Force
@@ -414,8 +498,37 @@ if (-not $SkipCSharp) {
             }
 
             Write-BuildSuccess "C# build completed in $([math]::Round($sw.Elapsed.TotalSeconds, 2))s"
-        } finally {
-            Pop-Location
+        }
+
+        $otherProjects = @($CSharpProjects | Where-Object { $_.FullName -ne $primaryProject })
+        foreach ($proj in $otherProjects) {
+            $projName = [System.IO.Path]::GetFileNameWithoutExtension($proj.FullName)
+            Write-BuildInfo "Building C# project: $projName"
+            $BuildArgs = @('build', $proj.FullName, '-c', $Configuration, '--nologo')
+            Write-Host "    dotnet $($BuildArgs -join ' ')" -ForegroundColor $Colors.Dim
+            $BuildOutput = & dotnet @BuildArgs 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-BuildWarning "C# build failed: $projName"
+                continue
+            }
+
+            $outputDir = Get-DotNetOutputDir -ProjectPath $proj.FullName -Configuration $Configuration
+            if ($outputDir) {
+                $stageDir = Join-Path $BinDir "apps\\$projName"
+                if (-not (Test-Path $stageDir)) {
+                    New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
+                }
+                Get-ChildItem -Path $outputDir -File -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Extension -in @('.exe', '.dll', '.pdb', '.deps.json', '.runtimeconfig.json', '.json', '.xml') } |
+                    ForEach-Object {
+                        $destPath = Join-Path $stageDir $_.Name
+                        Copy-Item $_.FullName $destPath -Force
+                        if (Test-ArtifactIntegrity -Path $destPath -StartTime $BuildStartDateTime) {
+                            $StagedArtifacts += $destPath
+                        }
+                    }
+                Write-BuildSuccess "$projName output staged to $stageDir"
+            }
         }
     }
 } else {
@@ -565,6 +678,41 @@ if ($Docs) {
     } else {
         Write-BuildWarning "Documentation script not found: $DocScript"
     }
+
+    if ($DocsBuild) {
+        $DocsRoot = Join-Path $RepoRoot 'Docs\\Generated'
+        $RustDocsDest = Join-Path $DocsRoot 'Rust'
+        $CSharpDocsDest = Join-Path $DocsRoot 'CSharp'
+
+        $rustDocRoot = Resolve-RustDocRoot -WorkspacePath $RustWorkspace
+        if ($rustDocRoot) {
+            if (Invoke-RoboCopy -Source $rustDocRoot -Destination $RustDocsDest -Arguments @('/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NC', '/NS')) {
+                Write-BuildSuccess "Rust docs staged to: $RustDocsDest"
+            } else {
+                Write-BuildWarning "Failed to stage Rust docs from: $rustDocRoot"
+            }
+        } else {
+            Write-BuildWarning 'Rust docs not found for staging'
+        }
+
+        foreach ($proj in $CSharpProjects) {
+            $projName = [System.IO.Path]::GetFileNameWithoutExtension($proj.FullName)
+            $outputDir = Get-DotNetOutputDir -ProjectPath $proj.FullName -Configuration $Configuration
+            if (-not $outputDir) { continue }
+
+            $xmlDocs = Get-ChildItem -Path $outputDir -Filter '*.xml' -File -ErrorAction SilentlyContinue
+            if ($xmlDocs.Count -gt 0) {
+                $destDir = Join-Path $CSharpDocsDest $projName
+                if (-not (Test-Path $destDir)) {
+                    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+                }
+                foreach ($doc in $xmlDocs) {
+                    Copy-Item $doc.FullName (Join-Path $destDir $doc.Name) -Force
+                }
+                Write-BuildSuccess "C# docs staged to: $destDir"
+            }
+        }
+    }
 }
 
 # ============================================================================
@@ -606,4 +754,8 @@ Write-Host '  Next steps:' -ForegroundColor Yellow
 Write-Host '    1. Run tests:        .\build.ps1 -Test' -ForegroundColor DarkGray
 Write-Host '    2. Pester tests:     ..\Tests\Integration\FFI.Core.Tests.ps1' -ForegroundColor DarkGray
 Write-Host '    3. Import module:    Import-Module ..\Modules\PC-AI.Acceleration' -ForegroundColor DarkGray
+if ($DocsBuild) {
+    $DocsRoot = Join-Path (Split-Path $RootDir) 'Docs\\Generated'
+    Write-Host "    4. Docs output:      $DocsRoot" -ForegroundColor DarkGray
+}
 Write-Host ''

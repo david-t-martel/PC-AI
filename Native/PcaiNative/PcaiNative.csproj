@@ -31,6 +31,8 @@
   <ItemGroup>
     <!-- System.Text.Json for JSON operations -->
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <!-- Microsoft.PowerShell.SDK for persistent Runspaces -->
+    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.4.1" />
   </ItemGroup>
 
   <ItemGroup>
