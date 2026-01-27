@@ -76,8 +76,14 @@ BeforeAll {
                 'Get-LLMStatus'
                 'Send-OllamaRequest'
                 'Invoke-LLMChat'
+                'Invoke-LLMChatRouted'
+                'Invoke-LLMChatTui'
+                'Invoke-FunctionGemmaReAct'
                 'Invoke-PCDiagnosis'
                 'Set-LLMConfig'
+                'Invoke-DocSearch'
+                'Get-SystemInfoTool'
+                'Invoke-LogSearch'
             )
         }
     )

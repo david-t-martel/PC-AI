@@ -351,7 +351,7 @@ WDC HDD: Pred Fail
                         model = "qwen2.5-coder:7b"
                         message = @{
                             role = "assistant"
-                            content = "Analysis complete. Found USB device error code 43."
+                            content = '{"diagnosis_version":"2.0.0","timestamp":"2026-01-27T00:00:00Z","model_id":"qwen2.5-coder:7b","environment":{"os_version":"Windows","pcai_tooling":"Test"},"summary":["USB device error code 43 found."],"findings":[],"recommendations":[],"what_is_missing":[]}'
                         }
                         done = $true
                         eval_count = 500
@@ -427,7 +427,7 @@ WDC HDD: Pred Fail
                         model = "qwen2.5-coder:7b"
                         message = @{
                             role = "assistant"
-                            content = "Analysis results"
+                            content = '{"diagnosis_version":"2.0.0","timestamp":"2026-01-27T00:00:00Z","model_id":"qwen2.5-coder:7b","environment":{"os_version":"Windows","pcai_tooling":"Test"},"summary":["Analysis results"],"findings":[],"recommendations":[],"what_is_missing":[]}'
                         }
                         done = $true
                         eval_count = 500
@@ -449,7 +449,8 @@ WDC HDD: Pred Fail
 
             # Verify the result contains the saved path
             $result.ReportSavedTo | Should -Be $analysisPath
-            $result.Analysis | Should -Be "Analysis results"
+            $result.Analysis | Should -Match '"diagnosis_version":"2.0.0"'
+            $result.JsonValid | Should -Be $true
         }
     }
 }
