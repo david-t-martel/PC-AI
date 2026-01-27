@@ -466,3 +466,4 @@ Invoke-PCDiagnosis -DiagnosticReportPath "$env:USERPROFILE\Desktop\Hardware-Diag
 ---
 
 *This context document should be updated after significant milestones or architectural changes.*
+

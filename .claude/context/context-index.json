@@ -1,192 +1,174 @@
 {
+  "schema_version": "2.0",
+  "context_id": "ctx-pcai-20260127",
   "project": {
     "name": "PC_AI",
-    "type": "diagnostics-agent",
+    "type": "diagnostics-agent-with-native-acceleration",
     "location": "C:\\Users\\david\\PC_AI",
     "platform": "Windows 10/11",
-    "integrations": ["WSL2", "Docker", "Hyper-V", "Ollama", "LM Studio"]
+    "integrations": ["WSL2", "Docker", "Hyper-V", "Ollama", "LM Studio", "vLLM", "Rust FFI", "C# P/Invoke", "FunctionGemma"]
   },
   "context": {
-    "version": "3.0.0",
+    "version": "5.0.0",
     "created": "2025-01-23",
-    "updated": "2026-01-23",
+    "updated": "2026-01-27",
     "files": {
       "full": "project-context.md",
+      "native": "native-acceleration-context.md",
       "detailed": "pc-ai-project-context.md",
       "quick": "quick-context.md",
       "index": "context-index.json"
     }
   },
   "state": {
-    "current_phase": "test_fixing",
+    "current_phase": "native_acceleration_phase_4",
+    "phase_description": "System Module with PATH analysis and log search",
     "core_functional": true,
+    "native_functional": true,
     "migration_pending": false,
-    "test_pass_rate": "79%",
-    "tests_total": 218,
-    "tests_passed": 173,
-    "tests_failed": 26,
-    "tests_skipped": 19,
-    "blockers": ["Optimize-Disks context failures", "CursorPosition console errors"]
+    "uncommitted_changes": 182,
+    "latest_commit": "c338e11",
+    "latest_commit_message": "feat(native): add Phase 4 System Module with PATH analysis and log search"
   },
-  "files": {
-    "core": [
-      {
-        "name": "Get-PcDiagnostics.ps1",
-        "type": "script",
-        "status": "functional",
-        "requires_admin": true
+  "native_acceleration": {
+    "architecture": "Rust DLL + C# Hybrid Framework",
+    "reference_implementation": "NukeNul (C:\\Users\\david\\nuke_nul)",
+    "phases": {
+      "phase1": {
+        "name": "Foundation",
+        "module": "pcai_core_lib",
+        "status": "COMPLETE",
+        "ffi_tests": 16,
+        "unit_tests": 26
       },
-      {
-        "name": "DIAGNOSE.md",
-        "type": "llm_prompt",
-        "status": "complete"
+      "phase2": {
+        "name": "Search Module",
+        "module": "pcai_search",
+        "status": "COMPLETE",
+        "ffi_tests": 21,
+        "unit_tests": 14
       },
-      {
-        "name": "DIAGNOSE_LOGIC.md",
-        "type": "decision_tree",
-        "status": "complete"
+      "phase3": {
+        "name": "Performance Module",
+        "module": "pcai_performance",
+        "status": "COMPLETE",
+        "ffi_tests": 25,
+        "unit_tests": 19
       },
-      {
-        "name": "CLAUDE.md",
-        "type": "documentation",
-        "status": "complete"
+      "phase4": {
+        "name": "System Module",
+        "module": "pcai_system",
+        "status": "COMPLETE",
+        "ffi_tests": 28,
+        "unit_tests": 22,
+        "features": ["PATH analysis", "Event log search", "Registry queries"]
+      },
+      "phase5": {
+        "name": "Integration",
+        "status": "PLANNED",
+        "features": ["PowerShell cmdlet integration", "Graceful fallback"]
+      },
+      "phase6": {
+        "name": "CI/CD",
+        "status": "PLANNED",
+        "features": ["GitHub Actions", "Automated releases"]
       }
-    ],
-    "migration_candidates": [
-      {
-        "name": "Optimize-Disks.ps1",
-        "category": "disk",
-        "priority": "high"
-      },
-      {
-        "name": "wsl2-comprehensive-optimizer.ps1",
-        "category": "wsl2",
-        "priority": "high"
-      },
-      {
-        "name": "wsl2-config-analyzer.ps1",
-        "category": "wsl2",
-        "priority": "high"
-      },
-      {
-        "name": "diagnose-docker-desktop.ps1",
-        "category": "docker",
-        "priority": "high"
-      },
-      {
-        "name": "check_virt_errors.ps1",
-        "category": "error_analysis",
-        "priority": "high"
-      },
-      {
-        "name": "wsl_diagnostics.ps1",
-        "category": "wsl2",
-        "priority": "medium"
-      },
-      {
-        "name": "wsl2-network-stability.ps1",
-        "category": "wsl2",
-        "priority": "medium"
-      },
-      {
-        "name": "check_logs.ps1",
-        "category": "error_analysis",
-        "priority": "medium"
-      },
-      {
-        "name": "clean_machine_path.ps1",
-        "category": "cleanup",
-        "priority": "medium"
-      },
-      {
-        "name": "quick_status.ps1",
-        "category": "wsl2",
-        "priority": "low"
-      },
-      {
-        "name": "cleanup-duplicates.ps1",
-        "category": "cleanup",
-        "priority": "low"
-      },
-      {
-        "name": "wezterm-performance-profiler.ps1",
-        "category": "performance",
-        "priority": "low"
-      }
-    ]
+    },
+    "test_totals": {
+      "ffi_integration": 90,
+      "rust_unit": 81,
+      "total": 171
+    },
+    "dependencies": {
+      "rust": ["sysinfo", "rayon", "ignore", "walkdir", "sha2", "regex", "parking_lot", "serde", "windows-sys", "widestring"],
+      "csharp": [".NET 8", "System.Text.Json"]
+    }
+  },
+  "test_status": {
+    "powershell_tests": {
+      "total": 240,
+      "passed": 195,
+      "failed": 26,
+      "skipped": 19,
+      "pass_rate": "81%"
+    },
+    "ffi_tests": {
+      "total": 90,
+      "passed": 90,
+      "failed": 0,
+      "pass_rate": "100%"
+    },
+    "rust_unit_tests": {
+      "total": 81,
+      "passed": 81,
+      "failed": 0,
+      "pass_rate": "100%"
+    }
+  },
+  "key_files": {
+    "native": {
+      "rust_workspace": "Native/pcai_core/Cargo.toml",
+      "core_lib": "Native/pcai_core/pcai_core_lib/src/lib.rs",
+      "search_module": "Native/pcai_core/pcai_search/src/lib.rs",
+      "system_module": "Native/pcai_core/pcai_core_lib/src/system.rs",
+      "csharp_wrappers": "Native/PcaiNative/*.cs",
+      "system_wrapper": "Native/PcaiNative/SystemModule.cs",
+      "ffi_tests": "Tests/Integration/FFI.*.Tests.ps1",
+      "bin_dlls": "bin/*.dll"
+    },
+    "llm": {
+      "module": "Modules/PC-AI.LLM/PC-AI.LLM.psm1",
+      "config": "Config/llm-config.json",
+      "functiongemma": "Deploy/functiongemma-finetune/",
+      "vllm": "Deploy/docker/vllm/"
+    },
+    "powershell": {
+      "cli": "PC-AI.ps1",
+      "modules": "Modules/PC-AI.*/"
+    }
   },
   "design_decisions": {
-    "architecture": "3-file pattern (prompt, logic, script)",
-    "safety_mode": "read_only_default",
-    "wmi_api": "Get-CimInstance (not Get-WmiObject)",
-    "event_window": "3 days default",
-    "output_format": "structured with priority classification"
+    "ffi_contract": {
+      "rust": "#[repr(C)] structs + extern \"C\" fn",
+      "csharp": "[DllImport] + [StructLayout(LayoutKind.Sequential)]"
+    },
+    "string_handling": "PcaiStringBuffer pattern (malloc in Rust, free via pcai_free_string_buffer)",
+    "error_codes": "PcaiStatus enum (Success, InvalidArgument, NullPointer, IoError, etc.)",
+    "output_format": "JSON for LLM consumption"
   },
-  "diagnostic_categories": {
-    "implemented": [
-      "device_manager_errors",
-      "disk_smart_status",
-      "system_event_errors",
-      "usb_controllers",
-      "network_adapters"
-    ],
-    "planned": [
-      "cpu_memory_performance",
-      "thermal_monitoring",
-      "scheduled_runs",
-      "automated_workflows"
-    ]
+  "build_commands": {
+    "rust_build": "cd Native/pcai_core && cargo build --release",
+    "csharp_build": "cd Native/PcaiNative && dotnet build -c Release",
+    "rust_target": "T:\\RustCache\\cargo-target\\release\\",
+    "run_ffi_tests": "Invoke-Pester -Path 'Tests\\Integration\\FFI.*.Tests.ps1'"
+  },
+  "powershell_modules": {
+    "PC-AI.Hardware": { "status": "functional", "tests": 33 },
+    "PC-AI.Virtualization": { "status": "functional", "tests": "TBD" },
+    "PC-AI.USB": { "status": "functional", "tests": 24 },
+    "PC-AI.Network": { "status": "functional", "tests": 24 },
+    "PC-AI.Performance": { "status": "functional", "tests": 22 },
+    "PC-AI.Cleanup": { "status": "functional", "tests": 26 },
+    "PC-AI.LLM": { "status": "functional", "tests": 28 },
+    "PC-AI.Acceleration": { "status": "functional", "tests": "TBD" }
   },
   "roadmap": {
-    "phase1": "Script consolidation from home directory",
-    "phase2": "Enhanced diagnostics (CPU, thermal, GPU)",
-    "phase3": "Automation (scheduled runs, alerts)",
-    "phase4": "LLM integration (Python wrapper, streaming)"
+    "immediate": ["Phase 5: PowerShell cmdlet integration", "-UseNative switch", "Graceful fallback"],
+    "short_term": ["Performance benchmarks", "Documentation updates", "FunctionGemma vLLM integration"],
+    "medium_term": ["CI/CD automation", "GitHub Actions workflow", "Release artifacts"],
+    "long_term": ["Linux support", "Cross-platform builds", "Tool router fine-tuning"]
   },
-  "agent_coordination_history": {
-    "sessions": [
+  "agents": {
+    "registry": [
       {
-        "date": "2026-01-23",
-        "round": 1,
-        "agents": ["test-automator", "explore"],
-        "focus": "PC-AI.Network, PC-AI.USB tests",
-        "outcome": "48/48 tests passing"
-      },
-      {
-        "date": "2026-01-23",
-        "round": 2,
-        "agents": ["parallel-fix-hardware", "parallel-fix-llm", "parallel-fix-cleanup", "parallel-fix-performance"],
-        "focus": "Hardware, LLM, Cleanup, Performance tests",
-        "outcome": "106+ tests fixed"
-      },
-      {
-        "date": "2026-01-23",
-        "round": 3,
-        "agents": ["admin-skip", "encoding-fix"],
-        "focus": "Cross-cutting concerns",
-        "outcome": "PS5.1/PS7+ compatibility achieved"
+        "agent": "rust-pro",
+        "task": "Implemented Phase 4 System Module",
+        "files_touched": ["Native/pcai_core/pcai_core_lib/src/system.rs", "Native/PcaiNative/SystemModule.cs"],
+        "completed_at": "2026-01-27",
+        "handoff_notes": "PATH analysis and log search FFI complete, ready for PowerShell integration"
       }
     ],
-    "lessons_learned": [
-      "Mock at the right level - Invoke-RestMethod for API calls",
-      "Verify return types - PSCustomObject not strings",
-      "Use -ModuleName for module-scoped mocks",
-      "Test exceptions with Should -Throw -ErrorAction Stop"
-    ]
-  },
-  "code_patterns": {
-    "encoding_fix": "[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::UTF8)",
-    "admin_skip": "-Skip:(-not $script:IsAdmin)",
-    "module_mock": "Mock Get-CimInstance { ... } -ModuleName PC-AI.Hardware",
-    "validate_pattern": "[ValidatePattern('^\\d+-\\d+$')]"
-  },
-  "test_status_by_module": {
-    "PC-AI.Network": { "total": 24, "passed": 24, "failed": 0 },
-    "PC-AI.USB": { "total": 24, "passed": 24, "failed": 0 },
-    "PC-AI.Hardware": { "total": 33, "passed": 33, "failed": 0 },
-    "PC-AI.LLM": { "total": 28, "passed": 28, "failed": 0 },
-    "PC-AI.Cleanup": { "total": 26, "passed": 26, "failed": 0 },
-    "PC-AI.Performance": { "total": 22, "passed": 19, "failed": 3 },
-    "PC-AI.Virtualization": { "total": "TBD", "passed": "TBD", "failed": "TBD" }
+    "recommended_next": ["test-runner", "deployment-engineer", "code-reviewer"],
+    "coordination_notes": "Phase 4 complete, 182 uncommitted changes ready for commit"
   }
 }

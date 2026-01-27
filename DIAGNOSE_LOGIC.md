@@ -2,7 +2,6 @@ Branched Reasoning Logic
 When you have the report contents, follow this decision tree to analyze and respond.
 6.1 Parse the Report
 
-
 Identify sections in the report by headings:
 
 "== 1. Devices with Errors in Device Manager =="
@@ -11,35 +10,35 @@ Identify sections in the report by headings:
 "== 4. USB Controllers and USB Devices Status =="
 "== 5. Physical Network Adapters Status =="
 
-
-
 Extract data:
 
 From Section 1: list each device with:
 
 Name, PNPClass, Manufacturer, ConfigManagerErrorCode, Status
 
-
 From Section 2: disk models and their Status values.
 From Section 3: list of events with:
 
 TimeCreated, ProviderName, Id, LevelDisplayName, key phrases in Message.
-
 
 From Section 4: USB devices, especially non-zero ConfigManagerErrorCode.
 From Section 5: network adapters with:
 
 Name, NetEnabled, Status, Speed.
 
-
-
-
-
-
 6.2 Branch 1: Devices with ConfigManager Errors (Section 1 and 4)
 Condition: One or more devices with ConfigManagerErrorCode != 0 or Status not "OK".
 Steps:
 
+**6.2.0 Hypothesis Verification (Documentation & System)**
+
+Before jumping to recommendations, verify the specific error code context:
+
+1. **Lookup documentation**: `callTool(SearchDocs, 'ConfigManagerErrorCode [X]', 'Microsoft')`.
+2. **Verify driver details**: `callTool(GetSystemInfo, '[PNPClass]', 'DriverVersion')`.
+3. **Cross-reference logs**: `callTool(SearchLogs, '[DeviceName]')`.
+
+---
 
 Classify each device by PNPClass and/or its name:
 
@@ -51,10 +50,7 @@ Media / audio
 HIDClass / input devices
 Unknown / unclassified
 
-
-
 For each device, follow appropriate branch:
-
 
 6.2.1 Storage / Disk Device Errors
 
@@ -67,16 +63,11 @@ Recommend:
 Checking for updated chipset and storage controller drivers from system or motherboard vendor.
 Ensuring no loose or damaged cables (for desktop systems).
 
-
 If combined with bad SMART status or disk error events (see Branch 2), treat as critical.
 Do not automatically recommend destructive commands (like chkdsk /r) without:
 
 Explicit warning
 Advising backups first
-
-
-
-
 
 6.2.2 USB Device / Controller Errors
 
@@ -89,7 +80,6 @@ On a different USB port.
 Without a USB hub (direct to PC).
 With a different cable, if applicable.
 
-
 Recommend:
 
 Updating USB controller / chipset drivers from the vendor site.
@@ -97,12 +87,7 @@ Disabling USB power-saving features for affected devices:
 
 Device Manager → device properties → Power Management.
 
-
-
-
 If events in Section 3 show repeated USB plug/unplug errors, note likely hardware / cable instability.
-
-
 
 6.2.3 Network Adapter Errors
 
@@ -115,10 +100,7 @@ If yes:
 Suggest disabling and re-enabling the adapter in Device Manager.
 Recommend vendor driver update (Intel, Realtek, etc.).
 
-
 If adapter is unused (e.g., old virtual adapter), suggest it may be safe to leave as-is or disable.
-
-
 
 6.2.4 Unknown Devices
 
@@ -129,11 +111,7 @@ Suggest user installs:
 
 OEM drivers (from Dell/HP/Lenovo/etc.) or driver packs appropriate for their model.
 
-
 If device has no functional impact the user cares about, mark as low priority.
-
-
-
 
 6.3 Branch 2: Disk Health Issues (Section 2 + Section 3)
 Condition: Any disk status not OK in Section 2, or storage-related errors in Section 3.
@@ -146,21 +124,15 @@ Clearly state:
 
 “One or more disks may be failing. This is a critical issue.”
 
-
 Recommend:
 
 Immediate backup of important files.
 Avoiding heavy disk operations (no large writes or repairs) until data is backed up.
 
-
 After backup, suggest:
 
 Using vendor tools (e.g., Samsung Magician, Intel SSD Toolbox) for deeper diagnostics.
 Planning disk replacement if confirmed.
-
-
-
-
 
 6.3.2 Disk-Related System Events
 Look for messages like:
@@ -181,18 +153,12 @@ Cabling issues (for SATA)
 Controller/driver problems
 Power issues (for external drives)
 
-
-
-
 Recommend:
 
 Backup as a precaution.
 Checking physical connections (if internal desktop).
 Updating storage controller drivers.
 If external: trying another port, cable, or PC to isolate the problem.
-
-
-
 
 6.4 Branch 3: USB Instability (Section 3 + Section 4)
 Condition: Multiple USB-related warnings/errors, or many USB devices with non-zero error codes.
@@ -206,18 +172,13 @@ Simplifying the setup temporarily:
 Disconnect all non-essential USB devices.
 Reconnect devices one by one, prioritizing critical components.
 
-
 Avoiding unpowered hubs or questionable adapters.
 Updating chipset and USB drivers from OEM.
-
 
 If a particular device repeatedly shows issues:
 
 Suggest testing that device on another machine.
 Conclude whether device or host is at fault.
-
-
-
 
 6.5 Branch 4: Network Adapter Status (Section 5)
 Condition: Network adapters show problems in Section 5.
@@ -227,14 +188,11 @@ Examples:
 Expected adapter has NetEnabled = False or poor Status.
 Only low-speed link on wired connection where higher speed is expected.
 
-
-
 Response:
 
 Ask user:
 
 Which network connection they are actively using (Ethernet vs. Wi-Fi).
-
 
 For the in-use adapter:
 
@@ -243,19 +201,11 @@ If disabled or erroring:
 Suggest enabling it and checking Device Manager for errors.
 Recommend updated driver from OEM.
 
-
-
-
 For adapters the user does not use:
 
 Mark issues as non-critical but optionally suggest:
 
 Disabling unused adapters to reduce noise/confusion.
-
-
-
-
-
 
 6.6 Branch 5: No Apparent Issues Found
 Condition:
@@ -273,82 +223,83 @@ Ask:
 
 What symptoms they are experiencing (e.g., freezes, slowdowns, disconnects).
 
+6.7 Branch 6: GPU / Compute Issues
+Condition: GPU-related errors in Device Manager, Event Viewer, or diagnostic text; CUDA/DirectX failures; LLM inference failures mentioning GPU.
+
+Response:
+
+- Confirm GPU visibility in Device Manager and `nvidia-smi`.
+- If eGPU:
+  - Confirm enclosure power, cable, and hot-plug stability.
+  - Ask whether failures correlate with boot/resume or cable reseating.
+- If errors occur only in WSL/Docker:
+  - Check `nvidia-smi` inside WSL.
+  - Verify Docker GPU runtime (`docker run --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`).
+  - Re-check WSL/Docker versions and driver compatibility.
+
+6.8 Branch 7: WSL / Docker / Virtualization Issues
+Condition: Logs mention WSL, HNS, Hyper-V, Docker Desktop, or container runtime failures.
+
+Response:
+
+- Verify WSL status/version and networking mode.
+- Check HNS/Hyper-V services state.
+- Run:
+  - `C:\Scripts\wsl-network-recovery.ps1 -Diagnose`
+  - `C:\Scripts\Startup\wsl-docker-health-check.ps1`
+  - `Get-WSLEnvironmentHealth`
+  - `Invoke-WSLDockerHealthCheck`
+- If Docker Desktop returns 500 errors for the Linux engine:
+  - Confirm WSL is healthy first, then restart Docker Desktop.
+- For local LLM services:
+  - Validate Ollama (11434), vLLM (8000), LM Studio (1234).
+  - If WSL access fails, try host gateway IP or VSock bridges (if configured).
+- Recommend restart order: WSL service → Docker Desktop → containers → LLM services.
 
 Offer to:
 
 Run more targeted diagnostics in that area (e.g., performance, memory, CPU thermals) via additional scripts or instructions.
 
+## 6. Advanced Native Diagnostics (Optional)
 
+If the `Measure-PcaiPerformance.ps1` script is available and loaded, you can request high-performance metrics to debug resource exhaustion or storage hotspots.
 
+### when to Use
 
-7. Output Formatting
-When reporting findings, use a structured format:
+- **Slow Performance**: User complains of lag; check `Get-PcaiTopProcesses`.
+- **Disk Full**: User says "disk full"; check `Get-PcaiDiskUsage`.
+- **Memory Pressure**: Check `Get-PcaiMemoryStats`.
 
-Summary
+### Capabilities
 
-Brief, high-level overview (2–4 bullet points).
+- **Disk Usage**: Scans millions of files in seconds (files/sec) to find space hogs.
+- **Process Stats**: Instant snapshot of top CPU/RAM consumers without WMI overhead.
 
+### Integration
 
-Findings by Category
+If you see these JSON outputs in the chat, treat them as high-fidelity data sources (more reliable than wmic/PowerShell counters).
 
-Devices with errors
-Disk health
-USB stability
-Network adapters
+---
 
+## 7. Output Formatting (JSON Mandatory)
 
-Priority Issues
+All diagnostic findings MUST be output in valid JSON format as specified in `DIAGNOSE.md` and `Config/DIAGNOSE_TEMPLATE.json`.
 
-Clearly label Critical, High, Medium, Low.
+Ensure the JSON includes:
 
+- **Summary**: Concise high-level bullets.
+- **Findings**: Categorized issues with evidence from logs.
+- **Priority**: Criticality scoring for each finding.
+- **Next Steps**: Safe, actionable recovery steps.
 
-Recommended Next Steps
+---
 
-For each category, provide numbered steps.
-Call out risky steps with explicit warnings.
-
-
-
-Example structure:
-
-
-Summary
-
-One USB controller has driver issues.
-One external disk shows intermittent errors but SMART is OK.
-
-
-
-Findings
-
-USB: Controller X shows ConfigManagerErrorCode 10 (device cannot start).
-Disk: External Drive Y has multiple reset events, SMART appears OK.
-
-
-
-Priority Issues
-
-High: USB controller instability affecting multiple devices.
-Medium: External disk I/O errors – monitor and back up data.
-
-
-
-Next Steps
-
-Update chipset/USB drivers from OEM site.
-Connect external drive directly to a rear motherboard USB port.
-Back up important data from the external disk as a precaution.
-
-
-
-
-8. Safety & Escalation
+1. Safety & Escalation
 
 If you detect possible disk failure or system-level instability, always:
 
 Advise immediate backup of important data.
 Recommend professional/IT assistance if user is not comfortable with hardware replacements.
-
 
 Do not encourage:
 

@@ -1,69 +1,72 @@
 # PC_AI Quick Context
 
 > For rapid session restoration - read this first
-> Updated: 2026-01-23 | Version: 3.0.0
+> Updated: 2026-01-27 | Version: 5.0.0
 
 ## What Is This Project?
 
-**PC_AI** is a local LLM-powered PC diagnostics framework with 8 PowerShell modules.
+**PC_AI** is a local LLM-powered PC diagnostics framework with:
+- 8 PowerShell modules
+- **Native Rust acceleration** (Rust DLL + C# Hybrid Framework)
+- **LLM Integration** (Ollama, LM Studio, vLLM)
 
-## Current State (Test Fixing Phase)
+## Current State (Native Acceleration Phase 4 Complete)
 
 | Component | Status |
 |-----------|--------|
-| 8 Modules | All functional |
+| 8 PowerShell Modules | All functional |
 | Unified CLI | `PC-AI.ps1` |
-| Pester Tests | ~79% pass rate (173/218) |
-| GitHub Actions | CI/CD configured |
-| Rust Tools | 8/10 installed |
+| Pester Tests | ~81% pass rate (195/240) |
+| **Native FFI Tests** | **90 passing** |
+| **Rust Unit Tests** | **81 passing** |
 | Ollama LLM | qwen2.5-coder:7b primary |
+| Uncommitted Changes | **182 files** |
 
-## Test Status (2026-01-23)
+## Native Acceleration Status
 
-| Module | Tests | Passed | Failed | Skipped |
-|--------|-------|--------|--------|---------|
-| PC-AI.Network | 24 | 24 | 0 | 0 |
-| PC-AI.USB | 24 | 24 | 0 | 0 |
-| PC-AI.Hardware | 33 | 33 | 0 | 0 |
-| PC-AI.LLM | 28 | 28 | 0 | 0 |
-| PC-AI.Cleanup | 26 | 26 | 0 | 0 |
-| PC-AI.Performance | 22 | 19 | 3 | 0 |
-| PC-AI.Virtualization | TBD | TBD | TBD | TBD |
+| Phase | Module | Status | FFI Tests | Unit Tests |
+|-------|--------|--------|-----------|------------|
+| 1 | pcai_core_lib | COMPLETE | 16 | 26 |
+| 2 | pcai_search | COMPLETE | 21 | 14 |
+| 3 | pcai_performance | COMPLETE | 25 | 19 |
+| 4 | pcai_system | COMPLETE | 28 | 22 |
+| 5 | Integration | PLANNED | - | - |
 
-## Recent Work (2026-01-23) - Test Fixes
+**Latest Commit**: c338e11 "feat(native): add Phase 4 System Module with PATH analysis and log search"
 
-**Round 1**: test-automator + explore agents
-- Fixed PC-AI.Network.Tests.ps1 (24/24)
-- Fixed PC-AI.USB.Tests.ps1 (24/24)
+## Architecture Pattern
 
-**Round 2**: Parallel agents
-- Fixed PC-AI.Hardware.Tests.ps1 (33/33)
-- Fixed PC-AI.LLM.Tests.ps1 (28/28)
-- Fixed PC-AI.Cleanup.Tests.ps1 (26/26)
-- Fixed PC-AI.Performance.Tests.ps1 (19/22)
-
-**Round 3**: Cross-cutting agents
-- Admin-skip pattern implementation
-- Encoding fix pattern (PS5.1/PS7+ compat)
-
-## Key Code Patterns
-
-```powershell
-# Encoding (PS5.1/PS7+ compat)
-[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::UTF8)
-
-# Admin skip pattern
--Skip:(-not $script:IsAdmin)
-
-# Module-scoped mock
-Mock Get-CimInstance { ... } -ModuleName PC-AI.Hardware
-
-# API mocking
-Mock Invoke-RestMethod {
-    param($Uri)
-    if ($Uri -match "/api/tags") { Get-MockOllamaResponse -Type ModelList }
-} -ModuleName PC-AI.LLM
 ```
+Rust DLL (#[no_mangle] extern "C")
+    |
+    v
+C# P/Invoke ([DllImport])
+    |
+    v
+PowerShell Cmdlets (with fallback)
+```
+
+## Key Native Files
+
+| Category | Path |
+|----------|------|
+| Rust Workspace | `Native/pcai_core/Cargo.toml` |
+| Core Library | `Native/pcai_core/pcai_core_lib/src/lib.rs` |
+| Search Module | `Native/pcai_core/pcai_search/src/*.rs` |
+| System Module | `Native/pcai_core/pcai_core_lib/src/system.rs` |
+| C# Wrappers | `Native/PcaiNative/*.cs` |
+| System Wrapper | `Native/PcaiNative/SystemModule.cs` |
+| FFI Tests | `Tests/Integration/FFI.*.Tests.ps1` |
+| Built DLLs | `bin/*.dll` |
+
+## Key LLM Files
+
+| Category | Path |
+|----------|------|
+| LLM Module | `Modules/PC-AI.LLM/PC-AI.LLM.psm1` |
+| Config | `Config/llm-config.json` |
+| FunctionGemma | `Deploy/functiongemma-finetune/` |
+| vLLM Docker | `Deploy/docker/vllm/` |
 
 ## Quick Commands
 
@@ -71,32 +74,66 @@ Mock Invoke-RestMethod {
 # Navigate to project
 cd C:\Users\david\PC_AI
 
-# Run all tests
-.\Tests\.pester.ps1 -Type Unit
+# Build Rust (release)
+cd Native\pcai_core && cargo build --release
 
-# Run specific test file
-Invoke-Pester Tests/Unit/PC-AI.LLM.Tests.ps1 -Output Detailed
+# Build C#
+cd Native\PcaiNative && dotnet build -c Release
 
-# Check LLM status
-Import-Module .\Modules\PC-AI.LLM -Force
-Get-LLMStatus -TestConnection
+# Run FFI tests
+Invoke-Pester -Path 'Tests\Integration\FFI.*.Tests.ps1'
+
+# Test native library availability
+Add-Type -Path bin\PcaiNative.dll
+[PcaiNative.PcaiCore]::GetDiagnostics() | ConvertTo-Json
 ```
 
-## Active Issues
+## Code Patterns
 
-1. `Optimize-Disks` context failures in PC-AI.Performance
-2. `CursorPosition` console errors in `Watch-VSockPerformance`
-3. TestDrive path concatenation in some tests
-4. Admin tests skipped when not elevated (~19 tests)
+```rust
+// Rust FFI export
+#[no_mangle]
+pub extern "C" fn pcai_xxx(path: *const c_char) -> PcaiStringBuffer { ... }
+```
 
-## Next Steps
+```csharp
+// C# P/Invoke
+[DllImport("pcai_xxx.dll", CallingConvention = CallingConvention.Cdecl)]
+internal static extern PcaiStringBuffer pcai_xxx(
+    [MarshalAs(UnmanagedType.LPUTF8Str)] string path);
 
-1. Fix remaining ~26 test failures
-2. Push to GitHub as public repository
-3. Test with LM Studio agents
-4. Document API for LLM integration
+// Always free string buffers
+var buffer = NativeXxx.pcai_xxx(path);
+try { return buffer.ToManagedString(); }
+finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+```
+
+```powershell
+# Pester test with Skip condition
+BeforeDiscovery { $script:Available = ... }
+It "Test" -Skip:(-not $script:Available) { ... }
+```
+
+## Next Steps (Phase 5 - Integration)
+
+1. PowerShell cmdlet integration for native modules
+2. Add `-UseNative` switch with graceful fallback
+3. Performance benchmarks (native vs managed)
+4. FunctionGemma vLLM tool router integration
+5. Commit 182 pending changes
+
+## Recommended Agents
+
+| Agent | Purpose |
+|-------|---------|
+| test-runner | Run comprehensive FFI/Pester tests |
+| deployment-engineer | CI/CD automation setup |
+| code-reviewer | Review Phase 4 implementation |
+| rust-pro | Rust module refinement |
+| csharp-pro | C# wrapper improvements |
 
 ## For Full Context
 
-Read: `C:\Users\david\PC_AI\.claude\context\project-context.md`
-Also: `C:\Users\david\PC_AI\.claude\context\pc-ai-project-context.md`
+- **Native Details**: `C:\Users\david\PC_AI\.claude\context\native-acceleration-context.md`
+- **Full Project**: `C:\Users\david\PC_AI\.claude\context\project-context.md`
+- **Framework Pattern**: `~/.claude/context/rust-csharp-hybrid-framework.md`

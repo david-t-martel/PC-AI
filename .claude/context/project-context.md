@@ -422,11 +422,96 @@ test_framework: Pester 5.x
 coverage_target: 85%
 ci_cd: GitHub Actions
 safety_mode: read_only_default
+native_acceleration: true
+native_phase: 3 (Performance Module Complete)
+ffi_tests: 62
+rust_unit_tests: 59
 ```
 
 ---
 
-## 12. Session History
+## 12. Native Acceleration Framework
+
+> **Full Details**: See `native-acceleration-context.md`
+
+### Architecture: Rust DLL + C# Hybrid Framework
+
+```
+Rust DLL (#[no_mangle] extern "C")
+    |
+    v
+C# P/Invoke ([DllImport])
+    |
+    v
+PowerShell Cmdlets (with fallback)
+```
+
+### Phase Status
+
+| Phase | Module | Status | FFI Tests | Unit Tests |
+|-------|--------|--------|-----------|------------|
+| 1 | pcai_core_lib | COMPLETE | 16 | 26 |
+| 2 | pcai_search | COMPLETE | 21 | 14 |
+| 3 | pcai_performance | COMPLETE | 25 | 19 |
+| 4 | pcai_system | PLANNED | - | - |
+
+**Latest Commit**: 9404eb9 "feat(native): add Phase 3 Performance Module with FFI integration"
+
+### Key Native Files
+
+| Category | Path |
+|----------|------|
+| Rust Workspace | `Native/pcai_core/Cargo.toml` |
+| Core Library | `Native/pcai_core/pcai_core_lib/src/lib.rs` |
+| Search Module | `Native/pcai_core/pcai_search/src/*.rs` |
+| Performance Module | `Native/pcai_core/pcai_performance/src/*.rs` |
+| C# Wrappers | `Native/PcaiNative/*.cs` |
+| FFI Tests | `Tests/Integration/FFI.*.Tests.ps1` |
+| Built DLLs | `bin/*.dll` |
+
+### Key Code Patterns
+
+**Rust FFI**:
+```rust
+#[repr(C)]
+pub struct PcaiStringBuffer {
+    pub status: PcaiStatus,
+    pub data: *mut c_char,
+    pub length: usize,
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_xxx(path: *const c_char) -> PcaiStringBuffer { ... }
+```
+
+**C# P/Invoke**:
+```csharp
+[DllImport("pcai_xxx.dll", CallingConvention = CallingConvention.Cdecl)]
+internal static extern PcaiStringBuffer pcai_xxx(
+    [MarshalAs(UnmanagedType.LPUTF8Str)] string path);
+
+// Always free string buffers in try/finally
+var buffer = NativeXxx.pcai_xxx(path);
+try { return buffer.ToManagedString(); }
+finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+```
+
+### Build Commands
+
+```powershell
+# Rust build
+cd Native\pcai_core && cargo build --release
+
+# C# build
+cd Native\PcaiNative && dotnet build -c Release
+
+# Run FFI tests
+Invoke-Pester -Path 'Tests\Integration\FFI.*.Tests.ps1'
+```
+
+---
+
+## 13. Session History
 
 ### 2026-01-23: Pester Test Fixing Campaign
 
@@ -460,7 +545,30 @@ safety_mode: read_only_default
 3. PC-AI.Virtualization tests (TBD)
 4. Admin tests skipped (~19 tests)
 
-### 2025-01-23 (Earlier): Acceleration Module Complete
+### 2026-01-23 (Later): Native Acceleration Framework - Phase 3 Complete
+
+**Objective**: Build Rust DLL + C# Hybrid Framework for high-performance native operations
+
+**Phases Completed**:
+- **Phase 1 (Foundation)**: pcai_core_lib with FFI utilities (16 FFI tests, 26 unit tests)
+- **Phase 2 (Search)**: pcai_search with duplicates, files, content search (21 FFI tests, 14 unit tests)
+- **Phase 3 (Performance)**: pcai_performance with disk, process, memory (25 FFI tests, 19 unit tests)
+
+**Architecture Pattern**: Follows NukeNul reference implementation
+- Rust crates export `#[repr(C)]` structs and `extern "C"` functions
+- C# uses P/Invoke with `[DllImport]` and `[StructLayout]`
+- PcaiStringBuffer pattern for cross-FFI string handling
+- JSON output optimized for LLM consumption
+
+**Key Achievements**:
+- 62 FFI integration tests passing (Pester 5.x)
+- 59 Rust unit tests passing
+- Clean memory management with try/finally pattern
+- Full test coverage for all three modules
+
+**Latest Commit**: 9404eb9 "feat(native): add Phase 3 Performance Module with FFI integration"
+
+### 2025-01-23 (Earlier): PowerShell Acceleration Module Complete
 - Created PC-AI.Acceleration module with 9 public functions
 - Integrated 8 Rust CLI tools (rg, fd, procs, bat, hyperfine, tokei, eza, sd)
 - Identified 2 missing tools (dust, btm)
