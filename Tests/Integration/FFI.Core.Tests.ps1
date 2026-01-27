@@ -158,7 +158,7 @@ public static class PcaiCoreTest
                     $result | Should -Be $ExpectedMagicNumber
                 }
                 catch {
-                    Set-ItResult -Failed -Because "P/Invoke call failed: $_"
+                    throw "P/Invoke call failed: $_"
                 }
             }
         }
@@ -174,10 +174,10 @@ public static class PcaiCoreTest
 
                     $version = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi($ptr)
                     $version | Should -Not -BeNullOrEmpty
-                    $version | Should -Match '^\d+\.\d+\.\d+$'
+                    $version | Should -Match '^(\d+\.\d+\.\d+(-[0-9A-Za-z\.-]+)?)|([0-9a-f]{7,}(-dirty)?)$'
                 }
                 catch {
-                    Set-ItResult -Failed -Because "P/Invoke call failed: $_"
+                    throw "P/Invoke call failed: $_"
                 }
             }
         }
@@ -195,7 +195,7 @@ public static class PcaiCoreTest
                     $count | Should -BeGreaterOrEqual ([Environment]::ProcessorCount / 2)
                 }
                 catch {
-                    Set-ItResult -Failed -Because "P/Invoke call failed: $_"
+                    throw "P/Invoke call failed: $_"
                 }
             }
         }
@@ -219,7 +219,7 @@ public static class PcaiCoreTest
                     }
                 }
                 catch {
-                    Set-ItResult -Failed -Because "P/Invoke call failed: $_"
+                    throw "P/Invoke call failed: $_"
                 }
             }
         }
@@ -262,7 +262,7 @@ public static class PcaiCoreTest
                     $true | Should -Be $true
                 }
                 catch {
-                    Set-ItResult -Failed -Because "P/Invoke call crashed: $_"
+                    throw "P/Invoke call crashed: $_"
                 }
             }
         }

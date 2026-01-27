@@ -1,0 +1,36 @@
+=== Hardware & Device Diagnostics Report (2026-01-26 22:30:00) ===
+
+== 1. Devices with Errors in Device Manager ==
+
+Name                           PNPClass     Manufacturer       ConfigManagerErrorCode Status
+----                           --------     ------------       ---------------------- ------
+Intel(R) Wireless-AC 9560      Net          Intel Corporation                      31 Error
+
+== 2. Disk SMART Overall Status ==
+
+Model                               Status
+-----                               ------
+Samsung SSD 970 EVO Plus 1TB        OK
+ST2000DM008-2FR102                  OK
+
+== 3. USB Controllers and Devices ==
+
+Name                                        PNPClass Status ConfigManagerErrorCode
+----                                        -------- ------ ----------------------
+Intel(R) USB 3.1 eXtensible Host Controller USB      OK                          0
+USB Root Hub (USB 3.0)                      USB      OK                          0
+Logitech USB Input Device                   HIDClass OK                          0
+
+== 4. Network Adapter Status ==
+
+Name                      NetEnabled Status
+----                      ---------- ------
+Intel(R) Wireless-AC 9560      False Error
+Realtek PCIe GbE Family Controller True Up
+
+== 5. Recent Critical System Events (Hardware) ==
+
+TimeCreated           ProviderName          Id LevelDisplayName Message
+-----------           ------------          -- ---------------- -------
+1/26/2026 10:15:23 PM Netwtw08            5007 Error            Intel(R) Wireless-AC 9560 : Has encountered an internal error and has failed.
+1/26/2026 10:15:25 PM Microsoft-Windows-Pnp 411 Error            The device Intel(R) Wireless-AC 9560 (location (Bus 0, Device 20, Function 3)) had a problem starting.
