@@ -1,0 +1,35 @@
+services:
+  vllm-functiongemma:
+    image: vllm/vllm-openai:latest
+    container_name: vllm-functiongemma
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
+      - HF_HUB_OFFLINE=1
+      - CUDA_DEVICE_ORDER=PCI_BUS_ID
+      - CUDA_VISIBLE_DEVICES=1
+      - VLLM_LOGGING_LEVEL=INFO
+    volumes:
+      - C:\\Users\\david\\.cache\\huggingface:/root/.cache/huggingface
+      - C:\\Users\\david\\PC_AI\\Models\\functiongemma-270m-it:/models/functiongemma-270m-it
+      - C:\\Users\\david\\PC_AI\\Deploy\\docker\\vllm\\tool_chat_template_functiongemma.jinja:/opt/pcai/tool_chat_template_functiongemma.jinja:ro
+    gpus: all
+    ipc: host
+    command:
+      - --model
+      - /models/functiongemma-270m-it
+      - --served-model-name
+      - functiongemma-270m-it
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - functiongemma
+      - --chat-template
+      - /opt/pcai/tool_chat_template_functiongemma.jinja
+      - --max-model-len
+      - "4096"
+      - --gpu-memory-utilization
+      - "0.6"
+      - --enforce-eager
