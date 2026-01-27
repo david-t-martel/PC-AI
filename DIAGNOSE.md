@@ -255,3 +255,14 @@ When diagnostics mention WSL, Docker, Hyper-V, or HNS:
   - `Invoke-WSLDockerHealthCheck`
 
 Emphasize **restart order**: WSL service → Docker Desktop → application containers.
+
+---
+
+[SYSTEM_RESOURCE_STATUS]
+(Live system metrics will be injected here)
+
+## TOOL INTERPRETATION HINTS
+
+1. **Native Performance**: `Measure-PcaiPerformance.ps1` results in `files/sec` or `IOPS`. Higher numbers are better.
+2. **SetupAPI**: USB errors (Code 43, 31) are prioritized.
+3. **vLLM Metrics**: KVCache usage > 90% indicates impending OOM or slowdown.

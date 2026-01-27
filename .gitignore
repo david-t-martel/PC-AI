@@ -119,3 +119,9 @@ Deploy/functiongemma-finetune/output/
 **/.cache/huggingface/
 **/.cache/vllm/
 **/.cache/torch/
+
+# Temporary debug/fix scripts
+fix_ps_files*.py
+*_Debug_Report*.json
+usb_deep.json
+testResults.xml

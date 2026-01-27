@@ -87,27 +87,7 @@ function Invoke-LLMChatRouted {
         [switch]$EnforceJson
     )
 
-    $projectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
-    $diagnosePromptPath = Join-Path -Path $projectRoot -ChildPath 'DIAGNOSE.md'
-    $diagnoseLogicPath = Join-Path -Path $projectRoot -ChildPath 'DIAGNOSE_LOGIC.md'
-    $chatPromptPath = Join-Path -Path $projectRoot -ChildPath 'CHAT.md'
-
-    $systemPrompt = ''
-    if ($Mode -eq 'chat' -and (Test-Path $chatPromptPath)) {
-        $systemPrompt = Get-Content -Path $chatPromptPath -Raw -Encoding utf8
-    } elseif (Test-Path $diagnosePromptPath) {
-        $systemPrompt = Get-Content -Path $diagnosePromptPath -Raw -Encoding utf8
-        if (Test-Path $diagnoseLogicPath) {
-            $logic = Get-Content -Path $diagnoseLogicPath -Raw -Encoding utf8
-            $systemPrompt = @"
-$systemPrompt
-
-## REASONING FRAMEWORK
-
-$logic
-"@
-        }
-    }
+    $systemPrompt = Get-EnrichedSystemPrompt -Mode $Mode
 
     if (-not $PSBoundParameters.ContainsKey('EnforceJson')) {
         $EnforceJson = ($Mode -eq 'diagnose')
