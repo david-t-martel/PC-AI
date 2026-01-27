@@ -12,7 +12,8 @@
         'Mount-UsbToWSL',
         'Dismount-UsbFromWSL',
         'Get-UsbWSLStatus',
-        'Invoke-UsbBind'
+        'Invoke-UsbBind',
+        'Get-PcaiNativeUsbDiagnostics'
     )
     CmdletsToExport = @()
     VariablesToExport = @()
@@ -21,6 +22,9 @@
         PSData = @{
             Tags = @('USB', 'WSL', 'usbipd', 'PC-AI')
             ProjectUri = 'https://github.com/david-t-martel/PC_AI'
+        }
+        PCAI = @{
+            Commands = @('usb')
         }
     }
 }

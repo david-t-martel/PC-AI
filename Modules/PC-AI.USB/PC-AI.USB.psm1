@@ -35,5 +35,6 @@ Export-ModuleMember -Function @(
     'Mount-UsbToWSL',
     'Dismount-UsbFromWSL',
     'Get-UsbWSLStatus',
-    'Invoke-UsbBind'
+    'Invoke-UsbBind',
+    'Get-PcaiNativeUsbDiagnostics'
 )
