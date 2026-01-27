@@ -1,0 +1,1724 @@
+{
+  "Generated": "2026-01-27 11:39:03",
+  "PowerShell": {
+    "FunctionCount": 109,
+    "MissingHelpCount": 56,
+    "MissingHelpParameters": [
+      {
+        "Name": "Compare-ToolPerformance",
+        "Parameters": [
+          "Test",
+          "Path",
+          "Iterations",
+          "Detailed"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Test",
+          "Path",
+          "Iterations"
+        ],
+        "MissingHelpParameters": [
+          "Detailed"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Compare-ToolPerformance.ps1"
+      },
+      {
+        "Name": "Compare-FileSearchPerformance",
+        "Parameters": [
+          "Path",
+          "Iterations"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Iterations"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Compare-ToolPerformance.ps1"
+      },
+      {
+        "Name": "Compare-ContentSearchPerformance",
+        "Parameters": [
+          "Path",
+          "Iterations"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Iterations"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Compare-ToolPerformance.ps1"
+      },
+      {
+        "Name": "Compare-ProcessListPerformance",
+        "Parameters": [
+          "Iterations"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Iterations"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Compare-ToolPerformance.ps1"
+      },
+      {
+        "Name": "Compare-HashPerformance",
+        "Parameters": [
+          "Path",
+          "Iterations"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Iterations"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Compare-ToolPerformance.ps1"
+      },
+      {
+        "Name": "Find-DuplicatesFast",
+        "Parameters": [
+          "Path",
+          "Recurse",
+          "MinimumSize",
+          "MaximumSize",
+          "Include",
+          "Exclude",
+          "Algorithm",
+          "ThrottleLimit",
+          "ShowProgress"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Path",
+          "Recurse",
+          "MinimumSize",
+          "Include",
+          "Exclude",
+          "Algorithm",
+          "ThrottleLimit"
+        ],
+        "MissingHelpParameters": [
+          "MaximumSize",
+          "ShowProgress"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Find-DuplicatesFast.ps1"
+      },
+      {
+        "Name": "Find-WithFdForDuplicates",
+        "Parameters": [
+          "Path",
+          "Include",
+          "Exclude",
+          "FdPath"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Include",
+          "Exclude",
+          "FdPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Find-DuplicatesFast.ps1"
+      },
+      {
+        "Name": "Find-FilesFast",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "Extension",
+          "Type",
+          "MaxDepth",
+          "Hidden",
+          "Exclude",
+          "FullPath"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Path",
+          "Pattern",
+          "Extension",
+          "Type",
+          "MaxDepth",
+          "Hidden",
+          "Exclude"
+        ],
+        "MissingHelpParameters": [
+          "FullPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Find-FilesFast.ps1"
+      },
+      {
+        "Name": "Find-WithFd",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "Extension",
+          "Type",
+          "MaxDepth",
+          "Hidden",
+          "Exclude",
+          "FullPath",
+          "FdPath"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Pattern",
+          "Extension",
+          "Type",
+          "MaxDepth",
+          "Hidden",
+          "Exclude",
+          "FullPath",
+          "FdPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Find-FilesFast.ps1"
+      },
+      {
+        "Name": "Find-WithGetChildItem",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "Extension",
+          "Type",
+          "MaxDepth",
+          "Hidden",
+          "Exclude",
+          "FullPath"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Pattern",
+          "Extension",
+          "Type",
+          "MaxDepth",
+          "Hidden",
+          "Exclude",
+          "FullPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Find-FilesFast.ps1"
+      },
+      {
+        "Name": "Get-DiskUsageFast",
+        "Parameters": [
+          "Path",
+          "Depth",
+          "Top",
+          "MinSize",
+          "SortBy",
+          "ThrottleLimit"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Path",
+          "Depth",
+          "Top",
+          "MinSize",
+          "SortBy"
+        ],
+        "MissingHelpParameters": [
+          "ThrottleLimit"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-DiskUsageFast.ps1"
+      },
+      {
+        "Name": "Convert-SizeToBytes",
+        "Parameters": [
+          "Size"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Size"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-DiskUsageFast.ps1"
+      },
+      {
+        "Name": "Get-DiskUsageWithDust",
+        "Parameters": [
+          "Path",
+          "Depth",
+          "DustPath"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Depth",
+          "DustPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-DiskUsageFast.ps1"
+      },
+      {
+        "Name": "Get-DiskUsageParallel",
+        "Parameters": [
+          "Path",
+          "Depth",
+          "ThrottleLimit"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Depth",
+          "ThrottleLimit"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-DiskUsageFast.ps1"
+      },
+      {
+        "Name": "Format-ByteSize",
+        "Parameters": [
+          "Bytes"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Bytes"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-DiskUsageFast.ps1"
+      },
+      {
+        "Name": "Sort-DiskUsageResults",
+        "Parameters": [
+          "InputObject",
+          "SortBy"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "InputObject",
+          "SortBy"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-DiskUsageFast.ps1"
+      },
+      {
+        "Name": "Select-TopResults",
+        "Parameters": [
+          "InputObject",
+          "Top"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "InputObject",
+          "Top"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-DiskUsageFast.ps1"
+      },
+      {
+        "Name": "Get-FileHashParallel",
+        "Parameters": [
+          "Path",
+          "Algorithm",
+          "Recurse",
+          "Include",
+          "ThrottleLimit",
+          "MinimumSize",
+          "MaximumSize"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Path",
+          "Algorithm",
+          "Recurse",
+          "Include",
+          "ThrottleLimit"
+        ],
+        "MissingHelpParameters": [
+          "MinimumSize",
+          "MaximumSize"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-FileHashParallel.ps1"
+      },
+      {
+        "Name": "Get-ProcessesFast",
+        "Parameters": [
+          "Name",
+          "SortBy",
+          "Top",
+          "Tree",
+          "Watch",
+          "RawOutput"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Name",
+          "SortBy",
+          "Top",
+          "Tree",
+          "Watch"
+        ],
+        "MissingHelpParameters": [
+          "RawOutput"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-ProcessesFast.ps1"
+      },
+      {
+        "Name": "Get-ProcessesWithProcs",
+        "Parameters": [
+          "Name",
+          "SortBy",
+          "Top",
+          "Tree",
+          "Watch",
+          "RawOutput",
+          "ProcsPath"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Name",
+          "SortBy",
+          "Top",
+          "Tree",
+          "Watch",
+          "RawOutput",
+          "ProcsPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-ProcessesFast.ps1"
+      },
+      {
+        "Name": "Get-ProcessesParallel",
+        "Parameters": [
+          "Name",
+          "SortBy",
+          "Top",
+          "Tree",
+          "Watch",
+          "RawOutput"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Name",
+          "SortBy",
+          "Top",
+          "Tree",
+          "Watch",
+          "RawOutput"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-ProcessesFast.ps1"
+      },
+      {
+        "Name": "Get-AcceleratedFunction",
+        "Parameters": [
+          "Tool"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Tool"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-RustToolStatus.ps1"
+      },
+      {
+        "Name": "Test-RustToolAvailable",
+        "Parameters": [
+          "Tool"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Tool"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-RustToolStatus.ps1"
+      },
+      {
+        "Name": "Get-UnifiedHardwareReportJson",
+        "Parameters": [
+          "Verbosity"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Verbosity"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-UnifiedHardwareReportJson.ps1"
+      },
+      {
+        "Name": "Measure-WithHyperfine",
+        "Parameters": [
+          "Command",
+          "Iterations",
+          "Warmup",
+          "Name",
+          "Shell",
+          "HyperfinePath"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Command",
+          "Iterations",
+          "Warmup",
+          "Name",
+          "Shell",
+          "HyperfinePath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Measure-CommandPerformance.ps1"
+      },
+      {
+        "Name": "Measure-WithNative",
+        "Parameters": [
+          "Command",
+          "Iterations",
+          "Warmup",
+          "Name"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Command",
+          "Iterations",
+          "Warmup",
+          "Name"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Measure-CommandPerformance.ps1"
+      },
+      {
+        "Name": "Search-ContentFast",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "LiteralPattern",
+          "FilePattern",
+          "Context",
+          "CaseSensitive",
+          "WholeWord",
+          "Invert",
+          "MaxResults",
+          "FilesOnly",
+          "ThrottleLimit"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Path",
+          "Pattern",
+          "LiteralPattern",
+          "FilePattern",
+          "Context",
+          "IgnoreCase",
+          "WholeWord",
+          "Invert"
+        ],
+        "MissingHelpParameters": [
+          "CaseSensitive",
+          "MaxResults",
+          "FilesOnly",
+          "ThrottleLimit"
+        ],
+        "ExtraHelpParameters": [
+          "IgnoreCase"
+        ],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-ContentFast.ps1"
+      },
+      {
+        "Name": "Search-WithRipgrepAdvanced",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "LiteralPattern",
+          "FilePattern",
+          "Context",
+          "CaseSensitive",
+          "WholeWord",
+          "Invert",
+          "MaxResults",
+          "FilesOnly",
+          "ThrottleLimit",
+          "SearchPattern",
+          "RgPath"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Pattern",
+          "LiteralPattern",
+          "FilePattern",
+          "Context",
+          "CaseSensitive",
+          "WholeWord",
+          "Invert",
+          "MaxResults",
+          "FilesOnly",
+          "ThrottleLimit",
+          "SearchPattern",
+          "RgPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-ContentFast.ps1"
+      },
+      {
+        "Name": "Search-WithParallelSelectString",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "LiteralPattern",
+          "FilePattern",
+          "Context",
+          "CaseSensitive",
+          "WholeWord",
+          "Invert",
+          "MaxResults",
+          "FilesOnly",
+          "ThrottleLimit",
+          "SearchPattern"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Pattern",
+          "LiteralPattern",
+          "FilePattern",
+          "Context",
+          "CaseSensitive",
+          "WholeWord",
+          "Invert",
+          "MaxResults",
+          "FilesOnly",
+          "ThrottleLimit",
+          "SearchPattern"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-ContentFast.ps1"
+      },
+      {
+        "Name": "Search-LogsFast",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "Include",
+          "Context",
+          "CaseSensitive",
+          "MaxCount",
+          "CountOnly"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Path",
+          "Pattern",
+          "Include",
+          "Context",
+          "CaseSensitive",
+          "MaxCount"
+        ],
+        "MissingHelpParameters": [
+          "CountOnly"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-LogsFast.ps1"
+      },
+      {
+        "Name": "Search-WithRipgrep",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "Include",
+          "Context",
+          "CaseSensitive",
+          "MaxCount",
+          "CountOnly",
+          "RgPath"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Pattern",
+          "Include",
+          "Context",
+          "CaseSensitive",
+          "MaxCount",
+          "CountOnly",
+          "RgPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-LogsFast.ps1"
+      },
+      {
+        "Name": "Search-WithSelectString",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "Include",
+          "Context",
+          "CaseSensitive",
+          "MaxCount",
+          "CountOnly"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Pattern",
+          "Include",
+          "Context",
+          "CaseSensitive",
+          "MaxCount",
+          "CountOnly"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-LogsFast.ps1"
+      },
+      {
+        "Name": "Clear-TempFiles",
+        "Parameters": [
+          "Target",
+          "OlderThanDays",
+          "IncludePrefetch",
+          "IncludeWindowsUpdate",
+          "Force"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Target",
+          "OlderThanDays",
+          "IncludePrefetch",
+          "IncludeWindowsUpdate",
+          "Force"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Cleanup\\Public\\Clear-TempFiles.ps1"
+      },
+      {
+        "Name": "Find-DuplicateFiles",
+        "Parameters": [
+          "Path",
+          "Recurse",
+          "MinimumSize",
+          "MaximumSize",
+          "Algorithm",
+          "Include",
+          "Exclude",
+          "ShowProgress"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Recurse",
+          "MinimumSize",
+          "MaximumSize",
+          "Algorithm",
+          "Include",
+          "Exclude",
+          "ShowProgress"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Cleanup\\Public\\Find-DuplicateFiles.ps1"
+      },
+      {
+        "Name": "Get-PathDuplicates",
+        "Parameters": [
+          "Target",
+          "IncludeProcess"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Target",
+          "IncludeProcess"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Cleanup\\Public\\Get-PathDuplicates.ps1"
+      },
+      {
+        "Name": "Invoke-NukeNulCleanup",
+        "Parameters": [
+          "Path",
+          "ExePath",
+          "Force"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "ExePath",
+          "Force"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Cleanup\\Public\\Invoke-NukeNulCleanup.ps1"
+      },
+      {
+        "Name": "Repair-MachinePath",
+        "Parameters": [
+          "Target",
+          "RemoveNonExistent",
+          "NormalizeSlashes",
+          "Force",
+          "BackupPath"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Target",
+          "RemoveNonExistent",
+          "NormalizeSlashes",
+          "Force",
+          "BackupPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Cleanup\\Public\\Repair-MachinePath.ps1"
+      },
+      {
+        "Name": "Get-LLMStatus",
+        "Parameters": [
+          "IncludeLMStudio",
+          "IncludeVLLM",
+          "TestConnection"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "IncludeLMStudio",
+          "IncludeVLLM",
+          "TestConnection"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Get-LLMStatus.ps1"
+      },
+      {
+        "Name": "Get-SystemInfoTool",
+        "Parameters": [
+          "Category",
+          "Detail"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Category",
+          "Detail"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Get-SystemInfoTool.ps1"
+      },
+      {
+        "Name": "Invoke-DocSearch",
+        "Parameters": [
+          "Query",
+          "Source"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Query",
+          "Source"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-DocSearch.ps1"
+      },
+      {
+        "Name": "Invoke-LLMChat",
+        "Parameters": [
+          "Message",
+          "Model",
+          "System",
+          "Temperature",
+          "MaxTokens",
+          "TimeoutSeconds",
+          "Interactive",
+          "ToJson",
+          "History",
+          "Provider",
+          "UseRouter",
+          "RouterMode",
+          "Stream",
+          "ShowProgress",
+          "ShowMetrics",
+          "ProgressIntervalSeconds"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Message",
+          "Model",
+          "System",
+          "Temperature",
+          "MaxTokens",
+          "TimeoutSeconds",
+          "Interactive",
+          "ToJson",
+          "History",
+          "Provider",
+          "UseRouter",
+          "RouterMode",
+          "Stream",
+          "ShowProgress",
+          "ShowMetrics",
+          "ProgressIntervalSeconds"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-LLMChat.ps1"
+      },
+      {
+        "Name": "Invoke-LLMChatRouted",
+        "Parameters": [
+          "Message",
+          "Mode",
+          "Model",
+          "Provider",
+          "RouterBaseUrl",
+          "RouterModel",
+          "ToolsPath",
+          "ExecuteTools",
+          "MaxToolCalls",
+          "TimeoutSeconds",
+          "Temperature",
+          "EnforceJson"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Message",
+          "Mode",
+          "Model",
+          "Provider",
+          "RouterBaseUrl",
+          "RouterModel",
+          "ToolsPath",
+          "ExecuteTools",
+          "MaxToolCalls",
+          "TimeoutSeconds",
+          "Temperature"
+        ],
+        "MissingHelpParameters": [
+          "EnforceJson"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-LLMChatRouted.ps1"
+      },
+      {
+        "Name": "Invoke-LLMChatTui",
+        "Parameters": [
+          "Arguments"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Arguments"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-LLMChatTui.ps1"
+      },
+      {
+        "Name": "Invoke-LogSearch",
+        "Parameters": [
+          "Pattern",
+          "RootPath",
+          "FilePattern",
+          "CaseSensitive",
+          "ContextLines",
+          "MaxMatches"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Pattern",
+          "RootPath",
+          "FilePattern",
+          "CaseSensitive",
+          "ContextLines",
+          "MaxMatches"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-LogSearch.ps1"
+      },
+      {
+        "Name": "Invoke-NativeSearch",
+        "Parameters": [
+          "Operation",
+          "Path",
+          "Pattern",
+          "FilePattern",
+          "MinimumSize",
+          "MaxResults",
+          "ContextLines",
+          "AsJson"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Operation",
+          "Path",
+          "Pattern",
+          "MinimumSize",
+          "MaxResults",
+          "ContextLines",
+          "AsJson"
+        ],
+        "MissingHelpParameters": [
+          "FilePattern"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-NativeSearch.ps1"
+      },
+      {
+        "Name": "Format-DuplicateResultForLLM",
+        "Parameters": [
+          "NativeResult"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "NativeResult"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-NativeSearch.ps1"
+      },
+      {
+        "Name": "Format-FileSearchResultForLLM",
+        "Parameters": [
+          "NativeResult"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "NativeResult"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-NativeSearch.ps1"
+      },
+      {
+        "Name": "Format-ContentSearchResultForLLM",
+        "Parameters": [
+          "NativeResult"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "NativeResult"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-NativeSearch.ps1"
+      },
+      {
+        "Name": "Invoke-PowerShellDuplicates",
+        "Parameters": [
+          "Path",
+          "MinimumSize",
+          "MaxResults"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "MinimumSize",
+          "MaxResults"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-NativeSearch.ps1"
+      },
+      {
+        "Name": "Invoke-PowerShellFileSearch",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "MaxResults"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Pattern",
+          "MaxResults"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-NativeSearch.ps1"
+      },
+      {
+        "Name": "Invoke-PowerShellContentSearch",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "FilePattern",
+          "MaxResults",
+          "ContextLines"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Pattern",
+          "FilePattern",
+          "MaxResults",
+          "ContextLines"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-NativeSearch.ps1"
+      },
+      {
+        "Name": "Invoke-PCDiagnosis",
+        "Parameters": [
+          "DiagnosticReportPath",
+          "ReportText",
+          "Model",
+          "Temperature",
+          "IncludeRawResponse",
+          "SaveReport",
+          "OutputPath",
+          "TimeoutSeconds",
+          "UseRouter",
+          "RouterBaseUrl",
+          "RouterModel",
+          "RouterToolsPath",
+          "RouterMaxCalls",
+          "RouterExecuteTools",
+          "EnforceJson"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "DiagnosticReportPath",
+          "ReportText",
+          "Model",
+          "Temperature",
+          "IncludeRawResponse",
+          "SaveReport",
+          "OutputPath",
+          "TimeoutSeconds",
+          "UseRouter",
+          "RouterBaseUrl",
+          "RouterModel",
+          "RouterToolsPath",
+          "RouterMaxCalls",
+          "RouterExecuteTools",
+          "EnforceJson"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-PCDiagnosis.ps1"
+      },
+      {
+        "Name": "Invoke-SmartDiagnosis",
+        "Parameters": [
+          "Path",
+          "AnalysisType",
+          "Model",
+          "SaveReport",
+          "OutputPath",
+          "SkipLLMAnalysis",
+          "OllamaBaseUrl",
+          "TimeoutSeconds"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "AnalysisType",
+          "Model",
+          "SaveReport",
+          "OutputPath",
+          "SkipLLMAnalysis",
+          "OllamaBaseUrl",
+          "TimeoutSeconds"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-SmartDiagnosis.ps1"
+      },
+      {
+        "Name": "Build-DiagnosticSummary",
+        "Parameters": [
+          "DiagnosticData"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "DiagnosticData"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-SmartDiagnosis.ps1"
+      },
+      {
+        "Name": "Send-OllamaRequest",
+        "Parameters": [
+          "Prompt",
+          "Model",
+          "System",
+          "Temperature",
+          "MaxTokens",
+          "Stream",
+          "TimeoutSeconds",
+          "MaxRetries",
+          "RetryDelaySeconds"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Prompt",
+          "Model",
+          "System",
+          "Temperature",
+          "MaxTokens",
+          "Stream",
+          "TimeoutSeconds",
+          "MaxRetries",
+          "RetryDelaySeconds"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Send-OllamaRequest.ps1"
+      },
+      {
+        "Name": "Set-LLMConfig",
+        "Parameters": [
+          "DefaultModel",
+          "OllamaApiUrl",
+          "LMStudioApiUrl",
+          "OllamaPath",
+          "DefaultTimeout",
+          "ShowConfig",
+          "Reset"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "DefaultModel",
+          "OllamaApiUrl",
+          "LMStudioApiUrl",
+          "OllamaPath",
+          "DefaultTimeout",
+          "ShowConfig",
+          "Reset"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Set-LLMConfig.ps1"
+      },
+      {
+        "Name": "Set-LLMProviderOrder",
+        "Parameters": [
+          "Order"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Order"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Set-LLMProviderOrder.ps1"
+      },
+      {
+        "Name": "Get-DiskSpace",
+        "Parameters": [
+          "DriveLetter",
+          "ThresholdPercent",
+          "IncludeRemovable",
+          "IncludeNetwork"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "DriveLetter",
+          "ThresholdPercent",
+          "IncludeRemovable",
+          "IncludeNetwork"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Performance\\Public\\Get-DiskSpace.ps1"
+      },
+      {
+        "Name": "Get-ProcessPerformance",
+        "Parameters": [
+          "Top",
+          "SortBy",
+          "IncludeSystemProcesses",
+          "ExcludeIdle",
+          "MinimumCpuPercent",
+          "MinimumMemoryMB"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Top",
+          "SortBy",
+          "IncludeSystemProcesses",
+          "ExcludeIdle",
+          "MinimumCpuPercent",
+          "MinimumMemoryMB"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Performance\\Public\\Get-ProcessPerformance.ps1"
+      },
+      {
+        "Name": "Optimize-Disks",
+        "Parameters": [
+          "DriveLetter",
+          "Force",
+          "Priority",
+          "AnalyzeOnly"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "DriveLetter",
+          "Force",
+          "Priority",
+          "AnalyzeOnly"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Performance\\Public\\Optimize-Disks.ps1"
+      },
+      {
+        "Name": "Watch-SystemResources",
+        "Parameters": [
+          "RefreshInterval",
+          "Duration",
+          "IncludeTopProcesses",
+          "TopProcessCount",
+          "OutputMode",
+          "WarningThreshold",
+          "CriticalThreshold"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "RefreshInterval",
+          "Duration",
+          "IncludeTopProcesses",
+          "TopProcessCount",
+          "OutputMode",
+          "WarningThreshold",
+          "CriticalThreshold"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Performance\\Public\\Watch-SystemResources.ps1"
+      },
+      {
+        "Name": "Get-UsbDeviceList",
+        "Parameters": [
+          "Filter"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Filter"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.USB\\Public\\Get-UsbDeviceList.ps1"
+      },
+      {
+        "Name": "Get-HVSockProxyStatus",
+        "Parameters": [
+          "StatePath"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "StatePath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-HVSockProxyStatus.ps1"
+      },
+      {
+        "Name": "Get-PcaiServiceHealth",
+        "Parameters": [
+          "Distribution",
+          "OllamaBaseUrl",
+          "vLLMBaseUrl"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Distribution",
+          "OllamaBaseUrl",
+          "vLLMBaseUrl"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-PcaiServiceHealth.ps1"
+      },
+      {
+        "Name": "Test-WSLHealth",
+        "Parameters": [
+          "Distribution",
+          "AutoRecover"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Distribution",
+          "AutoRecover"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-WSLEnvironmentHealth.ps1"
+      },
+      {
+        "Name": "Test-DockerHealth",
+        "Parameters": [
+          "Distribution",
+          "AutoRecover"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Distribution",
+          "AutoRecover"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-WSLEnvironmentHealth.ps1"
+      },
+      {
+        "Name": "Test-VSockBridgeHealth",
+        "Parameters": [
+          "Distribution",
+          "AutoRecover"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Distribution",
+          "AutoRecover"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-WSLEnvironmentHealth.ps1"
+      },
+      {
+        "Name": "Test-RAGRedisHealth",
+        "Parameters": [
+          "AutoRecover",
+          "ComposePath"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "AutoRecover",
+          "ComposePath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-WSLEnvironmentHealth.ps1"
+      },
+      {
+        "Name": "Test-WSLNetworkHealth",
+        "Parameters": [
+          "Distribution"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Distribution"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-WSLEnvironmentHealth.ps1"
+      },
+      {
+        "Name": "Get-StatusColor",
+        "Parameters": [
+          "Status"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Status"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-WSLEnvironmentHealth.ps1"
+      },
+      {
+        "Name": "Get-WSLVsockBridgeStatus",
+        "Parameters": [
+          "Distribution"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Distribution"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-WSLVsockBridgeStatus.ps1"
+      },
+      {
+        "Name": "Install-HVSockProxy",
+        "Parameters": [
+          "Installer",
+          "Force"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Installer",
+          "Force"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Install-HVSockProxy.ps1"
+      },
+      {
+        "Name": "Install-WSLVsockBridge",
+        "Parameters": [
+          "Distribution",
+          "BridgeScriptPath",
+          "ServiceFilePath",
+          "ConfigPath",
+          "EnableService",
+          "StartService"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Distribution",
+          "BridgeScriptPath",
+          "ServiceFilePath",
+          "ConfigPath",
+          "EnableService",
+          "StartService"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Install-WSLVsockBridge.ps1"
+      },
+      {
+        "Name": "Invoke-PcaiServiceHost",
+        "Parameters": [
+          "Args",
+          "HostPath"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Args",
+          "HostPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Invoke-PcaiServiceHost.ps1"
+      },
+      {
+        "Name": "Invoke-WSLDockerHealthCheck",
+        "Parameters": [
+          "ScriptPath",
+          "AutoRecover",
+          "Verbose",
+          "Quick"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "ScriptPath",
+          "AutoRecover",
+          "Verbose",
+          "Quick"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Invoke-WSLDockerHealthCheck.ps1"
+      },
+      {
+        "Name": "Invoke-WSLNetworkToolkit",
+        "Parameters": [
+          "ScriptPath",
+          "Distribution",
+          "Check",
+          "Diagnose",
+          "Repair",
+          "Full",
+          "Optimize",
+          "ApplyConfig",
+          "TestNetworkingMode",
+          "NetworkingMode",
+          "FixDns",
+          "RestartWsl",
+          "ResetAdapters",
+          "ResetWinsock",
+          "RestartHns",
+          "RestartWslService",
+          "DisableVmqOnWsl",
+          "Force"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "ScriptPath",
+          "Distribution",
+          "Check",
+          "Diagnose",
+          "Repair",
+          "Full"
+        ],
+        "MissingHelpParameters": [
+          "Optimize",
+          "ApplyConfig",
+          "TestNetworkingMode",
+          "NetworkingMode",
+          "FixDns",
+          "RestartWsl",
+          "ResetAdapters",
+          "ResetWinsock",
+          "RestartHns",
+          "RestartWslService",
+          "DisableVmqOnWsl",
+          "Force"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Invoke-WSLNetworkToolkit.ps1"
+      },
+      {
+        "Name": "Register-HVSockServices",
+        "Parameters": [
+          "ConfigPath",
+          "Force"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "ConfigPath",
+          "Force"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Register-HVSockServices.ps1"
+      },
+      {
+        "Name": "Set-PCaiServiceState",
+        "Parameters": [
+          "Name",
+          "Action"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Name",
+          "Action"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Set-PCaiServiceState.ps1"
+      },
+      {
+        "Name": "Start-HVSockProxy",
+        "Parameters": [
+          "ConfigPath",
+          "StatePath",
+          "Force",
+          "RegisterServices"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "ConfigPath",
+          "StatePath",
+          "Force",
+          "RegisterServices"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Start-HVSockProxy.ps1"
+      },
+      {
+        "Name": "Stop-HVSockProxy",
+        "Parameters": [
+          "StatePath"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "StatePath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Stop-HVSockProxy.ps1"
+      }
+    ],
+    "ExtraHelpParameters": [
+      {
+        "Name": "Search-ContentFast",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "LiteralPattern",
+          "FilePattern",
+          "Context",
+          "CaseSensitive",
+          "WholeWord",
+          "Invert",
+          "MaxResults",
+          "FilesOnly",
+          "ThrottleLimit"
+        ],
+        "HelpPresent": true,
+        "HelpParameters": [
+          "Path",
+          "Pattern",
+          "LiteralPattern",
+          "FilePattern",
+          "Context",
+          "IgnoreCase",
+          "WholeWord",
+          "Invert"
+        ],
+        "MissingHelpParameters": [
+          "CaseSensitive",
+          "MaxResults",
+          "FilesOnly",
+          "ThrottleLimit"
+        ],
+        "ExtraHelpParameters": [
+          "IgnoreCase"
+        ],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-ContentFast.ps1"
+      }
+    ]
+  },
+  "CSharp": {
+    "DllImportCount": 0,
+    "MissingRustExports": []
+  },
+  "PowerShellToCSharp": {
+    "PcaiCalls": [
+      "CheckResourceSafety",
+      "DeleteFsItem",
+      "EstimateTokens",
+      "ExtractJson",
+      "FindDuplicates",
+      "FindFiles",
+      "GetSystemTelemetryJson",
+      "GetUsbDeepDiagnostics",
+      "GetUsbProblemInfo",
+      "IsAvailable",
+      "IsValidJson",
+      "QueryFullContextJson",
+      "QueryHardwareMetrics",
+      "QuerySystemInfo",
+      "SearchContent",
+      "Version"
+    ],
+    "MissingCsharpMethods": [
+      "CheckResourceSafety",
+      "DeleteFsItem",
+      "EstimateTokens",
+      "ExtractJson",
+      "FindDuplicates",
+      "FindFiles",
+      "GetSystemTelemetryJson",
+      "GetUsbDeepDiagnostics",
+      "GetUsbProblemInfo",
+      "IsAvailable",
+      "IsValidJson",
+      "QueryFullContextJson",
+      "QueryHardwareMetrics",
+      "QuerySystemInfo",
+      "SearchContent",
+      "Version"
+    ]
+  }
+}

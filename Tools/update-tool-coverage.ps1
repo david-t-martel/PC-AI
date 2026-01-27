@@ -46,8 +46,14 @@ if ($sgExe) {
         $sgOutput = & $sgExe.Path @sgArgs 2>$null
         if ($LASTEXITCODE -eq 0 -and $sgOutput) {
             $sgJson = $sgOutput | ConvertFrom-Json
-            if ($sgJson.matches) {
-                foreach ($m in $sgJson.matches) {
+            $sgMatches = $null
+            if ($sgJson -is [System.Collections.IEnumerable] -and -not ($sgJson -is [string]) -and -not ($sgJson.PSObject.Properties.Name -contains 'matches')) {
+                $sgMatches = $sgJson
+            } elseif ($sgJson.matches) {
+                $sgMatches = $sgJson.matches
+            }
+            if ($sgMatches) {
+                foreach ($m in $sgMatches) {
                     if ($m.file -like "*Invoke-FunctionGemmaReAct.ps1" -and $m.text -match "pcai_") {
                         if ($m.text -match "'(?<name>pcai_[^']+)'" ) {
                             $mappedTools += $Matches['name']

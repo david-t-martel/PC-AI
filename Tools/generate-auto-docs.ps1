@@ -282,12 +282,40 @@ if ($IncludeRust) {
         if (-not (Test-Path (Join-Path $root 'Cargo.toml'))) { continue }
         if ($BuildDocs -and (Get-Command cargo -ErrorAction SilentlyContinue)) {
             Push-Location $root
-            try { & cargo doc --workspace --no-deps | Out-Null } finally { Pop-Location }
+            $prevWrapper = $env:RUSTC_WRAPPER
+            $prevSccache = $env:SCCACHE_DISABLE
+            try {
+                # Avoid sccache issues during doc builds
+                $env:RUSTC_WRAPPER = ''
+                $env:SCCACHE_DISABLE = '1'
+                & cargo doc --workspace --no-deps | Out-Null
+            } finally {
+                $env:RUSTC_WRAPPER = $prevWrapper
+                $env:SCCACHE_DISABLE = $prevSccache
+                Pop-Location
+            }
         }
-        $docIndex = Join-Path $root 'target\doc\index.html'
+        $docIndex = $null
+        $docRoot = $null
+        if ($env:CARGO_TARGET_DIR) {
+            $docRoot = Join-Path $env:CARGO_TARGET_DIR 'doc'
+        } else {
+            $docRoot = Join-Path $root 'target\doc'
+        }
+        if ($docRoot -and (Test-Path $docRoot)) {
+            $candidate = Join-Path $docRoot 'index.html'
+            if (Test-Path $candidate) {
+                $docIndex = $candidate
+            } else {
+                $anyIndex = Get-ChildItem -Path $docRoot -Filter 'index.html' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($anyIndex) {
+                    $docIndex = $docRoot
+                }
+            }
+        }
         $rustDocs += [PSCustomObject]@{
             Workspace = $root
-            DocIndex = if (Test-Path $docIndex) { $docIndex } else { $null }
+            DocIndex = $docIndex
         }
     }
 

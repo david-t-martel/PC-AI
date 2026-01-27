@@ -1,6 +1,6 @@
 # PS_MODULE_INDEX
 
-Generated: 2026-01-27 03:58:13
+Generated: 2026-01-27 04:13:42
 
 ## PC-AI.Acceleration.psm1
 - Compare-ToolPerformance: Compares performance between Rust tools and PowerShell equivalents

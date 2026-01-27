@@ -1,5 +1,313 @@
 [
   {
+    "tool": "SearchDocs",
+    "arguments": {
+      "query": "example"
+    }
+  },
+  {
+    "tool": "SearchDocs",
+    "arguments": {
+      "query": "example",
+      "source": "Microsoft"
+    }
+  },
+  {
+    "tool": "SearchDocs",
+    "arguments": {
+      "query": "example",
+      "source": "Intel"
+    }
+  },
+  {
+    "tool": "SearchDocs",
+    "arguments": {
+      "query": "example",
+      "source": "AMD"
+    }
+  },
+  {
+    "tool": "SearchDocs",
+    "arguments": {
+      "query": "example",
+      "source": "Dell"
+    }
+  },
+  {
+    "tool": "SearchDocs",
+    "arguments": {
+      "query": "example",
+      "source": "HP"
+    }
+  },
+  {
+    "tool": "SearchDocs",
+    "arguments": {
+      "query": "example",
+      "source": "Lenovo"
+    }
+  },
+  {
+    "tool": "SearchDocs",
+    "arguments": {
+      "query": "example",
+      "source": "Generic"
+    }
+  },
+  {
+    "tool": "GetSystemInfo",
+    "arguments": {
+      "category": "Storage"
+    }
+  },
+  {
+    "tool": "GetSystemInfo",
+    "arguments": {
+      "category": "Network"
+    }
+  },
+  {
+    "tool": "GetSystemInfo",
+    "arguments": {
+      "category": "USB"
+    }
+  },
+  {
+    "tool": "GetSystemInfo",
+    "arguments": {
+      "category": "BIOS"
+    }
+  },
+  {
+    "tool": "GetSystemInfo",
+    "arguments": {
+      "category": "OS"
+    }
+  },
+  {
+    "tool": "GetSystemInfo",
+    "arguments": {
+      "category": "Storage",
+      "detail": "example"
+    }
+  },
+  {
+    "tool": "GetSystemInfo",
+    "arguments": {
+      "category": "Network",
+      "detail": "example"
+    }
+  },
+  {
+    "tool": "GetSystemInfo",
+    "arguments": {
+      "category": "USB",
+      "detail": "example"
+    }
+  },
+  {
+    "tool": "GetSystemInfo",
+    "arguments": {
+      "category": "BIOS",
+      "detail": "example"
+    }
+  },
+  {
+    "tool": "GetSystemInfo",
+    "arguments": {
+      "category": "OS",
+      "detail": "example"
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example"
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "rootPath": "example"
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "filePattern": "example"
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "rootPath": "example",
+      "filePattern": "example"
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "caseSensitive": true
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "caseSensitive": false
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "rootPath": "example",
+      "caseSensitive": true
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "rootPath": "example",
+      "caseSensitive": false
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "filePattern": "example",
+      "caseSensitive": true
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "filePattern": "example",
+      "caseSensitive": false
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "rootPath": "example",
+      "filePattern": "example",
+      "caseSensitive": true
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "rootPath": "example",
+      "filePattern": "example",
+      "caseSensitive": false
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "contextLines": 0
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "contextLines": 1
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "rootPath": "example",
+      "contextLines": 0
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "rootPath": "example",
+      "contextLines": 1
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "filePattern": "example",
+      "contextLines": 0
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "filePattern": "example",
+      "contextLines": 1
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "rootPath": "example",
+      "filePattern": "example",
+      "contextLines": 0
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "rootPath": "example",
+      "filePattern": "example",
+      "contextLines": 1
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "caseSensitive": true,
+      "contextLines": 0
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "caseSensitive": true,
+      "contextLines": 1
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "caseSensitive": false,
+      "contextLines": 0
+    }
+  },
+  {
+    "tool": "SearchLogs",
+    "arguments": {
+      "pattern": "example",
+      "caseSensitive": false,
+      "contextLines": 1
+    }
+  },
+  {
     "tool": "pcai_run_wsl_network_tool",
     "arguments": {
       "mode": "check"

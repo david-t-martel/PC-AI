@@ -56,8 +56,14 @@ if ($sgExe) {
         if ($LASTEXITCODE -eq 0 -and $sgOutput) {
             $sgJson = $sgOutput | ConvertFrom-Json
             $sgOutput | Set-Content -Path $docStatusJson -Encoding UTF8
-            if ($sgJson.matches) {
-                foreach ($m in $sgJson.matches) {
+            $sgMatches = $null
+            if ($sgJson -is [System.Collections.IEnumerable] -and -not ($sgJson -is [string]) -and -not ($sgJson.PSObject.Properties.Name -contains 'matches')) {
+                $sgMatches = $sgJson
+            } elseif ($sgJson.matches) {
+                $sgMatches = $sgJson.matches
+            }
+            if ($sgMatches) {
+                foreach ($m in $sgMatches) {
                     $key = "$($m.file)|$($m.line)|$($m.text)"
                     if (-not $entryIndex.ContainsKey($key)) {
                         $entryIndex[$key] = $true
