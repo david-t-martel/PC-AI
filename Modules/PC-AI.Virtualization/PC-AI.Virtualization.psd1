@@ -15,7 +15,19 @@
         'Get-HyperVStatus',
         'Get-DockerStatus',
         'Backup-WSLConfig',
-        'Get-WSLEnvironmentHealth'
+        'Get-WSLEnvironmentHealth',
+        'Enable-WSLSystemd',
+        'Install-WSLVsockBridge',
+        'Get-WSLVsockBridgeStatus',
+        'Invoke-WSLNetworkToolkit',
+        'Invoke-WSLDockerHealthCheck',
+        'Install-HVSockProxy',
+        'Register-HVSockServices',
+        'Start-HVSockProxy',
+        'Stop-HVSockProxy',
+        'Get-HVSockProxyStatus',
+        'Invoke-PcaiServiceHost',
+        'Set-PCaiServiceState'
     )
     CmdletsToExport = @()
     VariablesToExport = @()

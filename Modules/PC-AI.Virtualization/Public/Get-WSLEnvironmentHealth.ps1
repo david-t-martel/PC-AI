@@ -8,6 +8,7 @@
     - WSL distro status and systemd health
     - Docker service and daemon connectivity
     - Hyper-V socket bridges (socat processes)
+    - RAG Redis backend and Search module
     - Network connectivity from WSL
     - Startup task configuration
 
@@ -56,6 +57,7 @@ function Get-WSLEnvironmentHealth {
         WSL             = $null
         Docker          = $null
         VSockBridges    = $null
+        RAGRedis        = $null
         Network         = $null
         StartupTask     = $null
         Issues          = @()
@@ -93,6 +95,17 @@ function Get-WSLEnvironmentHealth {
 
     if ($result.VSockBridges.Status -ne 'OK') {
         $result.Issues += $result.VSockBridges.Issues
+    }
+
+    # Check RAG Redis Status
+    Write-Host "[*] Checking RAG Redis status..." -ForegroundColor Yellow
+    $result.RAGRedis = Test-RAGRedisHealth -AutoRecover:$AutoRecover
+
+    if ($result.RAGRedis.Status -ne 'OK') {
+        $result.Issues += $result.RAGRedis.Issues
+        if ($result.RAGRedis.RecoveryAction) {
+            $result.RecoveryActions += $result.RAGRedis.RecoveryAction
+        }
     }
 
     # Check Network (unless Quick mode)
@@ -137,6 +150,7 @@ function Get-WSLEnvironmentHealth {
     Write-Host "  WSL: $($result.WSL.Status)" -ForegroundColor $(Get-StatusColor $result.WSL.Status)
     Write-Host "  Docker: $($result.Docker.Status)" -ForegroundColor $(Get-StatusColor $result.Docker.Status)
     Write-Host "  VSock Bridges: $($result.VSockBridges.Status)" -ForegroundColor $(Get-StatusColor $result.VSockBridges.Status)
+    Write-Host "  RAG Redis: $($result.RAGRedis.Status)" -ForegroundColor $(Get-StatusColor $result.RAGRedis.Status)
 
     if (-not $Quick) {
         Write-Host "  Network: $($result.Network.Status)" -ForegroundColor $(Get-StatusColor $result.Network.Status)
@@ -262,6 +276,30 @@ function Test-DockerHealth {
     }
 
     try {
+        # Prefer Windows Docker Desktop engine if available
+        $dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
+        if (-not $dockerCmd) {
+            $dockerBin = 'C:\Program Files\Docker\Docker\resources\bin'
+            if (Test-Path (Join-Path $dockerBin 'docker.exe')) {
+                $env:Path = "$dockerBin;$env:Path"
+                $dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
+            }
+        }
+
+        if ($dockerCmd) {
+            $dockerInfo = docker info 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                $health.ServiceActive = $true
+                $health.DaemonResponding = $true
+                $containers = docker ps -q 2>&1
+                if ($LASTEXITCODE -eq 0 -and $containers) {
+                    $health.ContainerCount = ($containers | Measure-Object -Line).Lines
+                }
+                $health.Status = 'OK'
+                return $health
+            }
+        }
+
         # Check Docker service in WSL
         $dockerActive = wsl -d $Distribution -- systemctl is-active docker 2>&1
         $dockerActive = $dockerActive.Trim()
@@ -341,14 +379,20 @@ function Test-VSockBridgeHealth {
     }
 
     try {
-        # Check for system-level bridge service
-        $bridgeActive = wsl -d $Distribution -- systemctl is-active wsl-vsock-bridge 2>&1
+        # Check for system-level bridge service (PC_AI)
+        $bridgeActive = wsl -d $Distribution -- systemctl is-active pcai-vsock-bridge 2>&1
         $health.BridgeService = $bridgeActive.Trim()
 
         # Also check user-level service
         if ($health.BridgeService -notmatch 'active|exited') {
-            $bridgeActive = wsl -d $Distribution -- systemctl --user is-active hyper-v-socket-bridges 2>&1
-            $health.BridgeService = "user: $($bridgeActive.Trim())"
+            $bridgeActive = wsl -d $Distribution -- systemctl is-active wsl-vsock-bridge 2>&1
+            if ($bridgeActive -match 'active|exited') {
+                $health.BridgeService = $bridgeActive.Trim()
+            }
+            else {
+                $bridgeActive = wsl -d $Distribution -- systemctl --user is-active hyper-v-socket-bridges 2>&1
+                $health.BridgeService = "user: $($bridgeActive.Trim())"
+            }
         }
 
         # Count socat processes (the actual bridges)
@@ -358,7 +402,7 @@ function Test-VSockBridgeHealth {
         }
 
         # Check common bridge ports
-        $commonPorts = @(8000, 8002, 3001, 3002)
+        $commonPorts = @(8000, 8001, 8002, 11434, 1234, 3001, 3002, 18000, 18001, 18002)
         foreach ($port in $commonPorts) {
             $listening = wsl -d $Distribution -- ss -tln "sport = :$port" 2>&1 | Select-String "LISTEN"
             if ($listening) {
@@ -387,6 +431,93 @@ function Test-VSockBridgeHealth {
     }
     catch {
         $health.Status = 'Unknown'
+    }
+
+    return $health
+}
+
+# Helper function to test RAG Redis health
+function Test-RAGRedisHealth {
+    param(
+        [switch]$AutoRecover,
+        [string]$ComposePath = "C:\codedev\llm\rag-redis\docker-compose.yml"
+    )
+
+    $health = [PSCustomObject]@{
+        Status         = 'Unknown'
+        ContainerID    = $null
+        ContainerStatus = $null
+        RedisPing      = $false
+        SearchModule   = $false
+        Issues         = @()
+        RecoveryAction = $null
+    }
+
+    $containerName = "rag-redis-backend"
+
+    try {
+        # Check if container exists and is running
+        $container = docker ps --filter "name=$containerName" --format "{{.ID}}|{{.Status}}" 2>&1
+        if ($LASTEXITCODE -ne 0 -or -not $container) {
+            $health.Issues += [PSCustomObject]@{
+                Component = 'RAGRedis'
+                Severity  = 'Warning'
+                Message   = "RAG-Redis container not running"
+            }
+
+            if ($AutoRecover -and (Test-Path $ComposePath)) {
+                Write-Host "    Attempting to start RAG-Redis..." -ForegroundColor Yellow
+                docker-compose -f $ComposePath up -d redis 2>&1 | Out-Null
+                Start-Sleep -Seconds 10
+                $container = docker ps --filter "name=$containerName" --format "{{.ID}}|{{.Status}}" 2>&1
+                if ($container) {
+                    Write-Host "    [+] RAG-Redis started successfully" -ForegroundColor Green
+                    $health.RecoveryAction = "Started RAG-Redis container"
+                }
+            }
+        }
+
+        if ($container) {
+            $parts = ($container | Out-String).Trim().Split('|')
+            $health.ContainerID = $parts[0]
+            $health.ContainerStatus = $parts[1]
+
+            # Check Redis connectivity
+            $pingTest = docker exec $health.ContainerID redis-cli ping 2>&1
+            if (($pingTest | Out-String).Trim() -eq "PONG") {
+                $health.RedisPing = $true
+
+                # Check RediSearch module
+                $moduleList = docker exec $health.ContainerID redis-cli module list 2>&1
+                if ($moduleList -match "search") {
+                    $health.SearchModule = $true
+                }
+                else {
+                    $health.Issues += [PSCustomObject]@{
+                        Component = 'RAGRedis'
+                        Severity  = 'Warning'
+                        Message   = 'RediSearch module not loaded'
+                    }
+                }
+            }
+            else {
+                $health.Issues += [PSCustomObject]@{
+                    Component = 'RAGRedis'
+                    Severity  = 'Warning'
+                    Message   = 'Redis not responding to PING'
+                }
+            }
+        }
+
+        $health.Status = if ($health.Issues.Count -eq 0) { 'OK' } elseif ($health.RedisPing) { 'Warning' } else { 'Error' }
+    }
+    catch {
+        $health.Status = 'Error'
+        $health.Issues += [PSCustomObject]@{
+            Component = 'RAGRedis'
+            Severity  = 'Critical'
+            Message   = $_.Exception.Message
+        }
     }
 
     return $health

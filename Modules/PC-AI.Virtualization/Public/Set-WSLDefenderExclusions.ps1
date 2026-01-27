@@ -13,13 +13,13 @@
     Prompt for confirmation before making changes
 
 .EXAMPLE
-    Set-WSLDefenderExclusions
+    Set-WSLDefenderExclusion
     Adds all recommended exclusions
 
 .OUTPUTS
     PSCustomObject with applied exclusions
 #>
-function Set-WSLDefenderExclusions {
+function Set-WSLDefenderExclusion {
     [CmdletBinding(SupportsShouldProcess)]
     [OutputType([PSCustomObject])]
     param()
@@ -27,7 +27,7 @@ function Set-WSLDefenderExclusions {
     # Check for Administrator privileges
     $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     if (-not $isAdmin) {
-        Write-Error "This function requires Administrator privileges. Please run PowerShell as Administrator."
+        Write-Error 'This function requires Administrator privileges. Please run PowerShell as Administrator.'
         return
     }
 
@@ -41,20 +41,20 @@ function Set-WSLDefenderExclusions {
     $pathExclusions = @(
         "$env:LOCALAPPDATA\Packages\CanonicalGroupLimited*",
         "$env:USERPROFILE\AppData\Local\Docker",
-        "\\wsl$",
-        "\\wsl.localhost"
+        '\\wsl$',
+        '\\wsl.localhost'
     )
 
     $processExclusions = @(
-        "wsl.exe",
-        "wslhost.exe",
-        "docker.exe",
-        "dockerd.exe",
-        "com.docker.backend.exe",
-        "vpnkit.exe"
+        'wsl.exe',
+        'wslhost.exe',
+        'docker.exe',
+        'dockerd.exe',
+        'com.docker.backend.exe',
+        'vpnkit.exe'
     )
 
-    Write-Host "[*] Adding Windows Defender exclusions for WSL..." -ForegroundColor Yellow
+    Write-Host '[*] Adding Windows Defender exclusions for WSL...' -ForegroundColor Yellow
 
     # Add path exclusions
     foreach ($path in $pathExclusions) {
@@ -63,8 +63,7 @@ function Set-WSLDefenderExclusions {
                 Add-MpPreference -ExclusionPath $path -ErrorAction Stop
                 $result.PathExclusions += $path
                 Write-Host "  [+] Added path: $path" -ForegroundColor Green
-            }
-            catch {
+            } catch {
                 $result.Errors += "Path $path : $_"
                 Write-Host "  [!] Failed to add path: $path" -ForegroundColor Yellow
             }
@@ -78,8 +77,7 @@ function Set-WSLDefenderExclusions {
                 Add-MpPreference -ExclusionProcess $process -ErrorAction Stop
                 $result.ProcessExclusions += $process
                 Write-Host "  [+] Added process: $process" -ForegroundColor Green
-            }
-            catch {
+            } catch {
                 $result.Errors += "Process $process : $_"
                 Write-Host "  [!] Failed to add process: $process" -ForegroundColor Yellow
             }
@@ -89,7 +87,7 @@ function Set-WSLDefenderExclusions {
     $result.Applied = ($result.PathExclusions.Count -gt 0 -or $result.ProcessExclusions.Count -gt 0)
 
     if ($result.Applied) {
-        Write-Host "[*] Windows Defender exclusions configured" -ForegroundColor Green
+        Write-Host '[*] Windows Defender exclusions configured' -ForegroundColor Green
     }
 
     return $result

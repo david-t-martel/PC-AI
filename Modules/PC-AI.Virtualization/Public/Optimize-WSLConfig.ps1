@@ -66,6 +66,22 @@ function Optimize-WSLConfig {
     $memoryValue = if ($Memory) { $Memory } else { "${defaultMemoryGB}GB" }
     $processorsValue = if ($Processors -gt 0) { $Processors } else { $defaultProcessors }
 
+    function Normalize-WSLPath {
+        param([string]$Path)
+        if (-not $Path) { return $Path }
+        return ($Path -replace '\\', '/')
+    }
+
+    $swapConfig = ''
+    if ($SwapPath) {
+        $swapNormalized = Normalize-WSLPath $SwapPath
+        $swapConfig = @"
+
+# Swap file location
+swapFile=$swapNormalized
+"@
+    }
+
     $config = @"
 # WSL Configuration - Optimized by PC-AI
 # Generated: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
@@ -77,9 +93,10 @@ memory=$memoryValue
 
 # CPU allocation
 processors=$processorsValue
+$swapConfig
 
-# Network configuration - Mirrored for better performance
-networkingMode=mirrored
+# Network configuration - NAT for broad compatibility
+networkingMode=nat
 
 # VM idle timeout (ms)
 vmIdleTimeout=60000
@@ -109,10 +126,6 @@ pageReporting=true
 hostAddressLoopback=true
 bestEffortDnsParsing=true
 "@
-
-    if ($SwapPath) {
-        $config += "`n# Custom swap location`nswapfile=$SwapPath`n"
-    }
 
     $result = [PSCustomObject]@{
         Path         = $wslConfigPath
