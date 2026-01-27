@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Retrieves status of the PC_AI VSock bridge service in WSL.
 #>

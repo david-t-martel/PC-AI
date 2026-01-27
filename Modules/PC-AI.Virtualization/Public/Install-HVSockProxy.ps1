@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Installs WinSocat for HVSOCK<->TCP proxy support.
 #>

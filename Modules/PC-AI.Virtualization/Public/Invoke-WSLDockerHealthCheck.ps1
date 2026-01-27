@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Wrapper for the WSL/Docker health check script in C:\Scripts\Startup.
 #>
@@ -20,23 +20,45 @@ function Invoke-WSLDockerHealthCheck {
         [switch]$Quick
     )
 
-    if (-not (Test-Path $ScriptPath)) {
-        throw "WSL/Docker health check script not found: $ScriptPath"
-    }
+    $scriptExists = Test-Path $ScriptPath
 
     $args = @()
     if ($AutoRecover) { $args += '-AutoRecover' }
     if ($Verbose) { $args += '-Verbose' }
     if ($Quick) { $args += '-Quick' }
 
-    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @args 2>&1
-    $exitCode = $LASTEXITCODE
+    if ($scriptExists) {
+        $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @args 2>&1
+        $exitCode = $LASTEXITCODE
+
+        return [PSCustomObject]@{
+            ScriptPath = $ScriptPath
+            Arguments  = $args
+            ExitCode   = $exitCode
+            Output     = ($output | Out-String).Trim()
+            Success    = ($exitCode -eq 0)
+            Fallback   = $false
+        }
+    }
+
+    $fallbackExitCode = 0
+    $fallbackOutput = $null
+    try {
+        $fallbackResult = Get-WSLEnvironmentHealth -AutoRecover:$AutoRecover -Quick:$Quick
+        $fallbackOutput = $fallbackResult | ConvertTo-Json -Depth 6
+    }
+    catch {
+        $fallbackExitCode = 1
+        $fallbackOutput = "Fallback execution failed: $($_.Exception.Message)"
+    }
 
     return [PSCustomObject]@{
-        ScriptPath = $ScriptPath
-        Arguments  = $args
-        ExitCode   = $exitCode
-        Output     = ($output | Out-String).Trim()
-        Success    = ($exitCode -eq 0)
+        ScriptPath   = $ScriptPath
+        Arguments    = $args
+        ExitCode     = $fallbackExitCode
+        Output       = $fallbackOutput
+        Success      = ($fallbackExitCode -eq 0)
+        Fallback     = $true
+        FallbackMode = 'Get-WSLEnvironmentHealth'
     }
 }

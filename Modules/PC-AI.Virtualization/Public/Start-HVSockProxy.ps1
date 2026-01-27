@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Starts WinSocat HVSOCK<->TCP proxies based on configuration.
 #>

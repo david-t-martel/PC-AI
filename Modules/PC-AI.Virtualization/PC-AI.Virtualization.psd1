@@ -37,5 +37,8 @@
             Tags = @('WSL', 'HyperV', 'Docker', 'Virtualization', 'PC-AI')
             ProjectUri = 'https://github.com/david-t-martel/PC_AI'
         }
+        PCAI = @{
+            Commands = @('diagnose', 'optimize')
+        }
     }
 }

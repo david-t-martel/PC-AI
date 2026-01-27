@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Starts, stops, or restarts a Windows service by name.
 #>

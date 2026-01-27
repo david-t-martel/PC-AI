@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Stops WinSocat HVSOCK proxies started by Start-HVSockProxy.
 #>

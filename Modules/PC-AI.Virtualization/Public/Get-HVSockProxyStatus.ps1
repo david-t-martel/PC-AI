@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Returns status of WinSocat HVSOCK proxies.
 #>

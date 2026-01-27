@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Registers Hyper-V socket (HVSOCK) services for WSL guests.
 

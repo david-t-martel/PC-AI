@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Enables systemd in a WSL distribution by updating /etc/wsl.conf.
 

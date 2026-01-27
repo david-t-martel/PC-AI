@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Installs and enables the PC_AI VSock bridge in WSL.
 #>
