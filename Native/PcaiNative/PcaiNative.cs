@@ -115,6 +115,79 @@ internal static partial class NativeCore
     /// </summary>
     [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void pcai_free_string_buffer(ref PcaiStringBuffer buffer);
+
+    /// <summary>
+    /// Extracts JSON from a markdown-formatted string.
+    /// </summary>
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern IntPtr pcai_extract_json([MarshalAs(UnmanagedType.LPUTF8Str)] string? input);
+
+    /// <summary>
+    /// Validates if a string is valid JSON.
+    /// </summary>
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern bool pcai_is_valid_json([MarshalAs(UnmanagedType.LPUTF8Str)] string? input);
+
+    /// <summary>
+    /// Searches for files matching a glob pattern.
+    /// </summary>
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern PcaiStringBuffer pcai_find_files(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? pattern,
+        ulong maxResults);
+
+    /// <summary>
+    /// Searches file contents for a regex pattern.
+    /// </summary>
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern PcaiStringBuffer pcai_search_content(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? pattern,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? filePattern,
+        ulong maxResults,
+        uint contextLines);
+
+    /// <summary>
+    /// Finds duplicate files using parallel SHA-256.
+    /// </summary>
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern PcaiStringBuffer pcai_find_duplicates(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
+        ulong minSize,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? includePattern,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? excludePattern);
+
+    /// <summary>
+    /// Queries comprehensive system information.
+    /// </summary>
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern PcaiStringBuffer pcai_query_system_info();
+
+    /// <summary>
+    /// Queries hardware metrics (CPU usage, temps).
+    /// </summary>
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern PcaiStringBuffer pcai_query_hardware_metrics();
+
+    /// <summary>
+    /// Estimates the number of tokens in a string for Gemma-like models.
+    /// </summary>
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern UIntPtr pcai_estimate_tokens([MarshalAs(UnmanagedType.LPUTF8Str)] string? text);
+
+    /// <summary>
+    /// Enforces a system resource safety cap (e.g. 0.8 / 80%).
+    /// Returns 1 for safe, 0 for unsafe.
+    /// </summary>
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern int pcai_check_resource_safety(float gpuLimit);
+
+    /// <summary>
+    /// Returns high-fidelity system telemetry as JSON.
+    /// </summary>
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern IntPtr pcai_get_system_telemetry_json();
 }
 
 /// <summary>
@@ -216,6 +289,120 @@ public static class PcaiCore
         {
             NativeCore.pcai_free_string(ptr);
         }
+    }
+
+    /// <summary>
+    /// Extracts JSON from a markdown-formatted string using high-performance native logic.
+    /// </summary>
+    public static string? ExtractJson(string input)
+    {
+        if (!IsAvailable) return null;
+
+        var ptr = NativeCore.pcai_extract_json(input);
+        if (ptr == IntPtr.Zero) return null;
+
+        try
+        {
+            return Marshal.PtrToStringUTF8(ptr);
+        }
+        finally
+        {
+            NativeCore.pcai_free_string(ptr);
+        }
+    }
+
+    /// <summary>
+    /// Validates if a string is valid JSON using native logic.
+    /// </summary>
+    public static bool IsValidJson(string input)
+    {
+        if (!IsAvailable) return false;
+        return NativeCore.pcai_is_valid_json(input);
+    }
+
+    /// <summary>
+    /// Searches for files matching a glob pattern using native traversal.
+    /// </summary>
+    public static string? FindFiles(string rootPath, string pattern, ulong maxResults = 0)
+    {
+        if (!IsAvailable) return null;
+        var buffer = NativeCore.pcai_find_files(rootPath, pattern, maxResults);
+        try { return buffer.ToManagedString(); }
+        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+    }
+
+    /// <summary>
+    /// Searches file contents using parallel native regex matching.
+    /// </summary>
+    public static string? SearchContent(string rootPath, string pattern, string? filePattern = null, ulong maxResults = 0, uint contextLines = 0)
+    {
+        if (!IsAvailable) return null;
+        var buffer = NativeCore.pcai_search_content(rootPath, pattern, filePattern, maxResults, contextLines);
+        try { return buffer.ToManagedString(); }
+        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+    }
+
+    /// <summary>
+    /// Finds duplicate files using parallel native hashing.
+    /// </summary>
+    public static string? FindDuplicates(string rootPath, ulong minSize = 0, string? includePattern = null, string? excludePattern = null)
+    {
+        if (!IsAvailable) return null;
+        var buffer = NativeCore.pcai_find_duplicates(rootPath, minSize, includePattern, excludePattern);
+        try { return buffer.ToManagedString(); }
+        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+    }
+
+    /// <summary>
+    /// Queries comprehensive system information natively.
+    /// </summary>
+    public static string? QuerySystemInfo()
+    {
+        if (!IsAvailable) return null;
+        var buffer = NativeCore.pcai_query_system_info();
+        try { return buffer.ToManagedString(); }
+        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+    }
+
+    /// <summary>
+    /// Queries hardware metrics natively.
+    /// </summary>
+    public static string? QueryHardwareMetrics()
+    {
+        if (!IsAvailable) return null;
+        var buffer = NativeCore.pcai_query_hardware_metrics();
+        try { return buffer.ToManagedString(); }
+        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+    }
+
+    /// <summary>
+    /// Estimates the number of tokens in a string for Gemma-like models natively.
+    /// </summary>
+    public static ulong EstimateTokens(string text)
+    {
+        if (!IsAvailable) return 0;
+        return (ulong)NativeCore.pcai_estimate_tokens(text);
+    }
+
+    /// <summary>
+    /// Checks if system resources are within safety limits (e.g. 80% load).
+    /// </summary>
+    public static bool CheckResourceSafety(float gpuLimit = 0.8f)
+    {
+        if (!IsAvailable) return true; // Fail safe if lib unavailable
+        return NativeCore.pcai_check_resource_safety(gpuLimit) != 0;
+    }
+
+    /// <summary>
+    /// Gets high-fidelity system telemetry as JSON using native core.
+    /// </summary>
+    public static string? GetSystemTelemetryJson()
+    {
+        if (!IsAvailable) return null;
+        var ptr = NativeCore.pcai_get_system_telemetry_json();
+        if (ptr == IntPtr.Zero) return null;
+        try { return Marshal.PtrToStringUTF8(ptr); }
+        finally { NativeCore.pcai_free_string(ptr); }
     }
 
     /// <summary>

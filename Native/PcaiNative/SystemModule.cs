@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 
 namespace PcaiNative
 {
@@ -256,6 +257,66 @@ namespace PcaiNative
                 >= KB => $"{bytes / (double)KB:F2} KB",
                 _ => $"{bytes} B"
             };
+        }
+        /// <summary>
+        /// Execute a command and return output as JSON.
+        /// </summary>
+        public static string ExecuteCommand(string command, string args, int timeoutMs = 30000)
+        {
+            try
+            {
+                var startInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = command,
+                    Arguments = args,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = new System.Diagnostics.Process { StartInfo = startInfo };
+                var output = new System.Text.StringBuilder();
+                var error = new System.Text.StringBuilder();
+
+                process.OutputDataReceived += (s, e) => { if (e.Data != null) output.AppendLine(e.Data); };
+                process.ErrorDataReceived += (s, e) => { if (e.Data != null) error.AppendLine(e.Data); };
+
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                bool completed = process.WaitForExit(timeoutMs);
+                if (!completed)
+                {
+                    process.Kill();
+                    return JsonSerializer.Serialize(new
+                    {
+                        status = "Timeout",
+                        elapsed_ms = sw.ElapsedMilliseconds,
+                        output = output.ToString(),
+                        error = error.ToString()
+                    });
+                }
+
+                return JsonSerializer.Serialize(new
+                {
+                    status = process.ExitCode == 0 ? "Success" : "Error",
+                    exit_code = process.ExitCode,
+                    elapsed_ms = sw.ElapsedMilliseconds,
+                    output = output.ToString(),
+                    error = error.ToString()
+                });
+            }
+            catch (Exception ex)
+            {
+                return JsonSerializer.Serialize(new
+                {
+                    status = "Exception",
+                    error = ex.Message
+                });
+            }
         }
     }
 }

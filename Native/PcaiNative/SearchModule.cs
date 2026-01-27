@@ -227,7 +227,7 @@ public sealed class ContentSearchResult
 /// </summary>
 internal static partial class NativeSearch
 {
-    private const string SearchDll = "pcai_search.dll";
+    private const string SearchDll = "pcai_core_lib.dll";
 
     // ---- Duplicate Detection ----
 

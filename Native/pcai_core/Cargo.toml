@@ -8,6 +8,7 @@ members = [
     "pcai_search",
     "pcai_performance",
     "pcai_system",
+    "pcai_fs",
 ]
 
 [workspace.package]
@@ -64,16 +65,8 @@ parking_lot = "0.12"
 winreg = "0.52"
 
 [profile.release]
-opt-level = 3           # Maximum optimization
-lto = "fat"             # Full link-time optimization
-codegen-units = 1       # Better optimization at cost of compile time
-strip = true            # Strip symbols for smaller binary
-panic = "abort"         # Smaller binary, faster panics
-
-[profile.release-size]
-inherits = "release"
-opt-level = "z"         # Optimize for size
-lto = "fat"
-codegen-units = 1
-strip = true
-panic = "abort"
+opt-level = 3      # Maximum optimization
+lto = false        # Disable LTO for faster troubleshooting
+codegen-units = 16 # Parallelize for faster build
+strip = false      # Keep symbols for verification
+panic = "abort"    # Smaller binary, faster panics

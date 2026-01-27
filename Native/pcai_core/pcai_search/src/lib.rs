@@ -14,6 +14,7 @@ use pcai_core_lib::string::PcaiStringBuffer;
 pub mod content;
 pub mod duplicates;
 pub mod files;
+pub mod walker;
 
 pub use content::{ContentMatch, ContentSearchResult};
 pub use duplicates::{DuplicateGroup, DuplicateResult};
@@ -40,7 +41,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 ///
 /// # Returns
 /// JSON string containing duplicate groups and statistics
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn pcai_find_duplicates(
     root_path: *const c_char,
     min_size: u64,
@@ -50,11 +51,7 @@ pub extern "C" fn pcai_find_duplicates(
     duplicates::find_duplicates_ffi(root_path, min_size, include_pattern, exclude_pattern)
 }
 
-/// Returns statistics about a duplicate search without the full file list.
-///
-/// # Safety
-/// Same as `pcai_find_duplicates`
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn pcai_find_duplicates_stats(
     root_path: *const c_char,
     min_size: u64,
@@ -82,7 +79,7 @@ pub extern "C" fn pcai_find_duplicates_stats(
 ///
 /// # Returns
 /// JSON string containing matched files and statistics
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn pcai_find_files(
     root_path: *const c_char,
     pattern: *const c_char,
@@ -91,8 +88,7 @@ pub extern "C" fn pcai_find_files(
     files::find_files_ffi(root_path, pattern, max_results)
 }
 
-/// Returns statistics about a file search without the full file list.
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn pcai_find_files_stats(
     root_path: *const c_char,
     pattern: *const c_char,
@@ -121,7 +117,7 @@ pub extern "C" fn pcai_find_files_stats(
 ///
 /// # Returns
 /// JSON string containing matches and statistics
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn pcai_search_content(
     root_path: *const c_char,
     pattern: *const c_char,
@@ -132,8 +128,7 @@ pub extern "C" fn pcai_search_content(
     content::search_content_ffi(root_path, pattern, file_pattern, max_results, context_lines)
 }
 
-/// Returns statistics about a content search without the full match list.
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn pcai_search_content_stats(
     root_path: *const c_char,
     pattern: *const c_char,
@@ -148,9 +143,9 @@ pub extern "C" fn pcai_search_content_stats(
 // ============================================================================
 
 /// Returns the search module version string.
-#[no_mangle]
+// #[no_mangle]
 pub extern "C" fn pcai_search_version() -> *const c_char {
-    const VERSION_CSTR: &[u8] = concat!(env!("CARGO_PKG_VERSION"), "\0").as_bytes();
+    const VERSION_CSTR: &[u8] = concat!(env!("CARGO_PKG_VERSION"), " (legacy pcai_search)\0").as_bytes();
     VERSION_CSTR.as_ptr() as *const c_char
 }
 

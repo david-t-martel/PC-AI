@@ -12,6 +12,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.100"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
+
+[[package]]
 name = "bitflags"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -227,6 +233,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
+name = "memmap2"
+version = "0.9.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "744133e4a0e0a658e1374cf3bf8e415c4052a15a111acd372764c55b4177d490"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "ntapi"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -285,10 +300,37 @@ name = "pcai_core_lib"
 version = "0.1.0"
 dependencies = [
  "dunce",
+ "globset",
+ "ignore",
  "libc",
+ "parking_lot",
  "path-slash",
+ "rayon",
+ "regex",
  "serde",
  "serde_json",
+ "sha2",
+ "sysinfo",
+ "walkdir",
+ "widestring",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "pcai_fs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ignore",
+ "log",
+ "memmap2",
+ "pcai_core_lib",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_json",
+ "walkdir",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -587,6 +629,12 @@ checksum = "9517f9239f02c069db75e65f174b3da828fe5f5b945c4dd26bd25d89c03ebcf5"
 dependencies = [
  "wit-bindgen",
 ]
+
+[[package]]
+name = "widestring"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72069c3113ab32ab29e5584db3c6ec55d416895e60715417b5b883a357c3e471"
 
 [[package]]
 name = "winapi"
