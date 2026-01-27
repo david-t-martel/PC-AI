@@ -4,7 +4,7 @@
   "providers": {
     "ollama": {
       "enabled": true,
-      "baseUrl": "http://127.0.0.1:11434",
+      "baseUrl": "hvsock://ollama",
       "defaultModel": "qwen2.5-coder:7b",
       "fallbackModels": [
         "mistral:7b",
@@ -16,13 +16,13 @@
     },
     "lmstudio": {
       "enabled": true,
-      "baseUrl": "http://127.0.0.1:1234",
+      "baseUrl": "hvsock://lmstudio",
       "priority": 2,
       "timeout": 120000
     },
     "vllm": {
       "enabled": true,
-      "baseUrl": "http://127.0.0.1:8000",
+      "baseUrl": "hvsock://vllm",
       "defaultModel": "functiongemma-270m-it",
       "priority": 1,
       "timeout": 120000
@@ -32,7 +32,14 @@
     "maxContextTokens": 16384,
     "reservedForResponse": 4096,
     "systemPromptFile": "DIAGNOSE.md",
-    "decisionTreeFile": "DIAGNOSE_LOGIC.md"
+    "decisionTreeFile": "DIAGNOSE_LOGIC.md",
+    "chatPromptFile": "CHAT.md"
+  },
+  "router": {
+    "enabled": true,
+    "baseUrl": "http://127.0.0.1:8000",
+    "model": "functiongemma-270m-it",
+    "toolsPath": "Config/pcai-tools.json"
   },
   "prompts": {
     "diagnosticAnalysis": {

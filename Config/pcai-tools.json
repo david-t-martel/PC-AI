@@ -3,6 +3,123 @@
 		{
 			"type": "function",
 			"function": {
+				"name": "SearchDocs",
+				"description": "Search vendor documentation for error codes and device guidance.",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"query": {
+							"type": "string",
+							"description": "Search query (e.g., ConfigManagerErrorCode 31)."
+						},
+						"source": {
+							"type": "string",
+							"description": "Preferred vendor documentation source.",
+							"enum": [
+								"Microsoft",
+								"Intel",
+								"AMD",
+								"Dell",
+								"HP",
+								"Lenovo",
+								"Generic"
+							]
+						}
+					},
+					"required": ["query"]
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.LLM",
+				"cmdlet": "Invoke-DocSearch",
+				"params": {
+					"Query": "$query",
+					"Source": "$source"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "GetSystemInfo",
+				"description": "Query system diagnostics for storage, network, USB, BIOS, or OS details.",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"category": {
+							"type": "string",
+							"description": "Information category.",
+							"enum": ["Storage", "Network", "USB", "BIOS", "OS"]
+						},
+						"detail": {
+							"type": "string",
+							"description": "Detail level (e.g., Summary, DriverVersion, FullStatus)."
+						}
+					},
+					"required": ["category"]
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.LLM",
+				"cmdlet": "Get-SystemInfoTool",
+				"params": {
+					"Category": "$category",
+					"Detail": "$detail"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "SearchLogs",
+				"description": "Search local log files for a regex pattern (native-first).",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"pattern": {
+							"type": "string",
+							"description": "Regex pattern to search for."
+						},
+						"rootPath": {
+							"type": "string",
+							"description": "Root directory for log search."
+						},
+						"filePattern": {
+							"type": "string",
+							"description": "File glob pattern (e.g., *.log)."
+						},
+						"caseSensitive": {
+							"type": "boolean",
+							"description": "Case-sensitive search."
+						},
+						"contextLines": {
+							"type": "integer",
+							"description": "Number of context lines."
+						},
+						"maxMatches": {
+							"type": "integer",
+							"description": "Maximum matches to return."
+						}
+					},
+					"required": ["pattern"]
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.LLM",
+				"cmdlet": "Invoke-LogSearch",
+				"params": {
+					"Pattern": "$pattern",
+					"RootPath": "$rootPath",
+					"FilePattern": "$filePattern",
+					"CaseSensitive": "$caseSensitive",
+					"ContextLines": "$contextLines",
+					"MaxMatches": "$maxMatches"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
 				"name": "pcai_run_wsl_network_tool",
 				"description": "Run the WSL network toolkit with a mode: check, diagnose, repair, full.",
 				"parameters": {
@@ -76,7 +193,8 @@
 			},
 			"pcai_mapping": {
 				"cmdlet": "wsl",
-				"args": ["--shutdown"]
+				"args": ["--shutdown"],
+				"is_destructive": true
 			}
 		},
 		{
@@ -166,7 +284,8 @@
 				"params": {
 					"Service": "$service",
 					"Action": "Stop"
-				}
+				},
+				"is_destructive": true
 			}
 		},
 		{
