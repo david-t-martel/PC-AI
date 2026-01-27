@@ -1,0 +1,404 @@
+[
+  {
+    "Module": "PC-AI.Acceleration.psm1",
+    "Function": "Compare-ToolPerformance",
+    "Synopsis": "Compares performance between Rust tools and PowerShell equivalents",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Compare-ToolPerformance.ps1"
+  },
+  {
+    "Module": "PC-AI.Acceleration.psm1",
+    "Function": "Find-DuplicatesFast",
+    "Synopsis": "Fast duplicate file detection using parallel hashing and fd",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Find-DuplicatesFast.ps1"
+  },
+  {
+    "Module": "PC-AI.Acceleration.psm1",
+    "Function": "Find-FilesFast",
+    "Synopsis": "Fast file finding using fd",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Find-FilesFast.ps1"
+  },
+  {
+    "Module": "PC-AI.Acceleration.psm1",
+    "Function": "Get-DiskUsageFast",
+    "Synopsis": "Fast disk usage analysis using dust or parallel enumeration",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-DiskUsageFast.ps1"
+  },
+  {
+    "Module": "PC-AI.Acceleration.psm1",
+    "Function": "Get-FileHashParallel",
+    "Synopsis": "Computes file hashes in parallel using PowerShell 7+ native parallelism",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-FileHashParallel.ps1"
+  },
+  {
+    "Module": "PC-AI.Acceleration.psm1",
+    "Function": "Get-ProcessesFast",
+    "Synopsis": "Fast process listing using procs",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-ProcessesFast.ps1"
+  },
+  {
+    "Module": "PC-AI.Acceleration.psm1",
+    "Function": "Get-RustToolStatus",
+    "Synopsis": "Reports the status of available Rust acceleration tools",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-RustToolStatus.ps1"
+  },
+  {
+    "Module": "PC-AI.Acceleration.psm1",
+    "Function": "Measure-CommandPerformance",
+    "Synopsis": "Benchmarks command performance using hyperfine or native measurement",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Measure-CommandPerformance.ps1"
+  },
+  {
+    "Module": "PC-AI.Acceleration.psm1",
+    "Function": "Search-ContentFast",
+    "Synopsis": "Fast content search using ripgrep with parallel fallback",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-ContentFast.ps1"
+  },
+  {
+    "Module": "PC-AI.Acceleration.psm1",
+    "Function": "Search-LogsFast",
+    "Synopsis": "Fast log file searching using ripgrep",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-LogsFast.ps1"
+  },
+  {
+    "Module": "PC-AI.Cleanup.psm1",
+    "Function": "Clear-TempFiles",
+    "Synopsis": "Safely cleans temporary files from common system locations.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Cleanup\\Public\\Clear-TempFiles.ps1"
+  },
+  {
+    "Module": "PC-AI.Cleanup.psm1",
+    "Function": "Find-DuplicateFiles",
+    "Synopsis": "Finds duplicate files by content hash in specified directory.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Cleanup\\Public\\Find-DuplicateFiles.ps1"
+  },
+  {
+    "Module": "PC-AI.Cleanup.psm1",
+    "Function": "Get-PathDuplicates",
+    "Synopsis": "Analyzes PATH environment variable for duplicates and non-existent entries.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Cleanup\\Public\\Get-PathDuplicates.ps1"
+  },
+  {
+    "Module": "PC-AI.Cleanup.psm1",
+    "Function": "Invoke-NukeNulCleanup",
+    "Synopsis": "Runs the NukeNul reserved filename cleanup tool and returns JSON results.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Cleanup\\Public\\Invoke-NukeNulCleanup.ps1"
+  },
+  {
+    "Module": "PC-AI.Cleanup.psm1",
+    "Function": "Repair-MachinePath",
+    "Synopsis": "Repairs PATH environment variable by removing duplicates and invalid entries.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Cleanup\\Public\\Repair-MachinePath.ps1"
+  },
+  {
+    "Module": "PC-AI.Hardware.psm1",
+    "Function": "Get-DeviceErrors",
+    "Synopsis": "Gets devices with errors from Device Manager",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Hardware\\Public\\Get-DeviceErrors.ps1"
+  },
+  {
+    "Module": "PC-AI.Hardware.psm1",
+    "Function": "Get-DiskHealth",
+    "Synopsis": "Gets disk health status including SMART information",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Hardware\\Public\\Get-DiskHealth.ps1"
+  },
+  {
+    "Module": "PC-AI.Hardware.psm1",
+    "Function": "Get-NetworkAdapters",
+    "Synopsis": "Gets physical network adapter status",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Hardware\\Public\\Get-NetworkAdapters.ps1"
+  },
+  {
+    "Module": "PC-AI.Hardware.psm1",
+    "Function": "Get-SystemEvents",
+    "Synopsis": "Gets system events related to disk and USB devices",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Hardware\\Public\\Get-SystemEvents.ps1"
+  },
+  {
+    "Module": "PC-AI.Hardware.psm1",
+    "Function": "Get-UsbStatus",
+    "Synopsis": "Gets USB device and controller status",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Hardware\\Public\\Get-UsbStatus.ps1"
+  },
+  {
+    "Module": "PC-AI.Hardware.psm1",
+    "Function": "New-DiagnosticReport",
+    "Synopsis": "Generates a comprehensive hardware diagnostic report",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Hardware\\Public\\New-DiagnosticReport.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Get-LLMStatus",
+    "Synopsis": "Checks the status of Ollama LLM service and available models",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Get-LLMStatus.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Get-SystemInfoTool",
+    "Synopsis": "Active system interrogation tool for the AI agent.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Get-SystemInfoTool.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Invoke-DocSearch",
+    "Synopsis": "Search Microsoft and manufacturer documentation for technical details.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-DocSearch.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Invoke-FunctionGemmaReAct",
+    "Synopsis": "Uses FunctionGemma (via vLLM OpenAI API) to plan tool calls and optionally executes them.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-FunctionGemmaReAct.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Invoke-LLMChat",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-LLMChat.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Invoke-LLMChatTui",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-LLMChatTui.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Invoke-NativeSearch",
+    "Synopsis": "Invokes native high-performance search operations for LLM analysis",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-NativeSearch.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Invoke-PCDiagnosis",
+    "Synopsis": "Analyzes PC diagnostic reports using LLM",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-PCDiagnosis.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Invoke-SmartDiagnosis",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-SmartDiagnosis.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Send-OllamaRequest",
+    "Synopsis": "Sends a request to the Ollama API for text generation",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Send-OllamaRequest.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Set-LLMConfig",
+    "Synopsis": "Configures LLM module settings",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Set-LLMConfig.ps1"
+  },
+  {
+    "Module": "PC-AI.LLM.psm1",
+    "Function": "Set-LLMProviderOrder",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Set-LLMProviderOrder.ps1"
+  },
+  {
+    "Module": "PC-AI.Network.psm1",
+    "Function": "Get-NetworkDiagnostics",
+    "Synopsis": "Performs comprehensive network stack analysis",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Network\\Public\\Get-NetworkDiagnostics.ps1"
+  },
+  {
+    "Module": "PC-AI.Network.psm1",
+    "Function": "Optimize-VSock",
+    "Synopsis": "Optimizes VSock and TCP settings for WSL2 performance (Requires Administrator)",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Network\\Public\\Optimize-VSock.ps1"
+  },
+  {
+    "Module": "PC-AI.Network.psm1",
+    "Function": "Test-WSLConnectivity",
+    "Synopsis": "Tests connectivity between Windows and WSL",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Network\\Public\\Test-WSLConnectivity.ps1"
+  },
+  {
+    "Module": "PC-AI.Network.psm1",
+    "Function": "Watch-VSockPerformance",
+    "Synopsis": "Real-time VSock and network interface performance monitoring",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Network\\Public\\Watch-VSockPerformance.ps1"
+  },
+  {
+    "Module": "PC-AI.Performance.psm1",
+    "Function": "Get-DiskSpace",
+    "Synopsis": "Analyzes disk space usage on all or specified drives.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Performance\\Public\\Get-DiskSpace.ps1"
+  },
+  {
+    "Module": "PC-AI.Performance.psm1",
+    "Function": "Get-ProcessPerformance",
+    "Synopsis": "Gets top processes sorted by CPU or memory usage.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Performance\\Public\\Get-ProcessPerformance.ps1"
+  },
+  {
+    "Module": "PC-AI.Performance.psm1",
+    "Function": "Optimize-Disks",
+    "Synopsis": "Optimizes disks using TRIM for SSDs or defragmentation for HDDs.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Performance\\Public\\Optimize-Disks.ps1"
+  },
+  {
+    "Module": "PC-AI.Performance.psm1",
+    "Function": "Watch-SystemResources",
+    "Synopsis": "Real-time monitoring of CPU, memory, and disk I/O.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Performance\\Public\\Watch-SystemResources.ps1"
+  },
+  {
+    "Module": "PC-AI.USB.psm1",
+    "Function": "Dismount-UsbFromWSL",
+    "Synopsis": "Detaches a USB device from WSL",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.USB\\Public\\Dismount-UsbFromWSL.ps1"
+  },
+  {
+    "Module": "PC-AI.USB.psm1",
+    "Function": "Get-UsbDeviceList",
+    "Synopsis": "Lists USB devices available for WSL attachment",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.USB\\Public\\Get-UsbDeviceList.ps1"
+  },
+  {
+    "Module": "PC-AI.USB.psm1",
+    "Function": "Get-UsbWSLStatus",
+    "Synopsis": "Gets complete USB/WSL status",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.USB\\Public\\Get-UsbWSLStatus.ps1"
+  },
+  {
+    "Module": "PC-AI.USB.psm1",
+    "Function": "Invoke-UsbBind",
+    "Synopsis": "Binds a USB device for WSL sharing",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.USB\\Public\\Invoke-UsbBind.ps1"
+  },
+  {
+    "Module": "PC-AI.USB.psm1",
+    "Function": "Mount-UsbToWSL",
+    "Synopsis": "Attaches a USB device to WSL",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.USB\\Public\\Mount-UsbToWSL.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Backup-WSLConfig",
+    "Synopsis": "Creates a backup of .wslconfig",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Backup-WSLConfig.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Enable-WSLSystemd",
+    "Synopsis": "Enables systemd in a WSL distribution by updating /etc/wsl.conf.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Enable-WSLSystemd.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Get-DockerStatus",
+    "Synopsis": "Gets Docker Desktop status and configuration",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-DockerStatus.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Get-HVSockProxyStatus",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-HVSockProxyStatus.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Get-HyperVStatus",
+    "Synopsis": "Gets Hyper-V status and configuration",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-HyperVStatus.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Get-WSLEnvironmentHealth",
+    "Synopsis": "Comprehensive health check for WSL, Docker, and VSock bridges",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-WSLEnvironmentHealth.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Get-WSLStatus",
+    "Synopsis": "Gets comprehensive WSL status information",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-WSLStatus.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Get-WSLVsockBridgeStatus",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Get-WSLVsockBridgeStatus.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Install-HVSockProxy",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Install-HVSockProxy.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Install-WSLVsockBridge",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Install-WSLVsockBridge.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Invoke-PcaiServiceHost",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Invoke-PcaiServiceHost.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Invoke-WSLDockerHealthCheck",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Invoke-WSLDockerHealthCheck.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Invoke-WSLNetworkToolkit",
+    "Synopsis": "Wrapper for the external WSL network toolkit script.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Invoke-WSLNetworkToolkit.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Optimize-ModelHost",
+    "Synopsis": "Optimizes the model host (WSL) for vLLM performance and resource safety.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Optimize-ModelHost.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Optimize-WSLConfig",
+    "Synopsis": "Optimizes .wslconfig for performance",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Optimize-WSLConfig.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Register-HVSockServices",
+    "Synopsis": "Registers Hyper-V socket (HVSOCK) services for WSL guests.",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Register-HVSockServices.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Repair-WSLNetworking",
+    "Synopsis": "Repairs WSL networking issues",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Repair-WSLNetworking.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Set-PCaiServiceState",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Set-PCaiServiceState.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Set-WSLDefenderExclusion",
+    "Synopsis": "Adds Windows Defender exclusions for WSL",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Set-WSLDefenderExclusions.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Start-HVSockProxy",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Start-HVSockProxy.ps1"
+  },
+  {
+    "Module": "PC-AI.Virtualization.psm1",
+    "Function": "Stop-HVSockProxy",
+    "Synopsis": "",
+    "Path": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Stop-HVSockProxy.ps1"
+  }
+]

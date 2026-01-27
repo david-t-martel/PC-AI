@@ -1,0 +1,17 @@
+[Unit]
+Description=PC_AI WSL VSock Bridge
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/dev/vsock
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/pcai-vsock-bridge start
+ExecStop=/usr/local/bin/pcai-vsock-bridge stop
+ExecReload=/usr/local/bin/pcai-vsock-bridge restart
+Restart=on-failure
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target
