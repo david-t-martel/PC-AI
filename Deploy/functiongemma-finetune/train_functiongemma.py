@@ -39,6 +39,12 @@ class TrainConfigModel(BaseModel):
     dtype: str = Field(default="auto", description="auto|bf16|fp16|fp32")
     gradient_checkpointing: bool = True
     packing: bool = False
+    lr_scheduler_type: str = "cosine"
+    warmup_ratio: float = 0.1
+    eval_split: float = 0.0
+    early_stopping_patience: int = 3
+    use_4bit: bool = False
+    resume_from_checkpoint: Optional[str] = None
 
 
 def parse_args() -> TrainConfigModel:
@@ -56,6 +62,12 @@ def parse_args() -> TrainConfigModel:
     parser.add_argument("--dtype", default="auto", choices=["auto", "bf16", "fp16", "fp32"])
     parser.add_argument("--no-gradient-checkpointing", action="store_true")
     parser.add_argument("--packing", action="store_true")
+    parser.add_argument("--lr-scheduler-type", default="cosine", help="Learning rate scheduler type")
+    parser.add_argument("--warmup-ratio", type=float, default=0.1, help="Warmup ratio (0.0-1.0)")
+    parser.add_argument("--eval-split", type=float, default=0.0, help="Validation split ratio (0.0-1.0)")
+    parser.add_argument("--early-stopping-patience", type=int, default=3, help="Early stopping patience epochs")
+    parser.add_argument("--use-4bit", action="store_true", help="Enable QLoRA 4-bit quantization")
+    parser.add_argument("--resume-from-checkpoint", type=str, default=None, help="Resume from checkpoint path or 'latest'")
     args = parser.parse_args()
 
     try:
@@ -73,6 +85,12 @@ def parse_args() -> TrainConfigModel:
             dtype=args.dtype,
             gradient_checkpointing=not args.no_gradient_checkpointing,
             packing=args.packing,
+            lr_scheduler_type=args.lr_scheduler_type,
+            warmup_ratio=args.warmup_ratio,
+            eval_split=args.eval_split,
+            early_stopping_patience=args.early_stopping_patience,
+            use_4bit=args.use_4bit,
+            resume_from_checkpoint=args.resume_from_checkpoint,
         )
     except ValidationError as exc:
         raise SystemExit(str(exc))
