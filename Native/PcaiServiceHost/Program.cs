@@ -1,0 +1,438 @@
+using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+
+namespace PcaiServiceHost;
+
+public static class Program
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true
+    };
+
+    private static readonly JsonSerializerOptions JsonWriteOptions = new()
+    {
+        WriteIndented = true
+    };
+
+    public static async Task<int> Main(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            PrintUsage();
+            return 1;
+        }
+
+        var command = args[0].ToLowerInvariant();
+        var remaining = args.Skip(1).ToArray();
+
+        switch (command)
+        {
+            case "vllm":
+                return await HandleVllmAsync(remaining);
+            case "hvsock":
+                return await HandleHvsockAsync(remaining);
+            case "provider":
+                return HandleProvider(remaining);
+            default:
+                PrintUsage();
+                return 1;
+        }
+    }
+
+    private static void PrintUsage()
+    {
+        Console.WriteLine("PcaiServiceHost");
+        Console.WriteLine("Usage:");
+        Console.WriteLine("  pcai-servicehost vllm start|stop|restart|status|ensure [--compose <path>] [--interval <sec>]");
+        Console.WriteLine("  pcai-servicehost hvsock start|stop|status|run [--config <path>] [--state <path>]");
+        Console.WriteLine("  pcai-servicehost provider show|set-order <comma-separated>");
+    }
+
+    private static async Task<int> HandleVllmAsync(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            PrintUsage();
+            return 1;
+        }
+
+        var action = args[0].ToLowerInvariant();
+        var composePath = GetArg(args, "--compose") ?? @"C:\Users\david\PC_AI\Deploy\docker\vllm\docker-compose.yml";
+        var intervalSec = int.TryParse(GetArg(args, "--interval"), out var parsed) ? parsed : 15;
+
+        return action switch
+        {
+            "start" => RunDockerCompose(new[] { "-f", composePath, "up", "-d" }),
+            "stop" => RunDockerCompose(new[] { "-f", composePath, "down" }),
+            "restart" => RunDockerCompose(new[] { "-f", composePath, "down" }) + RunDockerCompose(new[] { "-f", composePath, "up", "-d" }),
+            "status" => PrintVllmStatus(),
+            "ensure" => await EnsureVllmAsync(composePath, intervalSec),
+            _ => 1
+        };
+    }
+
+    private static int RunDockerCompose(string[] args)
+    {
+        var docker = FindExecutable("docker.exe");
+        if (docker == null)
+        {
+            Console.Error.WriteLine("Docker not found in PATH.");
+            return 2;
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = docker,
+            ArgumentList = { "compose" },
+            UseShellExecute = false
+        };
+
+        foreach (var arg in args)
+        {
+            startInfo.ArgumentList.Add(arg);
+        }
+
+        using var proc = Process.Start(startInfo);
+        proc?.WaitForExit();
+        return proc?.ExitCode ?? 1;
+    }
+
+    private static int PrintVllmStatus()
+    {
+        var docker = FindExecutable("docker.exe");
+        if (docker == null)
+        {
+            Console.Error.WriteLine("Docker not found in PATH.");
+            return 2;
+        }
+
+        var output = RunProcessCapture(docker, "ps", "--filter", "name=vllm-functiongemma", "--format", "{{.Status}}");
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            Console.WriteLine("vLLM container not running");
+            return 1;
+        }
+
+        Console.WriteLine($"vLLM container status: {output.Trim()}");
+        return 0;
+    }
+
+    private static async Task<int> EnsureVllmAsync(string composePath, int intervalSec)
+    {
+        Console.WriteLine("Ensuring vLLM container stays running...");
+        while (true)
+        {
+            var status = PrintVllmStatus();
+            if (status != 0)
+            {
+                RunDockerCompose(new[] { "-f", composePath, "up", "-d" });
+            }
+            await Task.Delay(TimeSpan.FromSeconds(intervalSec));
+        }
+    }
+
+    private static async Task<int> HandleHvsockAsync(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            PrintUsage();
+            return 1;
+        }
+
+        var action = args[0].ToLowerInvariant();
+        var configPath = GetArg(args, "--config") ?? @"C:\Users\david\PC_AI\Config\hvsock-proxy.conf";
+        var statePath = GetArg(args, "--state") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "PC_AI", "hvsock-proxy", "state.json");
+
+        return action switch
+        {
+            "start" => StartHvsockProxy(configPath, statePath),
+            "stop" => StopHvsockProxy(statePath),
+            "status" => PrintHvsockStatus(statePath),
+            "run" => await RunHvsockProxyLoop(configPath, statePath),
+            _ => 1
+        };
+    }
+
+    private static int StartHvsockProxy(string configPath, string statePath)
+    {
+        var winsocat = FindExecutable("winsocat.exe");
+        if (winsocat == null)
+        {
+            Console.Error.WriteLine("winsocat.exe not found in PATH.");
+            return 2;
+        }
+
+        var entries = LoadHvsockConfig(configPath);
+        if (entries.Count == 0)
+        {
+            Console.Error.WriteLine("No hvsock entries found.");
+            return 1;
+        }
+
+        var state = new List<HvsockProxyStateEntry>();
+        foreach (var entry in entries)
+        {
+            var args = $"HVSock-LISTEN:{entry.ServiceId} TCP:{entry.TcpHost}:{entry.TcpPort}";
+            var proc = Process.Start(new ProcessStartInfo
+            {
+                FileName = winsocat,
+                Arguments = args,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+
+            if (proc == null)
+            {
+                Console.Error.WriteLine($"Failed to start winsocat for {entry.Name}");
+                continue;
+            }
+
+            state.Add(new HvsockProxyStateEntry
+            {
+                Name = entry.Name,
+                ServiceId = entry.ServiceId,
+                TcpTarget = $"{entry.TcpHost}:{entry.TcpPort}",
+                Pid = proc.Id,
+                Started = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            });
+        }
+
+        SaveState(statePath, state);
+        Console.WriteLine($"Started {state.Count} HVSOCK proxies.");
+        return 0;
+    }
+
+    private static int StopHvsockProxy(string statePath)
+    {
+        if (!File.Exists(statePath))
+        {
+            Console.WriteLine("No state file found.");
+            return 0;
+        }
+
+        var state = JsonSerializer.Deserialize<List<HvsockProxyStateEntry>>(File.ReadAllText(statePath), JsonOptions) ?? new();
+        var stopped = 0;
+        foreach (var entry in state)
+        {
+            try
+            {
+                var proc = Process.GetProcessById(entry.Pid);
+                proc.Kill(true);
+                stopped++;
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        File.Delete(statePath);
+        Console.WriteLine($"Stopped {stopped} HVSOCK proxies.");
+        return 0;
+    }
+
+    private static int PrintHvsockStatus(string statePath)
+    {
+        if (!File.Exists(statePath))
+        {
+            Console.WriteLine("No HVSOCK proxies running.");
+            return 1;
+        }
+
+        var state = JsonSerializer.Deserialize<List<HvsockProxyStateEntry>>(File.ReadAllText(statePath), JsonOptions) ?? new();
+        var running = 0;
+        foreach (var entry in state)
+        {
+            var alive = true;
+            try
+            {
+                Process.GetProcessById(entry.Pid);
+            }
+            catch
+            {
+                alive = false;
+            }
+
+            Console.WriteLine($"{entry.Name}: {(alive ? "RUNNING" : "STOPPED")} pid={entry.Pid} target={entry.TcpTarget}");
+            if (alive) running++;
+        }
+
+        Console.WriteLine($"Active: {running}/{state.Count}");
+        return running == state.Count ? 0 : 1;
+    }
+
+    private static async Task<int> RunHvsockProxyLoop(string configPath, string statePath)
+    {
+        Console.WriteLine("Running HVSOCK proxy supervisor...");
+        while (true)
+        {
+            var status = PrintHvsockStatus(statePath);
+            if (status != 0)
+            {
+                StartHvsockProxy(configPath, statePath);
+            }
+            await Task.Delay(TimeSpan.FromSeconds(15));
+        }
+    }
+
+    private static int HandleProvider(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            PrintUsage();
+            return 1;
+        }
+
+        var action = args[0].ToLowerInvariant();
+        var configPath = @"C:\Users\david\PC_AI\Config\llm-config.json";
+
+        if (!File.Exists(configPath))
+        {
+            Console.Error.WriteLine("llm-config.json not found.");
+            return 2;
+        }
+
+        var configNode = JsonNode.Parse(File.ReadAllText(configPath)) as JsonObject;
+        if (configNode == null)
+        {
+            Console.Error.WriteLine("Failed to parse llm-config.json.");
+            return 2;
+        }
+
+        if (action == "show")
+        {
+            if (configNode.TryGetPropertyValue("fallbackOrder", out var value) && value != null)
+            {
+                Console.WriteLine(value.ToJsonString(JsonWriteOptions));
+                return 0;
+            }
+
+            Console.WriteLine("fallbackOrder not set.");
+            return 1;
+        }
+
+        if (action == "set-order" && args.Length > 1)
+        {
+            var order = args[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToArray();
+            var orderArray = new JsonArray(order.Select(item => JsonValue.Create(item)).ToArray());
+            configNode["fallbackOrder"] = orderArray;
+            File.WriteAllText(configPath, configNode.ToJsonString(JsonWriteOptions));
+            Console.WriteLine("Updated fallbackOrder.");
+            return 0;
+        }
+
+        return 1;
+    }
+
+    private static string? GetArg(string[] args, string name)
+    {
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase))
+            {
+                return args[i + 1];
+            }
+        }
+        return null;
+    }
+
+    private static string? FindExecutable(string exe)
+    {
+        var paths = (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var path in paths)
+        {
+            var candidate = Path.Combine(path.Trim(), exe);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static string RunProcessCapture(string file, params string[] args)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = file,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+
+        foreach (var arg in args)
+        {
+            psi.ArgumentList.Add(arg);
+        }
+
+        using var proc = Process.Start(psi);
+        if (proc == null)
+        {
+            return string.Empty;
+        }
+
+        var output = proc.StandardOutput.ReadToEnd();
+        proc.WaitForExit();
+        return output;
+    }
+
+    private static List<HvsockProxyEntry> LoadHvsockConfig(string path)
+    {
+        var entries = new List<HvsockProxyEntry>();
+        foreach (var raw in File.ReadAllLines(path))
+        {
+            var line = raw.Trim();
+            if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+            {
+                continue;
+            }
+
+            var parts = line.Split(':');
+            if (parts.Length < 4)
+            {
+                continue;
+            }
+
+            entries.Add(new HvsockProxyEntry
+            {
+                Name = parts[0],
+                ServiceId = parts[1],
+                TcpHost = parts[2],
+                TcpPort = parts[3]
+            });
+        }
+        return entries;
+    }
+
+    private static void SaveState(string path, List<HvsockProxyStateEntry> state)
+    {
+        var dir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        File.WriteAllText(path, JsonSerializer.Serialize(state, JsonOptions));
+    }
+}
+
+public sealed class HvsockProxyEntry
+{
+    public string Name { get; set; } = string.Empty;
+    public string ServiceId { get; set; } = string.Empty;
+    public string TcpHost { get; set; } = string.Empty;
+    public string TcpPort { get; set; } = string.Empty;
+}
+
+public sealed class HvsockProxyStateEntry
+{
+    public string Name { get; set; } = string.Empty;
+    public string ServiceId { get; set; } = string.Empty;
+    public string TcpTarget { get; set; } = string.Empty;
+    public int Pid { get; set; }
+    public string Started { get; set; } = string.Empty;
+}

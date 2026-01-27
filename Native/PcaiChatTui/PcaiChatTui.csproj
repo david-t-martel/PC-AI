@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PcaiNative\PcaiNative.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\PcaiNative\pcai_core_lib.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\PcaiNative\pcai_core_lib.dll')" />
+    <None Include="..\PcaiNative\pcai_search.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\PcaiNative\pcai_search.dll')" />
+    <None Include="..\PcaiNative\pcai_performance.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\PcaiNative\pcai_performance.dll')" />
+    <None Include="..\PcaiNative\pcai_system.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\PcaiNative\pcai_system.dll')" />
+  </ItemGroup>
+
+</Project>

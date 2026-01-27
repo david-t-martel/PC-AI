@@ -1,0 +1,29 @@
+[project]
+name = "pcai-functiongemma-finetune"
+version = "0.1.0"
+description = "Local fine-tuning and eval harness for FunctionGemma in PC_AI"
+requires-python = ">=3.10"
+readme = "README.md"
+license = { text = "Proprietary" }
+dependencies = [
+  "accelerate>=0.30.0",
+  "transformers>=4.41.0",
+  "datasets>=2.19.0",
+  "peft>=0.11.0",
+  "trl>=0.9.6",
+  "bitsandbytes>=0.43.0",
+  "sentencepiece>=0.2.0",
+  "torch>=2.3.0",
+  "evaluate>=0.4.2",
+  "protobuf>=4.25.0",
+  "tensorboard>=2.16.0",
+  "huggingface_hub>=0.23.0",
+  "pydantic>=2.7.0",
+  "httpx>=0.27.0",
+  "orjson>=3.10.0",
+  "tqdm>=4.66.0",
+  "pytest>=8.2.0",
+]
+
+[tool.uv]
+resolution = "highest"
