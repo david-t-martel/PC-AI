@@ -10,14 +10,30 @@ services:
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
       - HF_HUB_OFFLINE=1
       - CUDA_DEVICE_ORDER=PCI_BUS_ID
-      - CUDA_VISIBLE_DEVICES=1
-      - VLLM_LOGGING_LEVEL=INFO
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0,1}
+      - VLLM_LOGGING_LEVEL=${VLLM_LOGGING_LEVEL:-INFO}
+      - VLLM_ATTENTION_BACKEND=FLASH_ATTN
     volumes:
-      - C:\\Users\\david\\.cache\\huggingface:/root/.cache/huggingface
-      - C:\\Users\\david\\PC_AI\\Models\\functiongemma-270m-it:/models/functiongemma-270m-it
-      - C:\\Users\\david\\PC_AI\\Deploy\\docker\\vllm\\tool_chat_template_functiongemma.jinja:/opt/pcai/tool_chat_template_functiongemma.jinja:ro
-    gpus: all
+      - C:\Users\david\.cache\huggingface:/root/.cache/huggingface
+      - C:\Users\david\PC_AI\Models\functiongemma-270m-it:/models/functiongemma-270m-it
+      - C:\Users\david\PC_AI\Deploy\docker\vllm\tool_chat_template_functiongemma.jinja:/opt/pcai/tool_chat_template_functiongemma.jinja:ro
+    deploy:
+      resources:
+        limits:
+          memory: ${CONTAINER_MEMORY_LIMIT:-24g}
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    shm_size: ${SHM_SIZE:-8g}
     ipc: host
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
     command:
       - --model
       - /models/functiongemma-270m-it
@@ -29,7 +45,11 @@ services:
       - --chat-template
       - /opt/pcai/tool_chat_template_functiongemma.jinja
       - --max-model-len
-      - "4096"
+      - "${MAX_MODEL_LEN:-4096}"
       - --gpu-memory-utilization
-      - "0.6"
-      - --enforce-eager
+      - "${GPU_MEMORY_UTILIZATION:-0.85}"
+      - --tensor-parallel-size
+      - "${TENSOR_PARALLEL_SIZE:-2}"
+      - --max-num-seqs
+      - "16"
+      - --disable-log-requests
