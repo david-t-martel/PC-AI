@@ -67,7 +67,7 @@ pub fn get_system_summary() -> SystemSummary {
     let components_list = Components::new_with_refreshed_list();
     let temperatures = components_list.iter().map(|c| ComponentTemp {
         label: c.label().to_string(),
-        celsius: c.temperature(),
+        celsius: c.temperature().unwrap_or(0.0),
     }).collect();
 
     SystemSummary {
@@ -114,7 +114,7 @@ pub extern "C" fn pcai_query_hardware_metrics() -> PcaiStringBuffer {
     let components_list = Components::new_with_refreshed_list();
     let temps = components_list.iter().map(|c| ComponentTemp {
         label: c.label().to_string(),
-        celsius: c.temperature(),
+        celsius: c.temperature().unwrap_or(0.0),
     }).collect();
 
     crate::string::json_to_buffer(&Metrics {

@@ -41,8 +41,8 @@ regex = "1.11"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# Windows API bindings
-windows-sys = { version = "0.59", features = [
+# Windows API bindings (updated from 0.59 to 0.61)
+windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Storage_FileSystem",
     "Win32_System_ProcessStatus",
@@ -52,8 +52,8 @@ windows-sys = { version = "0.59", features = [
 # UTF-16 strings for Windows APIs
 widestring = "1.1"
 
-# System information (cross-platform)
-sysinfo = "0.32"
+# System information (cross-platform) - updated from 0.32 to 0.38
+sysinfo = "0.38"
 
 # Directory walking
 walkdir = "2.5"
@@ -61,8 +61,8 @@ walkdir = "2.5"
 # Concurrency primitives
 parking_lot = "0.12"
 
-# Windows Registry access
-winreg = "0.52"
+# Windows Registry access (updated from 0.52 to 0.55)
+winreg = "0.55"
 
 [profile.release]
 opt-level = 3      # Maximum optimization
