@@ -30,21 +30,6 @@ function Invoke-PCDiagnosis {
 
     .PARAMETER OutputPath
         Path to save the analysis report (default: Desktop\PC-Diagnosis-Analysis.txt)
-
-    .EXAMPLE
-        Invoke-PCDiagnosis -DiagnosticReportPath "C:\Users\david\Desktop\Hardware-Diagnostics-Report.txt"
-        Analyzes the diagnostic report and outputs structured findings
-
-    .EXAMPLE
-        Get-Content report.txt | Invoke-PCDiagnosis -ReportText $_ -SaveReport
-        Analyzes report from pipeline and saves analysis to file
-
-    .EXAMPLE
-        Invoke-PCDiagnosis -DiagnosticReportPath report.txt -Model "deepseek-r1:8b" -Temperature 0.1
-        Uses DeepSeek model with very low temperature for consistent analysis
-
-    .OUTPUTS
-        PSCustomObject with structured analysis findings and recommendations
     #>
     [CmdletBinding(DefaultParameterSetName = 'FromFile')]
     [OutputType([PSCustomObject])]
@@ -58,7 +43,7 @@ function Invoke-PCDiagnosis {
         [string]$ReportText,
 
         [Parameter()]
-        [string]$Model = $script:ModuleConfig.DefaultModel,
+        [string]$Model = "qwen2.5-coder:7b",
 
         [Parameter()]
         [ValidateRange(0.0, 2.0)]
@@ -75,35 +60,44 @@ function Invoke-PCDiagnosis {
 
         [Parameter()]
         [ValidateRange(30, 1800)]
-        [int]$TimeoutSeconds = ([math]::Max(300, ($script:ModuleConfig.DefaultTimeout * 2)))
+        [int]$TimeoutSeconds = 300,
+
+        [Parameter()]
+        [switch]$UseRouter,
+
+        [Parameter()]
+        [string]$RouterBaseUrl = "http://localhost:11434",
+
+        [Parameter()]
+        [string]$RouterModel = "qwen2.5-coder:7b",
+
+        [Parameter()]
+        [string]$RouterToolsPath,
+
+        [Parameter()]
+        [ValidateRange(1, 10)]
+        [int]$RouterMaxCalls = 3,
+
+        [Parameter()]
+        [switch]$RouterExecuteTools,
+
+        [Parameter()]
+        [switch]$EnforceJson
     )
 
     begin {
         Write-Verbose "Initializing PC diagnosis analysis..."
-
-        # Get project root directory (go up from Public -> PC-AI.LLM -> Modules -> PC_AI)
         $projectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 
-        # Paths to system prompts in project root
         $diagnosePromptPath = Join-Path -Path $projectRoot -ChildPath 'DIAGNOSE.md'
         $diagnoseLogicPath = Join-Path -Path $projectRoot -ChildPath 'DIAGNOSE_LOGIC.md'
 
-        Write-Verbose "Looking for DIAGNOSE.md at: $diagnosePromptPath"
+        if (-not (Test-Path $diagnosePromptPath)) { $diagnosePromptPath = "C:\Users\david\PC_AI\DIAGNOSE.md" }
+        if (-not (Test-Path $diagnoseLogicPath)) { $diagnoseLogicPath = "C:\Users\david\PC_AI\DIAGNOSE_LOGIC.md" }
 
-        # Load system prompts
-        if (-not (Test-Path $diagnosePromptPath)) {
-            throw "DIAGNOSE.md not found at $diagnosePromptPath"
-        }
-
-        if (-not (Test-Path $diagnoseLogicPath)) {
-            throw "DIAGNOSE_LOGIC.md not found at $diagnoseLogicPath"
-        }
-
-        Write-Verbose "Loading system prompts..."
         $diagnosePrompt = Get-Content -Path $diagnosePromptPath -Raw -Encoding utf8
         $diagnoseLogic = Get-Content -Path $diagnoseLogicPath -Raw -Encoding utf8
 
-        # Combine into system prompt
         $systemPrompt = @"
 $diagnosePrompt
 
@@ -114,133 +108,97 @@ $diagnoseLogic
 ## INSTRUCTIONS
 
 You are analyzing a Windows PC hardware diagnostic report. Follow the reasoning framework above to:
-
 1. Parse the diagnostic output into structured categories
-2. Identify issues by severity (Critical, High, Medium, Low)
-3. Apply the decision tree logic to determine root causes
-4. Provide specific, actionable recommendations
-
-Format your response with clear sections:
-- Summary (2-4 bullet points)
-- Findings by Category
-- Priority Issues
-- Recommended Next Steps
-
-Follow the Response Template in DIAGNOSE.md section 4.2 exactly. Do not add extra sections.
-Be concise, technical, and safety-conscious. Warn about destructive operations.
+2. Identify issues by severity
+3. Provide actionable recommendations
 "@
-
-        Write-Verbose "System prompt loaded: $($systemPrompt.Length) characters"
-
-        # Connectivity checks are handled by Invoke-LLMChatWithFallback
     }
 
     process {
-        # Load diagnostic report
         $diagnosticText = if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
-            Write-Verbose "Loading diagnostic report from file: $DiagnosticReportPath"
             Get-Content -Path $DiagnosticReportPath -Raw -Encoding utf8
-        }
-        else {
-            Write-Verbose "Using diagnostic report from text parameter"
+        } else {
             $ReportText
         }
 
         if ([string]::IsNullOrWhiteSpace($diagnosticText)) {
-            throw "Diagnostic report is empty or could not be read"
+            throw "Diagnostic report is empty"
         }
 
-        Write-Verbose "Diagnostic report loaded: $($diagnosticText.Length) characters"
+        $routerSummary = ''
+        if ($UseRouter) {
+            $routerPrompt = "Analyze this report and call tools if needed: `n`n $diagnosticText"
+            $routerResult = Invoke-FunctionGemmaReAct `
+                -Prompt $routerPrompt `
+                -BaseUrl $RouterBaseUrl `
+                -Model $RouterModel `
+                -ExecuteTools:([bool]$RouterExecuteTools) `
+                -MaxToolCalls $RouterMaxCalls `
+                -TimeoutSeconds $TimeoutSeconds
 
-        # Build user prompt
-        $userPrompt = @"
-Please analyze the following PC hardware diagnostic report:
+            if ($routerResult -and $routerResult.ToolResults) {
+                $routerSummary = ($routerResult.ToolResults | ConvertTo-Json -Depth 6)
+            }
+        }
 
-```
-$diagnosticText
-```
+        $userPrompt = "Analyze this PC hardware diagnostic report: `n`n $diagnosticText"
+        if ($routerSummary) {
+            $userPrompt += "`n`n[TOOL_RESULTS]`n$routerSummary"
+        }
 
-Provide a comprehensive analysis with severity-based prioritization and actionable recommendations.
-"@
-
-        # Send to LLM
         Write-Host "Analyzing diagnostic report with $Model..." -ForegroundColor Cyan
-        Write-Host "This may take 30-120 seconds depending on report size..." -ForegroundColor Gray
-
         $startTime = Get-Date
 
         try {
             $messages = @(
-                @{
-                    role = 'system'
-                    content = $systemPrompt
-                }
-                @{
-                    role = 'user'
-                    content = $userPrompt
-                }
+                @{ role = 'system'; content = $systemPrompt }
+                @{ role = 'user'; content = $userPrompt }
             )
 
             $response = Invoke-LLMChatWithFallback -Messages $messages -Model $Model -Temperature $Temperature -TimeoutSeconds $TimeoutSeconds
-
             $endTime = Get-Date
             $duration = ($endTime - $startTime).TotalSeconds
 
-            Write-Host "Analysis complete in $([math]::Round($duration, 1)) seconds" -ForegroundColor Green
-
-            # Parse response
             $analysisText = $response.message.content
 
-            # Build result object
+            if (-not $PSBoundParameters.ContainsKey('EnforceJson')) {
+                $EnforceJson = $true
+            }
+
+            $analysisJson = $null
+            $jsonValid = $false
+            $jsonError = $null
+            try {
+                $analysisJson = ConvertFrom-LLMJson -Content $analysisText -Strict
+                $jsonValid = $true
+            } catch {
+                $jsonError = $_.Exception.Message
+                if ($EnforceJson) {
+                    throw "Diagnose mode requires valid JSON output. $jsonError"
+                }
+            }
+
             $result = [PSCustomObject]@{
                 Analysis = $analysisText
+                AnalysisJson = $analysisJson
+                JsonValid = $jsonValid
+                JsonError = $jsonError
                 Model = $Model
-                Temperature = $Temperature
                 AnalysisDurationSeconds = [math]::Round($duration, 2)
-                DiagnosticReportLength = $diagnosticText.Length
-                ResponseLength = $analysisText.Length
                 Timestamp = $startTime
-                TokensEvaluated = $response.eval_count
             }
 
-            if ($IncludeRawResponse) {
-                $result | Add-Member -MemberType NoteProperty -Name 'RawResponse' -Value $response
-            }
-
-            # Save report if requested
             if ($SaveReport) {
-                $reportContent = @"
-PC DIAGNOSTICS ANALYSIS REPORT
-Generated: $($startTime.ToString('yyyy-MM-dd HH:mm:ss'))
-Model: $Model
-Analysis Duration: $([math]::Round($duration, 2)) seconds
-
-$("-" * 80)
-
-$analysisText
-
-$("-" * 80)
-
-Analysis completed at $($endTime.ToString('yyyy-MM-dd HH:mm:ss'))
-"@
-
-                [System.IO.File]::WriteAllText($OutputPath, $reportContent, [System.Text.Encoding]::UTF8)
-                Write-Host "`nAnalysis report saved to: $OutputPath" -ForegroundColor Cyan
-
-                $result | Add-Member -MemberType NoteProperty -Name 'ReportSavedTo' -Value $OutputPath
+                Set-Content -Path $OutputPath -Value $analysisText -Encoding utf8
+                Write-Host "Report saved to: $OutputPath" -ForegroundColor Cyan
+                $result.ReportSavedTo = $OutputPath
             }
 
-            # Display analysis
-            Write-Host "`n$("=" * 80)" -ForegroundColor Cyan
-            Write-Host "PC DIAGNOSTICS ANALYSIS" -ForegroundColor Cyan
-            Write-Host "$("=" * 80)`n" -ForegroundColor Cyan
             Write-Host $analysisText
-            Write-Host "`n$("=" * 80)" -ForegroundColor Cyan
-
             return $result
         }
         catch {
-            Write-Error "Diagnostic analysis failed: $_"
+            Write-Error "Analysis failed: $_"
             throw
         }
     }

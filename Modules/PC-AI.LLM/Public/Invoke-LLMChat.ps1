@@ -43,6 +43,16 @@ function Invoke-LLMChat {
         [string]$Provider = 'auto',
 
         [Parameter()]
+        [switch]$UseRouter,
+
+        [Parameter()]
+        [ValidateSet('chat', 'diagnose')]
+        [string]$RouterMode = 'chat',
+
+        [Parameter()]
+        [switch]$Stream,
+
+        [Parameter()]
         [switch]$ShowProgress,
 
         [Parameter()]
@@ -50,7 +60,10 @@ function Invoke-LLMChat {
 
         [Parameter()]
         [ValidateRange(1, 10)]
-        [int]$ProgressIntervalSeconds = 1
+        [int]$ProgressIntervalSeconds = 1,
+
+        [Parameter()]
+        [int]$ResultLimit = 8192
     )
 
     begin {
@@ -60,6 +73,10 @@ function Invoke-LLMChat {
     }
 
     process {
+        if ($UseRouter -and -not $Interactive) {
+            return Invoke-LLMChatRouted -Message $Message -Mode $RouterMode -Model $Model -Provider $Provider -TimeoutSeconds $TimeoutSeconds -Temperature $Temperature
+        }
+
         if ($Interactive) {
             Write-Host "`nStarting interactive chat session with $Model" -ForegroundColor Cyan
             $continueChat = $true
@@ -77,6 +94,12 @@ function Invoke-LLMChat {
                 }
 
                 if ([string]::IsNullOrWhiteSpace($userInput)) { continue }
+
+                if ($UseRouter) {
+                    $routed = Invoke-LLMChatRouted -Message $userInput -Mode $RouterMode -Model $Model -Provider $Provider -TimeoutSeconds $TimeoutSeconds -Temperature $Temperature
+                    Write-Host "`nAssistant: $($routed.Response)" -ForegroundColor Blue
+                    continue
+                }
 
                 [void]$conversationHistory.Add(@{ role = 'user'; content = $userInput })
 
@@ -104,13 +127,19 @@ function Invoke-LLMChat {
                         }
                         if ($PSBoundParameters.ContainsKey('MaxTokens')) { $params['MaxTokens'] = $MaxTokens }
 
-                        $response = Invoke-LLMChatWithFallback @params
+                        $assistantMessage = $null
+                        if ($Stream -and $Provider -eq 'ollama') {
+                            $assistantMessage = Invoke-OllamaChatStream -Messages $params.Messages -Model $Model -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds
+                            $response = [PSCustomObject]@{ Provider = 'ollama'; message = @{ content = $assistantMessage } }
+                        } else {
+                            $response = Invoke-LLMChatWithFallback @params
+                            $assistantMessage = $response.message.content
+                        }
                         $sw.Stop()
                         $metricsAfter = $null
                         if ($ShowMetrics -and $response.Provider -eq 'vllm') {
                             $metricsAfter = Get-VLLMMetricsSnapshot -ApiUrl $script:ModuleConfig.VLLMApiUrl -ModelName $script:ModuleConfig.VLLMModel -TimeoutSeconds 3
                         }
-                        $assistantMessage = $response.message.content
                         [void]$conversationHistory.Add(@{ role = 'assistant'; content = $assistantMessage })
 
                         # Parse for tool calls (Simplified with helper or standard pattern)
@@ -123,19 +152,13 @@ function Invoke-LLMChat {
                             Write-Host "`n[Tool Call] Executing $toolName..." -ForegroundColor Yellow
                             $toolResult = 'Error: Tool failed'
                             try {
-                                switch ($toolName) {
-                                    'SearchDocs' {
-                                        if ($toolArgs -match "'(?<query>.*?)'(\s*,\s*'(?<source>.*?)')?") {
-                                            $source = if ($Matches['source']) { $Matches['source'] } else { 'Microsoft' }
-                                            $toolResult = Invoke-DocSearch -Query $Matches['query'] -Source $source
-                                        }
-                                    }
-                                    'GetSystemInfo' {
-                                        if ($toolArgs -match "'(?<cat>.*?)'(\s*,\s*'(?<det>.*?)')?") {
-                                            $detail = if ($Matches['det']) { $Matches['det'] } else { 'Summary' }
-                                            $toolResult = Get-SystemInfoTool -Category $Matches['cat'] -Detail $detail
-                                        }
-                                    }
+                                # Use standardized Invoke-ToolByName helper
+                                $toolResult = Invoke-ToolByName -Name $toolName -Args $toolArgs -ModuleRoot $ModuleRoot
+
+                                # Truncate if exceeds limit
+                                if ($ResultLimit -gt 0 -and $toolResult -is [string] -and $toolResult.Length -gt $ResultLimit) {
+                                    $truncatedSize = $toolResult.Length - $ResultLimit
+                                    $toolResult = $toolResult.Substring(0, $ResultLimit) + "`n`n[TRUNCATED: $truncatedSize bytes removed for context window safety]"
                                 }
                             } catch { $toolResult = "Error: $($_.Exception.Message)" }
 
@@ -175,9 +198,15 @@ function Invoke-LLMChat {
             }
             if ($PSBoundParameters.ContainsKey('MaxTokens')) { $params['MaxTokens'] = $MaxTokens }
 
-            $response = Invoke-LLMChatWithFallback @params
+            $assistantMessage = $null
+            if ($Stream -and $Provider -eq 'ollama') {
+                $assistantMessage = Invoke-OllamaChatStream -Messages $params.Messages -Model $Model -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds
+                $response = [PSCustomObject]@{ Provider = 'ollama'; message = @{ content = $assistantMessage } }
+            } else {
+                $response = Invoke-LLMChatWithFallback @params
+                $assistantMessage = $response.message.content
+            }
             $sw.Stop()
-            $assistantMessage = $response.message.content
             [void]$conversationHistory.Add(@{ role = 'assistant'; content = $assistantMessage })
 
             $finalResponse = $assistantMessage

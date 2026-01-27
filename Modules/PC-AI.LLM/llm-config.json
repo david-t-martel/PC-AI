@@ -1,8 +1,16 @@
-{
-  "DefaultModel": "qwen2.5-coder:7b",
-  "LMStudioApiUrl": "http://localhost:1234",
+﻿{
   "DefaultTimeout": 120,
   "OllamaPath": "C:\\Users\\david\\AppData\\Local\\Programs\\Ollama\\ollama.exe",
+  "LMStudioApiUrl": "http://localhost:1234",
   "OllamaApiUrl": "http://localhost:11434",
+  "ProviderOrder": [
+    "ollama",
+    "vllm",
+    "lmstudio"
+  ],
+  "VLLMModel": "functiongemma-270m-it",
+  "DefaultModel": "qwen2.5-coder:7b",
+  "VLLMApiUrl": "hvsock://vllm",
+  "ProjectConfigPath": "C:\\Users\\david\\PC_AI\\Config\\llm-config.json",
   "ConfigPath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\llm-config.json"
 }

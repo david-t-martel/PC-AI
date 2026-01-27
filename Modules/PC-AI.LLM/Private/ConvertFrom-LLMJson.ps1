@@ -7,7 +7,8 @@
 function ConvertFrom-LLMJson {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory, ValueFromPipeline)]
+        [Parameter(ValueFromPipeline)]
+        [AllowEmptyString()]
         [string]$Content,
 
         [Parameter()]
@@ -17,14 +18,22 @@ function ConvertFrom-LLMJson {
     process {
         if ([string]::IsNullOrWhiteSpace($Content)) { return $null }
 
+        # Size guard: 5MB limit to prevent OOM
+        if ($Content.Length -gt 5MB) {
+            Write-Error "Content too large for JSON extraction ($($Content.Length) bytes)"
+            if ($Strict) { throw "Content exceeded 5MB limit" }
+            return $Content
+        }
+
         $jsonStr = $null
+        $nativeCoreType = ([System.Management.Automation.PSTypeName]'PcaiNative.PcaiCore').Type
+        $nativeAvailable = ($nativeCoreType -and [PcaiNative.PcaiCore]::IsAvailable)
 
         # 1. Try Native Extraction (Highest Performance)
-        # We try to use the direct FFI bridge if available
-        if ([PcaiNative.PcaiCore]::IsAvailable) {
+        if ($nativeAvailable) {
             try {
                 $jsonStr = [PcaiNative.PcaiCore]::ExtractJson($Content)
-                Write-Verbose 'Natively extracted JSON'
+                if ($jsonStr) { Write-Verbose 'Natively extracted JSON' }
             } catch {
                 Write-Verbose "Native JSON extraction failed: $_"
             }
@@ -34,15 +43,20 @@ function ConvertFrom-LLMJson {
         if (-not $jsonStr) {
             if ($Content -match '(?s)```json\s*(?<json>.*?)\s*```') {
                 $jsonStr = $Matches['json']
+            } elseif ($Content -match '(?s)\{.*\}|\[.*\]') {
+                # Attempt to find common JSON boundaries if not in markdown block
+                $jsonStr = $Content.Trim()
             } else {
                 $jsonStr = $Content.Trim()
             }
         }
 
+        if (-not $jsonStr) { return $null }
+
         # 3. Parse JSON
         try {
             # Final validation check via native if available (optional but good for strict mode)
-            if ($Strict -and [PcaiNative.PcaiCore]::IsAvailable) {
+            if ($Strict -and $nativeAvailable) {
                 if (-not [PcaiNative.PcaiCore]::IsValidJson($jsonStr)) {
                     throw 'Native validation failed: String is not valid JSON'
                 }
@@ -51,7 +65,7 @@ function ConvertFrom-LLMJson {
             return $jsonStr | ConvertFrom-Json
         } catch {
             if ($Strict) { throw "Failed to parse JSON: $_" }
-            Write-Warning 'JSON parsing failed. Returning raw content.'
+            Write-Warning "JSON parsing failed (length: $($jsonStr.Length)). Returning raw content."
             return $Content
         }
     }

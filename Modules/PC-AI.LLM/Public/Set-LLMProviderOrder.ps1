@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-<#+
+<#
 .SYNOPSIS
     Updates the LLM provider fallback order via PcaiServiceHost.
 #>

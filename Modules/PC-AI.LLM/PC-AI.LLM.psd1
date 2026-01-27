@@ -16,6 +16,7 @@
         'Get-LLMStatus'
         'Send-OllamaRequest'
         'Invoke-LLMChat'
+        'Invoke-LLMChatRouted'
         'Invoke-LLMChatTui'
         'Invoke-FunctionGemmaReAct'
         'Invoke-PCDiagnosis'
@@ -23,6 +24,9 @@
         'Set-LLMProviderOrder'
         'Invoke-SmartDiagnosis'
         'Invoke-NativeSearch'
+        'Invoke-DocSearch'
+        'Get-SystemInfoTool'
+        'Invoke-LogSearch'
     )
 
     # Cmdlets to export
@@ -42,6 +46,9 @@
             ProjectUri = ''
             IconUri = ''
             ReleaseNotes = 'Initial release with Ollama integration for PC diagnostics'
+        }
+        PCAI = @{
+            Commands = @('analyze', 'chat', 'llm')
         }
     }
 }

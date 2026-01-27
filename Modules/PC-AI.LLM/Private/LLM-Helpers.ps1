@@ -5,6 +5,185 @@
     Private helper functions for LLM API operations
 #>
 
+function Resolve-PcaiEndpoint {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ApiUrl,
+
+        [Parameter()]
+        [string]$ProviderName,
+
+        [Parameter()]
+        [string]$ConfigPath = 'C:\Users\david\PC_AI\Config\hvsock-proxy.conf'
+    )
+
+    if (-not $ApiUrl) { return $ApiUrl }
+
+    $name = $null
+    if ($ApiUrl -match '^(hvsock|vsock)://(?<name>.+)$') {
+        $name = $Matches['name']
+    }
+
+    if (-not $name) {
+        return $ApiUrl
+    }
+
+    if (-not (Test-Path $ConfigPath)) {
+        return $ApiUrl
+    }
+
+    $lines = Get-Content $ConfigPath | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') }
+    foreach ($line in $lines) {
+        $parts = $line.Split(':')
+        if ($parts.Count -lt 4) { continue }
+        $entryName = $parts[0]
+        if ($entryName -ne $name) { continue }
+
+        $tcpHost = $parts[2]
+        $tcpPort = $parts[3]
+        if ($tcpHost -and $tcpPort) {
+            return "http://$tcpHost`:$tcpPort"
+        }
+    }
+
+    return $ApiUrl
+}
+
+function Get-EnrichedSystemPrompt {
+    <#
+    .SYNOPSIS
+        Loads a system prompt and injects live telemetry and context.
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('chat', 'diagnose')]
+        [string]$Mode,
+
+        [Parameter()]
+        [string]$ProjectRoot = 'C:\Users\david\PC_AI'
+    )
+
+    $promptPath = if ($Mode -eq 'chat') { Join-Path $ProjectRoot 'CHAT.md' } else { Join-Path $ProjectRoot 'DIAGNOSE.md' }
+    if (-not (Test-Path $promptPath)) {
+        Write-Warning "System prompt not found at $promptPath"
+        return ''
+    }
+
+    $prompt = Get-Content -Path $promptPath -Raw -Encoding utf8
+
+    # Inject logic if in diagnose mode
+    if ($Mode -eq 'diagnose') {
+        $logicPath = Join-Path $ProjectRoot 'DIAGNOSE_LOGIC.md'
+        if (Test-Path $logicPath) {
+            $logic = Get-Content -Path $logicPath -Raw -Encoding utf8
+            $prompt = "$prompt`n`n## REASONING FRAMEWORK`n`n$logic"
+        }
+    }
+
+    # Inject Telemetry
+    $metrics = [PcaiNative.PcaiCore]::GetResourceMetrics()
+    if ($null -ne $metrics) {
+        $telemetryBlock = @"
+
+[SYSTEM_RESOURCE_STATUS]
+CPU Usage: $($metrics.CpuUsage)%
+Memory Usage: $([math]::Round($metrics.MemoryUsage / 1GB, 2)) GB / $([math]::Round($metrics.TotalMemory / 1GB, 2)) GB
+GPU Usage: $($metrics.GpuUsage)%
+System Uptime: $([TimeSpan]::FromSeconds($metrics.Uptime).ToString("dd'd 'hh'h 'mm'm'"))
+"@
+        if ($prompt -match '\[SYSTEM_RESOURCE_STATUS\]') {
+            $prompt = $prompt -replace '\[SYSTEM_RESOURCE_STATUS\]', $telemetryBlock
+        } else {
+            $prompt += "`n$telemetryBlock"
+        }
+    }
+
+    return $prompt
+}
+
+function Invoke-ToolByName {
+    <#
+    .SYNOPSIS
+        Executes a PC-AI tool by name using the pcai-tools.json mapping.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name,
+
+        [Parameter()]
+        [object]$Args,
+
+        [Parameter(Mandatory)]
+        [array]$Tools,
+
+        [Parameter(Mandatory)]
+        [string]$ModuleRoot
+    )
+
+    $argTable = @{}
+    if ($Args -is [hashtable]) {
+        $argTable = $Args
+    } elseif ($Args -is [System.Collections.IDictionary]) {
+        foreach ($key in $Args.Keys) { $argTable[$key] = $Args[$key] }
+    } elseif ($Args -is [pscustomobject]) {
+        foreach ($prop in $Args.PSObject.Properties) { $argTable[$prop.Name] = $prop.Value }
+    }
+
+    $toolDef = $Tools | Where-Object { $_.function.name -eq $Name }
+    if (-not $toolDef -or -not $toolDef.pcai_mapping) {
+        return "Unhandled tool: $Name (no mapping found)"
+    }
+
+    $mapping = $toolDef.pcai_mapping
+
+    # Dynamic Module Loading
+    if ($mapping.module) {
+        if (-not (Get-Module -Name $mapping.module -ListAvailable)) {
+            $modulePath = Join-Path $ModuleRoot "Modules\$($mapping.module)"
+            Import-Module $modulePath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # Parameter Binding
+    if ($mapping.cmdlet -eq 'wsl') {
+        $wslArgs = @()
+        if ($mapping.args) { $wslArgs += $mapping.args }
+        foreach ($key in $argTable.Keys) { $wslArgs += $argTable[$key] }
+        & wsl @wslArgs | Out-Null
+        return "WSL command executed: wsl $($wslArgs -join ' ')"
+    }
+
+    $params = @{}
+    if ($mapping.params) {
+        foreach ($pName in $mapping.params.psobject.Properties.Name) {
+            $pValue = $mapping.params.$pName
+            if ($pValue -is [string] -and $pValue -match '^\$') {
+                $argKey = $pValue.TrimStart('$')
+                if ($argTable.ContainsKey($argKey)) {
+                    $params[$pName] = $argTable[$argKey]
+                }
+            } else {
+                $params[$pName] = $pValue
+            }
+        }
+    }
+
+    # Execute Cmdlet
+    try {
+        $cmdResult = & $mapping.cmdlet @params
+        if ($cmdResult -is [PSCustomObject] -or $cmdResult -is [hashtable]) {
+            return ($cmdResult | ConvertTo-Json -Depth 6)
+        }
+        return [string]$cmdResult
+    } catch {
+        return "Error executing tool $Name ($($mapping.cmdlet)): $($_.Exception.Message)"
+    }
+}
+
 function Test-OllamaConnection {
     <#
     .SYNOPSIS
@@ -21,6 +200,8 @@ function Test-OllamaConnection {
         [Parameter()]
         [int]$TimeoutSeconds = 5
     )
+
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'ollama'
 
     try {
         $response = Invoke-RestMethod -Uri "$ApiUrl/api/tags" -Method Get -TimeoutSec $TimeoutSeconds -ErrorAction Stop
@@ -49,6 +230,8 @@ function Test-LMStudioConnection {
         [int]$TimeoutSeconds = 5
     )
 
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'lmstudio'
+
     try {
         $response = Invoke-RestMethod -Uri "$ApiUrl/v1/models" -Method Get -TimeoutSec $TimeoutSeconds -ErrorAction Stop
         return $true
@@ -75,6 +258,8 @@ function Test-OpenAIConnection {
         [Parameter()]
         [int]$TimeoutSeconds = 5
     )
+
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'vllm'
 
     try {
         $response = Invoke-RestMethod -Uri "$ApiUrl/v1/models" -Method Get -TimeoutSec $TimeoutSeconds -ErrorAction Stop
@@ -103,6 +288,8 @@ function Get-VLLMModelInfo {
         [Parameter()]
         [int]$TimeoutSeconds = 5
     )
+
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'vllm'
 
     try {
         $resp = Invoke-RestMethod -Uri "$ApiUrl/v1/models" -Method Get -TimeoutSec $TimeoutSeconds -ErrorAction Stop
@@ -144,6 +331,8 @@ function Get-VLLMMetricsSnapshot {
         [Parameter()]
         [int]$TimeoutSeconds = 5
     )
+
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'vllm'
 
     try {
         $metricsText = Invoke-RestMethod -Uri "$ApiUrl/metrics" -Method Get -TimeoutSec $TimeoutSeconds -ErrorAction Stop
@@ -237,6 +426,8 @@ function Invoke-OpenAIChatWithProgress {
         [int]$ProgressIntervalSeconds = 1
     )
 
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'vllm'
+
     $body = @{
         model = $Model
         messages = $Messages
@@ -302,6 +493,8 @@ function Get-OllamaModels {
         [string]$ApiUrl = $script:ModuleConfig.OllamaApiUrl
     )
 
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'ollama'
+
     try {
         $response = Invoke-RestMethod -Uri "$ApiUrl/api/tags" -Method Get -ErrorAction Stop
 
@@ -361,6 +554,8 @@ function Invoke-OllamaGenerate {
         [Parameter()]
         [string]$ApiUrl = $script:ModuleConfig.OllamaApiUrl
     )
+
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'ollama'
 
     $body = @{
         model = $Model
@@ -434,6 +629,8 @@ function Invoke-OllamaChat {
         [string]$ApiUrl = $script:ModuleConfig.OllamaApiUrl
     )
 
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'ollama'
+
     $body = @{
         model = $Model
         messages = $Messages
@@ -469,6 +666,86 @@ function Invoke-OllamaChat {
     }
 }
 
+function Invoke-OllamaChatStream {
+    <#
+    .SYNOPSIS
+        Streams Ollama chat responses and returns the full content.
+    .OUTPUTS
+        String (full assistant message)
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)]
+        [array]$Messages,
+
+        [Parameter()]
+        [string]$Model = $script:ModuleConfig.DefaultModel,
+
+        [Parameter()]
+        [ValidateRange(0.0, 2.0)]
+        [double]$Temperature = 0.7,
+
+        [Parameter()]
+        [int]$MaxTokens,
+
+        [Parameter()]
+        [int]$TimeoutSeconds = $script:ModuleConfig.DefaultTimeout,
+
+        [Parameter()]
+        [string]$ApiUrl = $script:ModuleConfig.OllamaApiUrl
+    )
+
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'ollama'
+
+    $body = @{
+        model = $Model
+        messages = $Messages
+        stream = $true
+        options = @{
+            temperature = $Temperature
+        }
+    }
+
+    if ($MaxTokens) {
+        $body.options['num_predict'] = $MaxTokens
+    }
+
+    $jsonBody = $body | ConvertTo-Json -Depth 10
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
+
+    $client = New-Object System.Net.Http.HttpClient
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
+    $content = New-Object System.Net.Http.ByteArrayContent($bytes)
+    $content.Headers.ContentType = 'application/json'
+
+    $sb = New-Object System.Text.StringBuilder
+    try {
+        $response = $client.PostAsync("$ApiUrl/api/chat", $content, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+        $response.EnsureSuccessStatusCode() | Out-Null
+        $stream = $response.Content.ReadAsStreamAsync().Result
+        $reader = New-Object System.IO.StreamReader($stream)
+        while (-not $reader.EndOfStream) {
+            $line = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            try {
+                $chunk = $line | ConvertFrom-Json -ErrorAction Stop
+                $text = $chunk.message.content
+                if ($text) {
+                    Write-Host -NoNewline $text
+                    $null = $sb.Append($text)
+                }
+                if ($chunk.done) { break }
+            } catch { }
+        }
+        Write-Host ""
+    } finally {
+        $client.Dispose()
+    }
+
+    return $sb.ToString()
+}
+
 function Invoke-OpenAIChat {
     <#
     .SYNOPSIS
@@ -501,6 +778,8 @@ function Invoke-OpenAIChat {
         [Parameter()]
         [string]$ApiKey
     )
+
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'vllm'
 
     $body = @{
         model = $Model

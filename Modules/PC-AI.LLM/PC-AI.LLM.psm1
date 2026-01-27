@@ -103,6 +103,7 @@ Export-ModuleMember -Function @(
     'Get-LLMStatus'
     'Send-OllamaRequest'
     'Invoke-LLMChat'
+    'Invoke-LLMChatRouted'
     'Invoke-LLMChatTui'
     'Invoke-FunctionGemmaReAct'
     'Invoke-PCDiagnosis'
@@ -110,6 +111,9 @@ Export-ModuleMember -Function @(
     'Set-LLMProviderOrder'
     'Invoke-SmartDiagnosis'
     'Invoke-NativeSearch'
+    'Invoke-DocSearch'
+    'Get-SystemInfoTool'
+    'Invoke-LogSearch'
 )
 
 Write-Verbose 'PC-AI.LLM module loaded successfully'
