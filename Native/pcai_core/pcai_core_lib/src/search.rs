@@ -101,8 +101,8 @@ pub fn search_content(
         .build()
         .map_err(|_| PcaiStatus::InvalidArgument)?;
 
-    let file_glob = file_pattern.map(|p| {
-        globset::Glob::new(p).unwrap().compile_matcher()
+    let file_glob = file_pattern.and_then(|p| {
+        globset::Glob::new(p).ok().map(|g| g.compile_matcher())
     });
 
     let (tx, rx) = std::sync::mpsc::channel();

@@ -12,6 +12,8 @@ pub mod hash;
 pub mod system;
 pub mod tokenizer;
 pub mod telemetry;
+pub mod vmm_health;
+pub mod prompt_engine;
 
 pub use error::PcaiStatus;
 pub use json::{extract_json_from_markdown, pcai_extract_json, pcai_is_valid_json};
@@ -87,10 +89,92 @@ pub extern "C" fn pcai_check_resource_safety(gpu_limit: f32) -> libc::c_int {
 pub extern "C" fn pcai_get_system_telemetry_json() -> *mut c_char {
     let tel = telemetry::collect_telemetry();
     match serde_json::to_string(&tel) {
-        Ok(json) => {
-            let s = std::ffi::CString::new(json).unwrap();
-            s.into_raw()
-        }
+        Ok(json) => rust_str_to_c(&json),
         Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_get_vmm_health_json() -> *mut c_char {
+    let health = vmm_health::check_vmm_health();
+    match serde_json::to_string(&health) {
+        Ok(json) => rust_str_to_c(&json),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_query_full_context_json() -> *mut c_char {
+    // Aggregates everything for the LLM context
+    #[derive(serde::Serialize)]
+    struct FullContext {
+        system: system::SystemSummary,
+        telemetry: telemetry::SystemTelemetry,
+        vmm: vmm_health::VmmHealth,
+    }
+
+    let context = FullContext {
+        system: system::get_system_summary(),
+        telemetry: telemetry::collect_telemetry(),
+        vmm: vmm_health::check_vmm_health(),
+    };
+
+    match serde_json::to_string(&context) {
+        Ok(json) => rust_str_to_c(&json),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_get_usb_deep_diagnostics_json() -> *mut c_char {
+    let devices = telemetry::usb::collect_usb_diagnostics();
+    match serde_json::to_string(&devices) {
+        Ok(json) => rust_str_to_c(&json),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_get_network_throughput_json() -> *mut c_char {
+    let interfaces = telemetry::network::collect_network_diagnostics();
+    match serde_json::to_string(&interfaces) {
+        Ok(json) => rust_str_to_c(&json),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_get_process_history_json() -> *mut c_char {
+    let history = telemetry::process::collect_process_telemetry();
+    match serde_json::to_string(&history) {
+        Ok(json) => rust_str_to_c(&json),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_query_prompt_assembly(
+    template: *const c_char,
+    json_vars: *const c_char,
+) -> PcaiStringBuffer {
+    prompt_engine::pcai_assemble_prompt(template, json_vars)
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_get_usb_problem_info(code: u32) -> *mut c_char {
+    match telemetry::usb_codes::get_problem_info(code) {
+        Some(info) => {
+            let json = serde_json::json!({
+                "code": info.code,
+                "short_description": info.short_description,
+                "help_summary": info.help_summary,
+                "help_url": info.help_url
+            });
+            match serde_json::to_string(&json) {
+                Ok(s) => rust_str_to_c(&s),
+                Err(_) => std::ptr::null_mut(),
+            }
+        }
+        None => std::ptr::null_mut(),
     }
 }

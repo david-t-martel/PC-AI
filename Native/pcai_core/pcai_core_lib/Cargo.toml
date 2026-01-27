@@ -18,12 +18,21 @@ ignore = { workspace = true }
 sha2 = { workspace = true }
 globset = { workspace = true }
 regex = { workspace = true }
-windows-sys = { workspace = true }
+windows-sys = { workspace = true, features = [
+    "Win32_Networking_WinSock",
+    "Win32_Foundation",
+    "Win32_System_SystemServices",
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+    "Win32_Security",
+] }
 widestring = { workspace = true }
 sysinfo = { workspace = true }
 walkdir = { workspace = true }
 parking_lot = { workspace = true }
 
 # Cross-platform path normalization
-dunce = "1.0"        # Removes \\?\ prefix on Windows
-path-slash = "0.2"   # Convert between / and \ path separators
+dunce = "1.0"      # Removes \\?\ prefix on Windows
+path-slash = "0.2" # Convert between / and \ path separators

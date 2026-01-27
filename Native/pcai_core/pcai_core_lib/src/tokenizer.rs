@@ -11,15 +11,11 @@ pub fn estimate_tokens(text: &str) -> usize {
     }
 
     let re = TOKEN_RE.get_or_init(|| {
-        // Broadly matches Gemma/SentencePiece patterns:
-        // - Words (letters/numbers)
-        // - Whitespace sequences
-        // - Individual punctuation
         Regex::new(r"(?x)
-            [p{L}p{N}]+ |  # Words or numbers
-            \s+         |  # Whitespace
-            [^\p{L}\p{N}\s] # Punctuation/Other
-        ").unwrap()
+            [\p{L}\p{N}]+ |  # Words or numbers
+            \s+           |  # Whitespace
+            [^\p{L}\p{N}\s]  # Punctuation/Other
+        ").unwrap_or_else(|_| Regex::new(".").unwrap()) // Fallback to safe catch-all
     });
 
     let mut count = 0;

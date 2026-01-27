@@ -9,11 +9,11 @@ use std::sync::{Arc, Mutex};
 
 use ignore::WalkBuilder;
 use rayon::prelude::*;
-use sha2::{Digest, Sha256};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 
-use crate::string::PcaiStringBuffer;
 use crate::PcaiStatus;
+use crate::string::PcaiStringBuffer;
 
 #[derive(Serialize)]
 pub struct DuplicateGroup {
@@ -44,12 +44,10 @@ pub fn find_duplicates(
     let start = std::time::Instant::now();
 
     // Compile matchers
-    let include_matcher = include_pattern.and_then(|p| {
-        globset::Glob::new(p).ok().map(|g| g.compile_matcher())
-    });
-    let exclude_matcher = exclude_pattern.and_then(|p| {
-        globset::Glob::new(p).ok().map(|g| g.compile_matcher())
-    });
+    let include_matcher =
+        include_pattern.and_then(|p| globset::Glob::new(p).ok().map(|g| g.compile_matcher()));
+    let exclude_matcher =
+        exclude_pattern.and_then(|p| globset::Glob::new(p).ok().map(|g| g.compile_matcher()));
 
     // Phase 1: Fast enumeration and size grouping
     let mut size_map: HashMap<u64, Vec<PathBuf>> = HashMap::new();
@@ -75,10 +73,14 @@ pub fn find_duplicates(
                 if size >= min_size {
                     // Apply patterns
                     if let Some(ref matcher) = include_matcher {
-                        if !matcher.is_match(path) { continue; }
+                        if !matcher.is_match(path) {
+                            continue;
+                        }
                     }
                     if let Some(ref matcher) = exclude_matcher {
-                        if matcher.is_match(path) { continue; }
+                        if matcher.is_match(path) {
+                            continue;
+                        }
                     }
 
                     size_map.entry(size).or_default().push(path.to_path_buf());
@@ -93,19 +95,27 @@ pub fn find_duplicates(
         .filter(|(_, paths)| paths.len() > 1)
         .collect();
 
-    let hash_groups: Arc<Mutex<HashMap<(u64, String), Vec<String>>>> = Arc::new(Mutex::new(HashMap::new()));
+    let hash_groups: Arc<Mutex<HashMap<(u64, String), Vec<String>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
 
     candidates.into_par_iter().for_each(|(size, paths)| {
         paths.into_par_iter().for_each(|path| {
             if let Ok(hash) = compute_file_hash(&path) {
-                let mut groups = hash_groups.lock().unwrap();
-                groups.entry((size, hash)).or_default().push(path.to_string_lossy().into_owned());
+                if let Ok(mut groups) = hash_groups.lock() {
+                    groups
+                        .entry((size, hash))
+                        .or_default()
+                        .push(path.to_string_lossy().into_owned());
+                }
             }
         });
     });
 
     // Phase 3: Final aggregation
-    let groups = Arc::try_unwrap(hash_groups).unwrap().into_inner().unwrap();
+    let groups = match Arc::try_unwrap(hash_groups) {
+        Ok(m) => m.into_inner().unwrap_or_default(),
+        Err(_) => return Err(PcaiStatus::InternalError),
+    };
     let mut results = Vec::new();
     let mut total_wasted = 0;
     let mut total_dups = 0;
@@ -191,7 +201,12 @@ pub extern "C" fn pcai_find_duplicates_stats(
 ) -> DuplicateStats {
     let root = match crate::path::parse_path_ffi(root_path) {
         Ok(p) => p,
-        Err(s) => return DuplicateStats { status: s, ..Default::default() },
+        Err(s) => {
+            return DuplicateStats {
+                status: s,
+                ..Default::default()
+            };
+        }
     };
 
     let include_str = unsafe { crate::string::c_str_to_rust(include_pattern) };
@@ -206,6 +221,9 @@ pub extern "C" fn pcai_find_duplicates_stats(
             wasted_bytes: res.wasted_bytes,
             elapsed_ms: res.elapsed_ms,
         },
-        Err(status) => DuplicateStats { status, ..Default::default() },
+        Err(status) => DuplicateStats {
+            status,
+            ..Default::default()
+        },
     }
 }

@@ -83,3 +83,11 @@ pub fn json_to_buffer_pretty<T: serde::Serialize>(value: &T) -> PcaiStringBuffer
         Err(_) => PcaiStringBuffer::error(PcaiStatus::JsonError),
     }
 }
+
+pub fn rust_str_to_buffer(s: &str) -> PcaiStringBuffer {
+    PcaiStringBuffer::from_string(s)
+}
+
+pub fn error_buffer(status: PcaiStatus) -> PcaiStringBuffer {
+    PcaiStringBuffer::error(status)
+}
