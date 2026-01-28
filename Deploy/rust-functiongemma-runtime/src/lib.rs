@@ -1,4 +1,9 @@
-use axum::{routing::{get, post}, Json, Router};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::{get, post},
+    Json, Router,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{env, net::SocketAddr, time::{SystemTime, UNIX_EPOCH}};
@@ -24,6 +29,15 @@ pub struct ChatCompletionRequest {
     pub tool_choice: Option<Value>,
     pub temperature: Option<f64>,
     pub max_tokens: Option<u32>,
+    // Additional OpenAI-compatible parameters
+    pub top_p: Option<f64>,
+    pub top_k: Option<u32>,
+    pub frequency_penalty: Option<f64>,
+    pub presence_penalty: Option<f64>,
+    pub stop: Option<Value>,  // Can be string or array of strings
+    pub seed: Option<i64>,
+    pub user: Option<String>,
+    pub n: Option<u32>,  // Number of completions (only 1 supported currently)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -43,12 +57,37 @@ struct Choice {
 }
 
 #[derive(Debug, Serialize)]
+struct Usage {
+    prompt_tokens: u32,
+    completion_tokens: u32,
+    total_tokens: u32,
+}
+
+#[derive(Debug, Serialize)]
 struct ChatCompletionResponse {
     id: String,
     object: String,
     created: u64,
     model: String,
     choices: Vec<Choice>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    usage: Option<Usage>,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiError {
+    message: String,
+    #[serde(rename = "type")]
+    error_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    param: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ErrorResponse {
+    error: ApiError,
 }
 
 #[derive(Debug, Serialize)]
@@ -84,6 +123,40 @@ struct InferenceResult {
 
 fn default_model() -> String {
     env::var("PCAI_ROUTER_MODEL").unwrap_or_else(|_| "functiongemma-270m-it".to_string())
+}
+
+impl ErrorResponse {
+    fn bad_request(message: impl Into<String>, param: Option<String>) -> Self {
+        Self {
+            error: ApiError {
+                message: message.into(),
+                error_type: "invalid_request_error".to_string(),
+                param,
+                code: None,
+            },
+        }
+    }
+
+    fn internal_error(message: impl Into<String>) -> Self {
+        Self {
+            error: ApiError {
+                message: message.into(),
+                error_type: "server_error".to_string(),
+                param: None,
+                code: Some("internal_error".to_string()),
+            },
+        }
+    }
+}
+
+impl IntoResponse for ErrorResponse {
+    fn into_response(self) -> Response {
+        let status = match self.error.error_type.as_str() {
+            "invalid_request_error" => StatusCode::BAD_REQUEST,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        (status, Json(self)).into_response()
+    }
 }
 
 #[cfg(feature = "model")]
@@ -351,11 +424,68 @@ pub fn build_router() -> Router {
         .route("/v1/chat/completions", post(chat))
 }
 
-async fn chat(Json(req): Json<ChatCompletionRequest>) -> Json<ChatCompletionResponse> {
+fn estimate_tokens(text: &str) -> u32 {
+    // Simple estimation: ~4 chars per token for English
+    (text.len() as u32 / 4).max(1)
+}
+
+fn validate_request(req: &ChatCompletionRequest) -> Result<(), ErrorResponse> {
+    if req.messages.is_empty() {
+        return Err(ErrorResponse::bad_request(
+            "messages array is required and must not be empty",
+            Some("messages".to_string()),
+        ));
+    }
+
+    // Validate message roles
+    let valid_roles = ["user", "assistant", "system", "tool", "developer"];
+    for (i, msg) in req.messages.iter().enumerate() {
+        if !valid_roles.contains(&msg.role.as_str()) {
+            return Err(ErrorResponse::bad_request(
+                format!("Invalid role '{}' at messages[{}]. Must be one of: user, assistant, system, tool, developer", msg.role, i),
+                Some(format!("messages[{}].role", i)),
+            ));
+        }
+    }
+
+    // Validate tool_choice if present
+    if let Some(tc) = &req.tool_choice {
+        match tc {
+            Value::String(s) if s != "none" && s != "auto" && s != "required" => {
+                return Err(ErrorResponse::bad_request(
+                    format!("Invalid tool_choice value '{}'. Must be 'none', 'auto', 'required', or an object", s),
+                    Some("tool_choice".to_string()),
+                ));
+            }
+            Value::Object(map) => {
+                if !map.contains_key("function") && !map.contains_key("type") {
+                    return Err(ErrorResponse::bad_request(
+                        "tool_choice object must have 'function' or 'type' field",
+                        Some("tool_choice".to_string()),
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
+
+async fn chat(Json(req): Json<ChatCompletionRequest>) -> Result<Json<ChatCompletionResponse>, ErrorResponse> {
+    // Validate request
+    validate_request(&req)?;
+
     let model = req.model.clone().unwrap_or_else(default_model);
     let created = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
     let message_text = last_user_message(&req.messages).unwrap_or_default();
     let prompt = parse_router_prompt(message_text);
+
+    // Estimate prompt tokens
+    let prompt_tokens = req.messages.iter()
+        .filter_map(|m| m.content.as_ref())
+        .map(|c| estimate_tokens(c))
+        .sum::<u32>();
 
     let result = match router_engine() {
         RouterEngine::Heuristic => heuristic_route(&req, &prompt),
@@ -378,13 +508,24 @@ async fn chat(Json(req): Json<ChatCompletionRequest>) -> Json<ChatCompletionResp
         }
     };
 
+    // Determine finish_reason based on whether tool was called
+    let finish_reason = if result.tool_calls.is_some() {
+        "tool_calls".to_string()
+    } else {
+        "stop".to_string()
+    };
+
+    // Estimate completion tokens
+    let completion_tokens = result.content.as_ref().map(|c| estimate_tokens(c)).unwrap_or(0)
+        + result.tool_calls.as_ref().map(|tc| estimate_tokens(&tc.to_string())).unwrap_or(0);
+
     let message = Message {
         role: "assistant".to_string(),
         content: result.content,
         tool_calls: result.tool_calls,
     };
 
-    Json(ChatCompletionResponse {
+    Ok(Json(ChatCompletionResponse {
         id: format!("pcai-router-{}", created),
         object: "chat.completion".to_string(),
         created,
@@ -392,9 +533,14 @@ async fn chat(Json(req): Json<ChatCompletionRequest>) -> Json<ChatCompletionResp
         choices: vec![Choice {
             index: 0,
             message,
-            finish_reason: "stop".to_string(),
+            finish_reason,
         }],
-    })
+        usage: Some(Usage {
+            prompt_tokens,
+            completion_tokens,
+            total_tokens: prompt_tokens + completion_tokens,
+        }),
+    }))
 }
 
 pub async fn serve(addr: SocketAddr) -> anyhow::Result<()> {
