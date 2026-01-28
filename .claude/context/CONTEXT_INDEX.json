@@ -1,0 +1,73 @@
+{
+  "schema_version": "2.0",
+  "latest": "ctx-pcai-20260128-s3",
+  "contexts": [
+    {
+      "id": "ctx-pcai-20260128-s3",
+      "file": "pcai-context-20260128-session3.md",
+      "created": "2026-01-28T17:30:00Z",
+      "project": "PC_AI",
+      "agents_involved": ["Explore", "code-reviewer"],
+      "summary": "Documentation accuracy fixes - 80.1% pollution eliminated",
+      "supersedes": ["ctx-pcai-20260128-s2"]
+    },
+    {
+      "id": "ctx-pcai-20260128-s2",
+      "file": "pcai-context-20260128-session2.md",
+      "created": "2026-01-28T19:30:00Z",
+      "project": "PC_AI",
+      "agents_involved": ["rust-pro", "powershell-pro", "architect-reviewer", "api-documenter"],
+      "summary": "CargoTools critical fixes - mutex, TOCTOU, paths",
+      "status": "partially_superseded"
+    },
+    {
+      "id": "ctx-pcai-20260128",
+      "file": "pcai-context-20260128.md",
+      "created": "2026-01-28T00:00:00Z",
+      "project": "PC_AI",
+      "agents_involved": ["rust-pro"],
+      "summary": "Rust FunctionGemma workspace setup",
+      "status": "active"
+    },
+    {
+      "id": "ctx-pcai-20260127",
+      "file": "pcai-context-20260127.md",
+      "created": "2026-01-27T00:00:00Z",
+      "project": "PC_AI",
+      "agents_involved": [],
+      "summary": "Initial context setup",
+      "status": "archived"
+    }
+  ],
+  "completed_goals": [
+    {
+      "goal": "Fix Rust clippy errors",
+      "completed": "2026-01-28",
+      "context": "ctx-pcai-20260128-s2",
+      "commit": "c32d6cb"
+    },
+    {
+      "goal": "Create unified doc-to-training pipeline",
+      "completed": "2026-01-28",
+      "context": "ctx-pcai-20260128-s3"
+    },
+    {
+      "goal": "Fix DOC_STATUS self-recursion bug",
+      "completed": "2026-01-28",
+      "context": "ctx-pcai-20260128-s3"
+    },
+    {
+      "goal": "Fix CargoTools mutex/TOCTOU bugs",
+      "completed": "2026-01-28",
+      "context": "ctx-pcai-20260128-s2"
+    }
+  ],
+  "active_blockers": [
+    {
+      "blocker": "Dependabot Alert #1 - protobuf CVE",
+      "severity": "high",
+      "status": "monitoring",
+      "notes": "No patch available yet"
+    }
+  ]
+}
