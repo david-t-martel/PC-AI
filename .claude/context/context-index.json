@@ -1,15 +1,15 @@
 {
   "schema_version": "2.0",
-  "context_id": "ctx-pcai-20260128",
+  "context_id": "ctx-pcai-20260128-s2",
   "project": {
     "name": "PC_AI",
     "type": "diagnostics-agent-with-native-acceleration",
     "location": "C:\\Users\\david\\PC_AI",
     "platform": "Windows 10/11",
-    "integrations": ["WSL2", "Docker", "Hyper-V", "Ollama", "LM Studio", "vLLM", "Rust FFI", "C# P/Invoke", "FunctionGemma"]
+    "integrations": ["WSL2", "Docker", "Hyper-V", "Ollama", "LM Studio", "vLLM", "Rust FFI", "C# P/Invoke", "FunctionGemma", "CargoTools"]
   },
   "context": {
-    "version": "5.2.0",
+    "version": "5.3.0",
     "created": "2025-01-23",
     "updated": "2026-01-28",
     "files": {
@@ -17,19 +17,20 @@
       "native": "native-acceleration-context.md",
       "detailed": "pc-ai-project-context.md",
       "quick": "quick-context.md",
-      "latest": "pcai-context-20260128.md",
+      "latest": "pcai-context-20260128-session2.md",
+      "cargotools_fixes": "cargotools-critical-fixes-2026-01-28.md",
       "index": "context-index.json"
     }
   },
   "state": {
-    "current_phase": "rust_consolidation_complete",
-    "phase_description": "Rust workspace consolidated into pcai_core_lib modules, FunctionGemma Docker training added",
+    "current_phase": "cargotools_fixes_complete",
+    "phase_description": "CargoTools critical fixes applied - mutex, TOCTOU race, hardcoded paths. 16/17 tests passing.",
     "core_functional": true,
     "native_functional": true,
     "migration_pending": false,
-    "uncommitted_changes": 0,
-    "latest_commit": "06092bb",
-    "latest_commit_message": "chore: update context and configuration files"
+    "uncommitted_changes": 14,
+    "latest_commit": "a91f737",
+    "latest_commit_message": "docs(plans): add rust LLM tooling enhancement plan and fix documentation"
   },
   "security": {
     "dependabot_alerts": {
@@ -45,6 +46,42 @@
       {"id": "high-severity", "package": "unknown", "status": "Review required", "url": "https://github.com/david-t-martel/PC-AI/security/dependabot/1"}
     ]
   },
+  "cargotools": {
+    "module_path": "C:\\Users\\david\\OneDrive\\Documents\\PowerShell\\Modules\\CargoTools\\",
+    "version": "0.4.0",
+    "test_coverage": "~20%",
+    "tests_passing": 16,
+    "tests_total": 17,
+    "critical_fixes_applied": [
+      "Mutex acquisition (WaitOne instead of just create)",
+      "TOCTOU race condition (atomic FileMode::CreateNew)",
+      "Hardcoded paths (dynamic Resolve-CacheRoot)"
+    ],
+    "pending_work": [
+      "Increase test coverage to 85%",
+      "Add ShouldProcess support",
+      "Split Environment.ps1",
+      "Implement Invoke-CargoAudit",
+      "Implement Invoke-CargoExpand",
+      "Implement Invoke-CargoBloat"
+    ]
+  },
+  "rust_functiongemma": {
+    "train_path": "Deploy/rust-functiongemma-train/",
+    "runtime_path": "Deploy/rust-functiongemma-runtime/",
+    "workspace_path": "Deploy/rust-functiongemma/",
+    "status": "partial",
+    "runtime_engine": "heuristic",
+    "model_inference": "experimental",
+    "p0_remaining": [
+      "OpenAI-compatible Chat Completions endpoint",
+      "Router prompt format",
+      "Dataset generator",
+      "LoRA/QLoRA support",
+      "Checkpoint resume"
+    ],
+    "uncommitted_files": 14
+  },
   "native_acceleration": {
     "architecture": "Consolidated Rust DLL + C# Hybrid Framework",
     "refactoring_status": "COMPLETE",
@@ -52,137 +89,98 @@
       "workspace": "Native/pcai_core/",
       "core_lib": "pcai_core_lib/",
       "modules": ["fs", "performance", "search", "system", "telemetry"]
-    },
-    "phases": {
-      "phase1": { "name": "Foundation", "module": "pcai_core_lib", "status": "COMPLETE" },
-      "phase2": { "name": "Search Module", "module": "search/", "status": "CONSOLIDATED" },
-      "phase3": { "name": "Performance Module", "module": "performance/", "status": "CONSOLIDATED" },
-      "phase4": { "name": "System Module", "module": "system/", "status": "CONSOLIDATED" },
-      "phase5": { "name": "Integration Testing", "status": "READY" },
-      "phase6": { "name": "CI/CD", "status": "PLANNED" }
-    },
-    "recent_changes": {
-      "rust_consolidation": "Merged pcai_performance, pcai_search, pcai_system into pcai_core_lib submodules",
-      "csharp_refactor": "Updated P/Invoke bindings for unified library",
-      "new_projects": ["rust-functiongemma-train", "PC-AI.Common module"]
-    },
-    "dependencies": {
-      "rust": {
-        "sysinfo": "0.38",
-        "windows-sys": "0.61",
-        "winreg": "0.55",
-        "rayon": "1.10",
-        "serde": "1.0",
-        "serde_json": "1.0"
-      },
-      "csharp": {
-        "Microsoft.PowerShell.SDK": "7.5.4",
-        "System.Text.Json": "8.0.5"
-      }
     }
-  },
-  "python_dependencies": {
-    "protobuf": ">=6.31.1",
-    "transformers": ">=4.47.0",
-    "torch": ">=2.5.0",
-    "accelerate": ">=1.2.0",
-    "datasets": ">=3.2.0",
-    "peft": ">=0.14.0",
-    "trl": ">=0.12.0",
-    "huggingface_hub": ">=0.27.0"
   },
   "key_files": {
-    "native": {
-      "rust_workspace": "Native/pcai_core/Cargo.toml",
-      "core_lib": "Native/pcai_core/pcai_core_lib/src/lib.rs",
-      "performance_module": "Native/pcai_core/pcai_core_lib/src/performance/mod.rs",
-      "search_module": "Native/pcai_core/pcai_core_lib/src/search/mod.rs",
-      "system_module": "Native/pcai_core/pcai_core_lib/src/system/mod.rs",
-      "telemetry_module": "Native/pcai_core/pcai_core_lib/src/telemetry/mod.rs",
-      "csharp_core": "Native/PcaiNative/PcaiCore.cs",
-      "csharp_performance": "Native/PcaiNative/PerformanceModule.cs",
-      "csharp_search": "Native/PcaiNative/SearchModule.cs",
-      "csharp_system": "Native/PcaiNative/SystemModule.cs"
+    "cargotools": {
+      "module": "C:\\Users\\david\\OneDrive\\Documents\\PowerShell\\Modules\\CargoTools\\",
+      "wrapper": "Public/Invoke-RustAnalyzerWrapper.ps1",
+      "environment": "Private/Environment.ps1",
+      "health_check": "Public/Test-RustAnalyzerHealth.ps1",
+      "llm_output": "Private/LlmOutput.ps1",
+      "tests": "Tests/Invoke-RustAnalyzerWrapper.Tests.ps1"
     },
-    "llm": {
-      "module": "Modules/PC-AI.LLM/PC-AI.LLM.psm1",
-      "config": "Modules/PC-AI.LLM/llm-config.json",
-      "validation": "Modules/PC-AI.LLM/Private/Validate-ToolParameters.ps1",
-      "functiongemma_python": "Deploy/functiongemma-finetune/",
-      "functiongemma_rust": "Deploy/rust-functiongemma-train/"
+    "plans": {
+      "consolidation": ".claude/plans/rust-analyzer-consolidation-plan.md",
+      "llm_tooling": ".claude/plans/rust-llm-tooling-enhancement.md"
     },
-    "powershell": {
-      "cli": "PC-AI.ps1",
-      "cli_module": "Modules/PC-AI.CLI/PC-AI.CLI.psm1",
-      "common_module": "Modules/PC-AI.Common/PC-AI.Common.psm1"
-    }
+    "scripts": {
+      "health_check": "Scripts/Test-RustAnalyzerHealth.ps1",
+      "cleanup": "Scripts/Cleanup-RustAnalyzer.ps1",
+      "test_module": "Scripts/Test-CargoToolsModule.ps1"
+    },
+    "shim": "C:\\Users\\david\\bin\\rust-analyzer.cmd"
   },
   "recent_commits": [
+    {"sha": "a91f737", "message": "docs(plans): add rust LLM tooling enhancement plan and fix documentation"},
+    {"sha": "23f3434", "message": "feat(rust): implement CargoTools rust-analyzer singleton integration"},
+    {"sha": "ce556d7", "message": "docs(context): add rust-analyzer memory analysis findings"},
+    {"sha": "107f4e2", "message": "chore(context): save session context for 2026-01-28"},
     {"sha": "06092bb", "message": "chore: update context and configuration files"},
     {"sha": "1200f97", "message": "test: update FFI tests and add new integration tests"},
-    {"sha": "0f619a7", "message": "feat(training): add Rust-based FunctionGemma trainer"},
-    {"sha": "989ba0e", "message": "feat(training): enhance FunctionGemma training with Docker and profiling"},
-    {"sha": "dc69c1b", "message": "feat(modules): add PC-AI.Common module and tool parameter validation"},
-    {"sha": "939dfcc", "message": "refactor(csharp): update native modules for Rust consolidation"},
-    {"sha": "8d8a38c", "message": "refactor(rust): consolidate pcai crates into pcai_core_lib modules"},
-    {"sha": "c561a13", "message": "chore: update gitignore and rgignore patterns"},
-    {"sha": "249ff69", "message": "feat(llm): add structured JSON logging module with configurable log levels"},
-    {"sha": "1b6cfa1", "message": "feat(llm): add graceful degradation when FunctionGemma router unavailable"}
+    {"sha": "0f619a7", "message": "feat(training): add Rust-based FunctionGemma trainer"}
   ],
   "agents": {
     "registry": [
       {
-        "agent": "rust-analyzer-analysis",
-        "task": "Comprehensive rust-analyzer memory investigation",
-        "completed_at": "2026-01-28T16:00:00Z",
-        "handoff_notes": "Documented 3 config tiers, MCP options, 8 workspaces found"
+        "agent": "rust-pro",
+        "task": "Installation consolidation analysis",
+        "completed_at": "2026-01-28T18:00:00Z",
+        "handoff_notes": "Found 0-byte empty file, PATH priority issues"
       },
       {
-        "agent": "commit-cluster",
-        "task": "Clustered and committed 84 files into 8 semantic commits",
-        "completed_at": "2026-01-28T15:31:00Z",
-        "handoff_notes": "All changes pushed to origin/main"
+        "agent": "rust-pro",
+        "task": "VS Code configuration",
+        "completed_at": "2026-01-28T18:00:00Z",
+        "handoff_notes": "Balanced config applied"
       },
       {
-        "agent": "context-save",
-        "task": "Gitignore/rgignore audit before commit",
-        "completed_at": "2026-01-28T15:19:00Z",
-        "handoff_notes": "Reduced 570+ untracked files, updated ignore patterns"
+        "agent": "rust-pro",
+        "task": "Process monitoring setup",
+        "completed_at": "2026-01-28T18:00:00Z",
+        "handoff_notes": "Health check script created"
       },
       {
-        "agent": "commit-cluster",
-        "task": "Clustered and committed 130+ files into 13 semantic commits",
-        "completed_at": "2026-01-27T12:30:00Z",
-        "handoff_notes": "Previous session commits"
+        "agent": "powershell-pro",
+        "task": "CargoTools module review",
+        "completed_at": "2026-01-28T19:00:00Z",
+        "handoff_notes": "Critical issues identified and fixed"
       },
       {
-        "agent": "security-auditor",
-        "task": "Analyzed Dependabot alerts, applied CVE fixes",
-        "files_touched": ["requirements.txt", "pyproject.toml", "Cargo.toml"],
-        "completed_at": "2026-01-27T13:30:00Z",
-        "handoff_notes": "2 CVEs fixed, new alert pending review"
+        "agent": "architect-reviewer",
+        "task": "Architecture review",
+        "completed_at": "2026-01-28T19:00:00Z",
+        "handoff_notes": "SRP violation in Environment.ps1"
+      },
+      {
+        "agent": "api-documenter",
+        "task": "LLM output documentation",
+        "completed_at": "2026-01-28T19:00:00Z",
+        "handoff_notes": "JSON envelope format documented"
       }
     ],
-    "recommended_next": ["rust-pro", "test-runner", "security-auditor", "csharp-pro"],
-    "coordination_notes": "Validate Rust build after consolidation, review Dependabot high-severity alert"
+    "recommended_next": [
+      "test-automator: Write additional Pester tests for 85% coverage",
+      "rust-pro: Complete rust-functiongemma-runtime OpenAI endpoint",
+      "powershell-pro: Implement Invoke-CargoAudit wrapper"
+    ],
+    "coordination_notes": "CargoTools module changes are in OneDrive, not PC_AI repo. Uncommitted rust-functiongemma files ready for commit."
   },
   "roadmap": {
     "immediate": [
-      "Apply rust-analyzer Balanced config to .vscode/settings.json",
-      "Validate Rust workspace builds (cargo build --release)",
-      "Run FFI test suite",
-      "Review Dependabot high-severity alert"
+      "Commit rust-functiongemma uncommitted files",
+      "Test rust-functiongemma-runtime heuristic engine",
+      "Verify CargoTools fixes with full test run"
     ],
     "this_week": [
-      "Test FunctionGemma Docker training workflow",
-      "Document new Rust module structure",
-      "Create Rust FunctionGemma trainer tests"
+      "Increase CargoTools test coverage to 50%+",
+      "Implement rust-functiongemma OpenAI endpoint",
+      "Add Invoke-CargoAudit to CargoTools"
     ],
     "tech_debt": [
-      "Remove .deprecated/ after validation",
-      "Add tests for PC-AI.Common module",
-      "Document Docker training workflow",
-      "Clean up unused GUID constants"
+      "Split Environment.ps1 (7 concerns)",
+      "Add ShouldProcess support to -Force operations",
+      "Document JSON schema for each CargoTools output"
     ]
   }
 }
