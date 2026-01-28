@@ -1,26 +1,14 @@
-# Core ML/Training
-accelerate>=1.2.0
-transformers>=4.47.0
-datasets>=3.2.0
-peft>=0.14.0
-trl>=0.12.0
-bitsandbytes>=0.45.0
-sentencepiece>=0.2.0
-torch>=2.5.0
+# Core ML/Training (Pre-installed in Unsloth Docker, but listing for reference/local dev)
+# unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
+trl==0.8.6
+# xformers
 
-# Evaluation & Monitoring
-evaluate>=0.4.3
-tensorboard>=2.18.0
-
-# Serialization - CVE-2025-4565 fix requires >=6.31.1
-protobuf>=6.31.1
-
-# API & Data
-huggingface_hub>=0.27.0
-pydantic>=2.10.0
-httpx>=0.28.0
-orjson>=3.10.12
-tqdm>=4.67.0
+# Dependencies not in Unsloth base image
+datasets>=2.16.0
+pydantic>=2.0.0
+typer>=0.9.0
+rich>=13.0.0
+wandb>=0.16.0
 
 # Testing
-pytest>=8.3.0
+pytest>=8.0.0

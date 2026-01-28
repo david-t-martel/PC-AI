@@ -1,0 +1,11 @@
+.venv
+.venv_wsl
+__pycache__
+.pytest_cache
+.git
+*.pyc
+metrics.json
+checkpoints/
+logs/
+out_model/
+data/

@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-
 from schema_utils import generate_arg_sets
 
 
@@ -36,7 +35,9 @@ def main() -> None:
     parser.add_argument("--test-vectors", required=True)
     parser.add_argument("--max-cases", type=int, default=24)
     parser.add_argument("--system-prompt", default=None)
-    parser.add_argument("--scenarios", default=None, help="Optional scenarios JSON for NO_TOOL examples")
+    parser.add_argument(
+        "--scenarios", default=None, help="Optional scenarios JSON for NO_TOOL examples"
+    )
     args = parser.parse_args()
 
     try:
@@ -55,7 +56,9 @@ def main() -> None:
 
     dataset_items = []
     test_vectors = []
-    default_system_msg = "You are a model that can do function calling with the following functions"
+    default_system_msg = (
+        "You are a model that can do function calling with the following functions"
+    )
     if cfg.system_prompt and Path(cfg.system_prompt).exists():
         system_prompt_text = Path(cfg.system_prompt).read_text(encoding="utf-8")
         default_system_msg = f"{system_prompt_text}\n\nYou are a tool-calling router. Use only the provided tools."
@@ -68,13 +71,35 @@ def main() -> None:
 
         for args in generate_arg_sets(params, max_cases=cfg.max_cases):
             user_prompt = build_prompt(name, description, args)
+
+            # Context-Aware Optimization: Inject [NATIVE_CONTEXT] placeholder
+            # In a real scenario, this would be a JSON string from PcaiCore
+            context_aware_prompt = f'[NATIVE_CONTEXT]\n{{"telemetry": "active", "tool": "{name}"}}\n\n[USER_REQUEST]\n{user_prompt}'
+
+            # FunctionGemma/Unsloth Optimization: Reasoning Trace
+            # We explicitly teach the model to "think" before "acting".
+            # This aligns with the "Reflexion" or "Chain of Thought" Agentic patterns.
+            # Ideally, these tokens should be distinct. Here we use <thought>...</thought> as defined in the plan.
+            thought_process = (
+                f"<thought>\n"
+                f'User request: "{user_prompt}".\n'
+                f"Reasoning: Tool '{name}' performs \"{description}\".\n"
+                f"Decision: I will call '{name}' to satisfy the request.\n"
+                f"</thought>\n"
+            )
+
             dataset_items.append(
                 {
                     "messages": [
-                        {"role": "developer", "content": default_system_msg},
-                        {"role": "user", "content": user_prompt},
+                        # Gemma 2 chat template does not support 'system' role.
+                        # We prepend the system instruction to the first user message.
                         {
-                            "role": "assistant",
+                            "role": "user",
+                            "content": f"{default_system_msg}\n\n{context_aware_prompt}",
+                        },
+                        {
+                            "role": "assistant",  # Standardize to 'assistant' for Unsloth/HuggingFace
+                            "content": thought_process,  # The thought is text content
                             "tool_calls": [
                                 {
                                     "type": "function",
@@ -102,7 +127,10 @@ def main() -> None:
                     "messages": [
                         {"role": "developer", "content": default_system_msg},
                         {"role": "user", "content": scenario.get("user_content", "")},
-                        {"role": "assistant", "content": scenario.get("assistant_content", "NO_TOOL")},
+                        {
+                            "role": "assistant",
+                            "content": scenario.get("assistant_content", "NO_TOOL"),
+                        },
                     ],
                     "tools": tools,
                 }

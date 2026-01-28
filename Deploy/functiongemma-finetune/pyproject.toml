@@ -18,6 +18,7 @@ dependencies = [
   # Evaluation & Monitoring
   "evaluate>=0.4.3",
   "tensorboard>=2.18.0",
+  "psutil>=6.1.0",
   # Serialization - CVE-2025-4565 fix requires >=6.31.1
   "protobuf>=6.31.1",
   # API & Data
