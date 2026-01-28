@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "../rust-functiongemma-runtime",
+    "../rust-functiongemma-train",
+]
