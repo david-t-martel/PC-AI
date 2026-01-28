@@ -1,6 +1,7 @@
 # FunctionGemma Fine-Tuning (Local)
 
 This folder provides a minimal local fine-tuning scaffold for FunctionGemma to improve tool/function calling for PC_AI.
+Note: the Python pipeline is deprecated in favor of the Rust implementation; keep this for reference only.
 
 ## Setup
 
@@ -99,11 +100,14 @@ uv run python tool_router.py --port 18010 --system-prompt C:\Users\david\PC_AI\D
 ## Tests
 
 ```powershell
-# Run unit tests only
-PowerShell -NoProfile -ExecutionPolicy Bypass -File C:\Users\david\PC_AI\Tools\run-functiongemma-tests.ps1 -Category unit
+# Run Rust-first tests (default runtime)
+PowerShell -NoProfile -ExecutionPolicy Bypass -File C:\Users\david\PC_AI\Tools\run-functiongemma-tests.ps1 -Category rust
 
-# Run integration tests (vLLM/Docker must be running)
-PowerShell -NoProfile -ExecutionPolicy Bypass -File C:\Users\david\PC_AI\Tools\run-functiongemma-tests.ps1 -Category integration
+# Run unit tests only (Python pipeline)
+PowerShell -NoProfile -ExecutionPolicy Bypass -File C:\Users\david\PC_AI\Tools\run-functiongemma-tests.ps1 -Category unit -Runtime python
+
+# Run integration tests (vLLM/Docker must be running, Python pipeline)
+PowerShell -NoProfile -ExecutionPolicy Bypass -File C:\Users\david\PC_AI\Tools\run-functiongemma-tests.ps1 -Category integration -Runtime python
 
 # Router-specific integration tests (FunctionGemma + provider routing)
 pwsh -NoProfile -Command "Invoke-Pester -Path C:\Users\david\PC_AI\Tests\Integration\Router.FunctionGemma.Execution.Tests.ps1,C:\Users\david\PC_AI\Tests\Integration\Router.Providers.Tests.ps1 -Output Detailed"

@@ -86,6 +86,14 @@ fn default_model() -> String {
     env::var("PCAI_ROUTER_MODEL").unwrap_or_else(|_| "functiongemma-270m-it".to_string())
 }
 
+#[cfg(feature = "model")]
+fn use_kv_cache() -> bool {
+    env::var("PCAI_ROUTER_KV_CACHE")
+        .unwrap_or_else(|_| "1".to_string())
+        .to_lowercase()
+        .as_str() != "0"
+}
+
 fn router_engine() -> RouterEngine {
     match env::var("PCAI_ROUTER_ENGINE").unwrap_or_else(|_| "heuristic".to_string()).to_lowercase().as_str() {
         "model" => RouterEngine::Model,
@@ -317,7 +325,11 @@ fn infer_with_model(req: &ChatCompletionRequest) -> anyhow::Result<InferenceResu
     let input_tensor = Tensor::new(encoding.get_ids(), &device)?.unsqueeze(0)?;
 
     let max_tokens = req.max_tokens.unwrap_or(64) as usize;
-    let output_ids = model.generate(&input_tensor, max_tokens, &device)?;
+    let output_ids = if use_kv_cache() {
+        model.generate_with_cache(&input_tensor, max_tokens, &device)?
+    } else {
+        model.generate(&input_tensor, max_tokens, &device)?
+    };
     let output_text = tokenizer.decode(&output_ids, true).map_err(anyhow::Error::msg)?;
 
     if let Some((name, args)) = parse_function_call(&output_text) {

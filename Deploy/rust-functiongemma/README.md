@@ -14,6 +14,50 @@ From repo root:
   .\Tools\Invoke-RustBuild.ps1 -Path Deploy\rust-functiongemma-runtime build
   .\Tools\Invoke-RustBuild.ps1 -Path Deploy\rust-functiongemma-train test
 
+## Build/Test scripts
+From Deploy/rust-functiongemma:
+
+  .\build.ps1
+  .\test.ps1
+
+## Fast CI mode
+Skip dataset/doc generation for quicker CI runs:
+
+  .\test.ps1 -Fast
+
+## Eval report
+Generate a metrics report (skips if the model is missing):
+
+  .\Tools\run-functiongemma-eval.ps1 -FastEval
+
+Or integrate it into the test runner:
+
+  .\test.ps1 -EvalReport
+
+## C# integration (PcaiNative)
+The native DLL exposes a router dataset generator for C#/PowerShell:
+
+  PcaiNative.FunctionGemmaModule.BuildRouterDataset(...)
+
+## Tool documentation
+Generate up-to-date tool docs (including NO_TOOL negatives):
+
+  .\Tools\generate-functiongemma-tool-docs.ps1
+
+## Native router dataset (optional)
+If PcaiNative.dll is built and available, you can generate the router dataset via FFI:
+
+  .\Tools\prepare-functiongemma-router-data.ps1 -UseNative
+
+## Documentation automation
+Run the unified docs + FunctionGemma dataset pipeline:
+
+  .\Tools\Invoke-DocPipeline.ps1 -Mode Full
+
+Use the native C# router dataset generator when available:
+
+  .\Tools\Invoke-DocPipeline.ps1 -Mode TrainingOnly -UseNativeRouter
+
 ## Future
 A shared core crate will be added for:
 - Prompt formatting

@@ -40,6 +40,11 @@ Build with model features, then enable model engine:
 This path loads the base model and attempts to parse FunctionGemma-style
 tool calls from the generated output. It is functional but not optimized.
 
+## KV cache
+KV cache is enabled by default for model inference. Toggle with:
+
+  setx PCAI_ROUTER_KV_CACHE 0
+
 ## Optional model features
 Enable extra dependencies only when needed:
 
