@@ -50,5 +50,13 @@
     "readOnlyByDefault": true,
     "requireConfirmation": true,
     "createBackups": true
+  },
+  "llm": {
+    "activeProvider": "vllm",
+    "activeModel": "functiongemma-270m-it",
+    "routerModel": "functiongemma-270m-it",
+    "routerUrl": "http://127.0.0.1:8000",
+    "temperature": 0.4,
+    "timeoutSeconds": 180
   }
 }

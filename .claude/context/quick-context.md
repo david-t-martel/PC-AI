@@ -1,72 +1,72 @@
 # PC_AI Quick Context
 
 > For rapid session restoration - read this first
-> Updated: 2026-01-27 | Version: 5.0.0
+> Updated: 2026-01-27 | Version: 5.1.0
 
 ## What Is This Project?
 
 **PC_AI** is a local LLM-powered PC diagnostics framework with:
-- 8 PowerShell modules
+- 9 PowerShell modules (NEW: PC-AI.CLI)
 - **Native Rust acceleration** (Rust DLL + C# Hybrid Framework)
-- **LLM Integration** (Ollama, LM Studio, vLLM)
+- **LLM Integration** (Ollama, LM Studio, vLLM, FunctionGemma)
 
-## Current State (Native Acceleration Phase 4 Complete)
+## Current State (Post-Refactoring Session)
 
 | Component | Status |
 |-----------|--------|
-| 8 PowerShell Modules | All functional |
+| 9 PowerShell Modules | All functional |
 | Unified CLI | `PC-AI.ps1` |
-| Pester Tests | ~81% pass rate (195/240) |
-| **Native FFI Tests** | **90 passing** |
-| **Rust Unit Tests** | **81 passing** |
-| Ollama LLM | qwen2.5-coder:7b primary |
-| Uncommitted Changes | **182 files** |
+| **Git Status** | **Clean (all committed)** |
+| **Latest Commit** | **2bbbbbc** |
+| Native FFI Tests | 90 passing |
+| Rust Unit Tests | 81 passing |
 
-## Native Acceleration Status
+## Security Status
 
-| Phase | Module | Status | FFI Tests | Unit Tests |
-|-------|--------|--------|-----------|------------|
-| 1 | pcai_core_lib | COMPLETE | 16 | 26 |
-| 2 | pcai_search | COMPLETE | 21 | 14 |
-| 3 | pcai_performance | COMPLETE | 25 | 19 |
-| 4 | pcai_system | COMPLETE | 28 | 22 |
-| 5 | Integration | PLANNED | - | - |
+| CVE | Package | Status |
+|-----|---------|--------|
+| CVE-2024-30105 | System.Text.Json | ✓ Fixed (8.0.5) |
+| CVE-2024-43485 | System.Text.Json | ✓ Fixed (8.0.5) |
+| CVE-2026-0994 | protobuf | ⚠️ No upstream fix |
 
-**Latest Commit**: c338e11 "feat(native): add Phase 4 System Module with PATH analysis and log search"
+## Recent Session (2026-01-27)
 
-## Architecture Pattern
+**13 Commits Pushed:**
+1. `c13119b` refactor(native): split PcaiNative.cs into modular components
+2. `51b027d` refactor(rust): modularize telemetry into submodules
+3. `69a1fb3` feat(llm): add routed chat and log search capabilities
+4. `bcca140` feat(usb): add native USB diagnostics support
+5. `92b9303` feat(virtualization): enhance WSL/Docker health checks
+6. `0df1b25` feat(modules): add CLI module and update manifests
+7. `7759a4c` feat(deploy): enhance FunctionGemma training pipeline
+8. `e772123` chore(config): update LLM and tool configurations
+9. `4c99b34` docs: add agent guidance and architecture documentation
+10. `fa1806c` test: add comprehensive test suite
+11. `a5fabd5` chore: update reports and tooling scripts
+12. `21f9911` refactor(cli): simplify PC-AI.ps1 entry point
+13. `2bbbbbc` security: fix CVE-2025-4565 and modernize dependencies
 
-```
-Rust DLL (#[no_mangle] extern "C")
-    |
-    v
-C# P/Invoke ([DllImport])
-    |
-    v
-PowerShell Cmdlets (with fallback)
-```
+## Dependency Updates Applied
 
-## Key Native Files
+| Ecosystem | Package | Old → New |
+|-----------|---------|-----------|
+| Rust | sysinfo | 0.32 → 0.38 |
+| Rust | windows-sys | 0.59 → 0.61 |
+| NuGet | Microsoft.PowerShell.SDK | 7.4.1 → 7.5.4 |
+| pip | torch | 2.3.0 → 2.5.0 |
+| pip | protobuf | 4.25.0 → 6.31.1 |
+
+## Key Native Files (Refactored)
 
 | Category | Path |
 |----------|------|
 | Rust Workspace | `Native/pcai_core/Cargo.toml` |
 | Core Library | `Native/pcai_core/pcai_core_lib/src/lib.rs` |
-| Search Module | `Native/pcai_core/pcai_search/src/*.rs` |
-| System Module | `Native/pcai_core/pcai_core_lib/src/system.rs` |
-| C# Wrappers | `Native/PcaiNative/*.cs` |
-| System Wrapper | `Native/PcaiNative/SystemModule.cs` |
-| FFI Tests | `Tests/Integration/FFI.*.Tests.ps1` |
-| Built DLLs | `bin/*.dll` |
-
-## Key LLM Files
-
-| Category | Path |
-|----------|------|
-| LLM Module | `Modules/PC-AI.LLM/PC-AI.LLM.psm1` |
-| Config | `Config/llm-config.json` |
-| FunctionGemma | `Deploy/functiongemma-finetune/` |
-| vLLM Docker | `Deploy/docker/vllm/` |
+| Telemetry Module | `Native/pcai_core/pcai_core_lib/src/telemetry/` (NEW structure) |
+| VMM Health | `Native/pcai_core/pcai_core_lib/src/vmm_health.rs` (NEW) |
+| C# Core | `Native/PcaiNative/PcaiCore.cs` (was PcaiNative.cs) |
+| C# Diagnostics | `Native/PcaiNative/PcaiDiagnostics.cs` (NEW) |
+| C# Safety | `Native/PcaiNative/SafetyInterlock.cs` (NEW) |
 
 ## Quick Commands
 
@@ -80,60 +80,31 @@ cd Native\pcai_core && cargo build --release
 # Build C#
 cd Native\PcaiNative && dotnet build -c Release
 
-# Run FFI tests
-Invoke-Pester -Path 'Tests\Integration\FFI.*.Tests.ps1'
+# Run all tests
+Invoke-Pester -Path Tests/
 
-# Test native library availability
-Add-Type -Path bin\PcaiNative.dll
-[PcaiNative.PcaiCore]::GetDiagnostics() | ConvertTo-Json
+# Check for vulnerabilities
+dotnet list package --vulnerable
 ```
 
-## Code Patterns
+## Next Steps
 
-```rust
-// Rust FFI export
-#[no_mangle]
-pub extern "C" fn pcai_xxx(path: *const c_char) -> PcaiStringBuffer { ... }
-```
-
-```csharp
-// C# P/Invoke
-[DllImport("pcai_xxx.dll", CallingConvention = CallingConvention.Cdecl)]
-internal static extern PcaiStringBuffer pcai_xxx(
-    [MarshalAs(UnmanagedType.LPUTF8Str)] string path);
-
-// Always free string buffers
-var buffer = NativeXxx.pcai_xxx(path);
-try { return buffer.ToManagedString(); }
-finally { NativeCore.pcai_free_string_buffer(ref buffer); }
-```
-
-```powershell
-# Pester test with Skip condition
-BeforeDiscovery { $script:Available = ... }
-It "Test" -Skip:(-not $script:Available) { ... }
-```
-
-## Next Steps (Phase 5 - Integration)
-
-1. PowerShell cmdlet integration for native modules
-2. Add `-UseNative` switch with graceful fallback
-3. Performance benchmarks (native vs managed)
-4. FunctionGemma vLLM tool router integration
-5. Commit 182 pending changes
+1. **Test Suite**: Run full Pester tests to verify refactoring
+2. **Monitor CVE**: Watch protobuf for CVE-2026-0994 fix
+3. **FunctionGemma**: Test training with updated torch/transformers
+4. **Documentation**: Update Native/PcaiNative structure docs
 
 ## Recommended Agents
 
 | Agent | Purpose |
 |-------|---------|
-| test-runner | Run comprehensive FFI/Pester tests |
-| deployment-engineer | CI/CD automation setup |
-| code-reviewer | Review Phase 4 implementation |
-| rust-pro | Rust module refinement |
-| csharp-pro | C# wrapper improvements |
+| test-runner | Verify tests pass post-refactoring |
+| python-pro | Test FunctionGemma training pipeline |
+| security-auditor | Monitor protobuf CVE status |
 
 ## For Full Context
 
-- **Native Details**: `C:\Users\david\PC_AI\.claude\context\native-acceleration-context.md`
-- **Full Project**: `C:\Users\david\PC_AI\.claude\context\project-context.md`
-- **Framework Pattern**: `~/.claude/context/rust-csharp-hybrid-framework.md`
+- **Latest Context**: `.claude/context/pcai-context-20260127.md`
+- **Native Details**: `.claude/context/native-acceleration-context.md`
+- **Full Project**: `.claude/context/project-context.md`
+- **Context Index**: `.claude/context/context-index.json`

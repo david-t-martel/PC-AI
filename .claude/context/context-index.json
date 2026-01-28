@@ -9,7 +9,7 @@
     "integrations": ["WSL2", "Docker", "Hyper-V", "Ollama", "LM Studio", "vLLM", "Rust FFI", "C# P/Invoke", "FunctionGemma"]
   },
   "context": {
-    "version": "5.0.0",
+    "version": "5.1.0",
     "created": "2025-01-23",
     "updated": "2026-01-27",
     "files": {
@@ -17,158 +17,150 @@
       "native": "native-acceleration-context.md",
       "detailed": "pc-ai-project-context.md",
       "quick": "quick-context.md",
+      "latest": "pcai-context-20260127.md",
       "index": "context-index.json"
     }
   },
   "state": {
-    "current_phase": "native_acceleration_phase_4",
-    "phase_description": "System Module with PATH analysis and log search",
+    "current_phase": "post_refactoring_modernization",
+    "phase_description": "Major refactoring complete, dependencies modernized, security fixes applied",
     "core_functional": true,
     "native_functional": true,
     "migration_pending": false,
-    "uncommitted_changes": 182,
-    "latest_commit": "c338e11",
-    "latest_commit_message": "feat(native): add Phase 4 System Module with PATH analysis and log search"
+    "uncommitted_changes": 0,
+    "latest_commit": "2bbbbbc",
+    "latest_commit_message": "security: fix CVE-2025-4565 and modernize dependencies"
+  },
+  "security": {
+    "dependabot_alerts": {
+      "total": 3,
+      "fixed": 2,
+      "open": 1
+    },
+    "cves_fixed": [
+      {"id": "CVE-2024-30105", "package": "System.Text.Json", "fixed_version": "8.0.5"},
+      {"id": "CVE-2024-43485", "package": "System.Text.Json", "fixed_version": "8.0.5"}
+    ],
+    "cves_pending": [
+      {"id": "CVE-2026-0994", "package": "protobuf", "status": "No upstream fix available", "note": "Only affects pure-Python implementation"}
+    ]
   },
   "native_acceleration": {
     "architecture": "Rust DLL + C# Hybrid Framework",
-    "reference_implementation": "NukeNul (C:\\Users\\david\\nuke_nul)",
+    "refactoring_status": "COMPLETE",
     "phases": {
-      "phase1": {
-        "name": "Foundation",
-        "module": "pcai_core_lib",
-        "status": "COMPLETE",
-        "ffi_tests": 16,
-        "unit_tests": 26
-      },
-      "phase2": {
-        "name": "Search Module",
-        "module": "pcai_search",
-        "status": "COMPLETE",
-        "ffi_tests": 21,
-        "unit_tests": 14
-      },
-      "phase3": {
-        "name": "Performance Module",
-        "module": "pcai_performance",
-        "status": "COMPLETE",
-        "ffi_tests": 25,
-        "unit_tests": 19
-      },
-      "phase4": {
-        "name": "System Module",
-        "module": "pcai_system",
-        "status": "COMPLETE",
-        "ffi_tests": 28,
-        "unit_tests": 22,
-        "features": ["PATH analysis", "Event log search", "Registry queries"]
-      },
-      "phase5": {
-        "name": "Integration",
-        "status": "PLANNED",
-        "features": ["PowerShell cmdlet integration", "Graceful fallback"]
-      },
-      "phase6": {
-        "name": "CI/CD",
-        "status": "PLANNED",
-        "features": ["GitHub Actions", "Automated releases"]
-      }
+      "phase1": { "name": "Foundation", "module": "pcai_core_lib", "status": "COMPLETE" },
+      "phase2": { "name": "Search Module", "module": "pcai_search", "status": "COMPLETE" },
+      "phase3": { "name": "Performance Module", "module": "pcai_performance", "status": "COMPLETE" },
+      "phase4": { "name": "System Module", "module": "pcai_system", "status": "COMPLETE" },
+      "phase5": { "name": "Integration", "status": "PLANNED" },
+      "phase6": { "name": "CI/CD", "status": "PLANNED" }
     },
-    "test_totals": {
-      "ffi_integration": 90,
-      "rust_unit": 81,
-      "total": 171
+    "recent_changes": {
+      "csharp_refactor": "PcaiNative.cs split into 9 modular files",
+      "rust_refactor": "telemetry.rs modularized into telemetry/ submodules",
+      "new_modules": ["vmm_health.rs", "prompt_engine.rs"]
     },
     "dependencies": {
-      "rust": ["sysinfo", "rayon", "ignore", "walkdir", "sha2", "regex", "parking_lot", "serde", "windows-sys", "widestring"],
-      "csharp": [".NET 8", "System.Text.Json"]
+      "rust": {
+        "sysinfo": "0.38",
+        "windows-sys": "0.61",
+        "winreg": "0.55",
+        "rayon": "1.10",
+        "serde": "1.0",
+        "serde_json": "1.0"
+      },
+      "csharp": {
+        "Microsoft.PowerShell.SDK": "7.5.4",
+        "System.Text.Json": "8.0.5"
+      }
     }
   },
-  "test_status": {
-    "powershell_tests": {
-      "total": 240,
-      "passed": 195,
-      "failed": 26,
-      "skipped": 19,
-      "pass_rate": "81%"
-    },
-    "ffi_tests": {
-      "total": 90,
-      "passed": 90,
-      "failed": 0,
-      "pass_rate": "100%"
-    },
-    "rust_unit_tests": {
-      "total": 81,
-      "passed": 81,
-      "failed": 0,
-      "pass_rate": "100%"
-    }
+  "python_dependencies": {
+    "protobuf": ">=6.31.1",
+    "transformers": ">=4.47.0",
+    "torch": ">=2.5.0",
+    "accelerate": ">=1.2.0",
+    "datasets": ">=3.2.0",
+    "peft": ">=0.14.0",
+    "trl": ">=0.12.0",
+    "huggingface_hub": ">=0.27.0"
   },
   "key_files": {
     "native": {
       "rust_workspace": "Native/pcai_core/Cargo.toml",
       "core_lib": "Native/pcai_core/pcai_core_lib/src/lib.rs",
-      "search_module": "Native/pcai_core/pcai_search/src/lib.rs",
       "system_module": "Native/pcai_core/pcai_core_lib/src/system.rs",
-      "csharp_wrappers": "Native/PcaiNative/*.cs",
-      "system_wrapper": "Native/PcaiNative/SystemModule.cs",
-      "ffi_tests": "Tests/Integration/FFI.*.Tests.ps1",
-      "bin_dlls": "bin/*.dll"
+      "telemetry_module": "Native/pcai_core/pcai_core_lib/src/telemetry/mod.rs",
+      "csharp_core": "Native/PcaiNative/PcaiCore.cs",
+      "csharp_diagnostics": "Native/PcaiNative/PcaiDiagnostics.cs"
     },
     "llm": {
       "module": "Modules/PC-AI.LLM/PC-AI.LLM.psm1",
       "config": "Config/llm-config.json",
-      "functiongemma": "Deploy/functiongemma-finetune/",
-      "vllm": "Deploy/docker/vllm/"
+      "functiongemma": "Deploy/functiongemma-finetune/"
     },
     "powershell": {
       "cli": "PC-AI.ps1",
-      "modules": "Modules/PC-AI.*/"
+      "cli_module": "Modules/PC-AI.CLI/PC-AI.CLI.psm1"
     }
   },
-  "design_decisions": {
-    "ffi_contract": {
-      "rust": "#[repr(C)] structs + extern \"C\" fn",
-      "csharp": "[DllImport] + [StructLayout(LayoutKind.Sequential)]"
-    },
-    "string_handling": "PcaiStringBuffer pattern (malloc in Rust, free via pcai_free_string_buffer)",
-    "error_codes": "PcaiStatus enum (Success, InvalidArgument, NullPointer, IoError, etc.)",
-    "output_format": "JSON for LLM consumption"
-  },
-  "build_commands": {
-    "rust_build": "cd Native/pcai_core && cargo build --release",
-    "csharp_build": "cd Native/PcaiNative && dotnet build -c Release",
-    "rust_target": "T:\\RustCache\\cargo-target\\release\\",
-    "run_ffi_tests": "Invoke-Pester -Path 'Tests\\Integration\\FFI.*.Tests.ps1'"
-  },
-  "powershell_modules": {
-    "PC-AI.Hardware": { "status": "functional", "tests": 33 },
-    "PC-AI.Virtualization": { "status": "functional", "tests": "TBD" },
-    "PC-AI.USB": { "status": "functional", "tests": 24 },
-    "PC-AI.Network": { "status": "functional", "tests": 24 },
-    "PC-AI.Performance": { "status": "functional", "tests": 22 },
-    "PC-AI.Cleanup": { "status": "functional", "tests": 26 },
-    "PC-AI.LLM": { "status": "functional", "tests": 28 },
-    "PC-AI.Acceleration": { "status": "functional", "tests": "TBD" }
-  },
-  "roadmap": {
-    "immediate": ["Phase 5: PowerShell cmdlet integration", "-UseNative switch", "Graceful fallback"],
-    "short_term": ["Performance benchmarks", "Documentation updates", "FunctionGemma vLLM integration"],
-    "medium_term": ["CI/CD automation", "GitHub Actions workflow", "Release artifacts"],
-    "long_term": ["Linux support", "Cross-platform builds", "Tool router fine-tuning"]
-  },
+  "recent_commits": [
+    {"sha": "2bbbbbc", "message": "security: fix CVE-2025-4565 and modernize dependencies"},
+    {"sha": "c0ba5d7", "message": "chore: add prompt tests and update gitignore"},
+    {"sha": "21f9911", "message": "refactor(cli): simplify PC-AI.ps1 entry point"},
+    {"sha": "a5fabd5", "message": "chore: update reports and tooling scripts"},
+    {"sha": "fa1806c", "message": "test: add comprehensive test suite"},
+    {"sha": "4c99b34", "message": "docs: add agent guidance and architecture documentation"},
+    {"sha": "e772123", "message": "chore(config): update LLM and tool configurations"},
+    {"sha": "7759a4c", "message": "feat(deploy): enhance FunctionGemma training pipeline"},
+    {"sha": "0df1b25", "message": "feat(modules): add CLI module and update manifests"},
+    {"sha": "92b9303", "message": "feat(virtualization): enhance WSL/Docker health checks"},
+    {"sha": "bcca140", "message": "feat(usb): add native USB diagnostics support"},
+    {"sha": "69a1fb3", "message": "feat(llm): add routed chat and log search capabilities"},
+    {"sha": "51b027d", "message": "refactor(rust): modularize telemetry into submodules"},
+    {"sha": "c13119b", "message": "refactor(native): split PcaiNative.cs into modular components"}
+  ],
   "agents": {
     "registry": [
       {
+        "agent": "commit-cluster",
+        "task": "Clustered and committed 130+ files into 13 semantic commits",
+        "completed_at": "2026-01-27T12:30:00Z",
+        "handoff_notes": "All changes pushed to origin/main"
+      },
+      {
+        "agent": "security-auditor",
+        "task": "Analyzed Dependabot alerts, applied CVE fixes",
+        "files_touched": ["requirements.txt", "pyproject.toml", "Cargo.toml", "system.rs"],
+        "completed_at": "2026-01-27T13:30:00Z",
+        "handoff_notes": "2 CVEs fixed, 1 pending upstream"
+      },
+      {
         "agent": "rust-pro",
-        "task": "Implemented Phase 4 System Module",
-        "files_touched": ["Native/pcai_core/pcai_core_lib/src/system.rs", "Native/PcaiNative/SystemModule.cs"],
-        "completed_at": "2026-01-27",
-        "handoff_notes": "PATH analysis and log search FFI complete, ready for PowerShell integration"
+        "task": "Fixed sysinfo 0.38 breaking API change",
+        "files_touched": ["Native/pcai_core/pcai_core_lib/src/system.rs"],
+        "completed_at": "2026-01-27T13:25:00Z",
+        "handoff_notes": "temperature() now returns Option<f32>, using unwrap_or(0.0)"
       }
     ],
-    "recommended_next": ["test-runner", "deployment-engineer", "code-reviewer"],
-    "coordination_notes": "Phase 4 complete, 182 uncommitted changes ready for commit"
+    "recommended_next": ["test-runner", "python-pro", "security-auditor"],
+    "coordination_notes": "Monitor protobuf CVE-2026-0994 for upstream fix"
+  },
+  "roadmap": {
+    "immediate": [
+      "Run full test suite to verify refactoring",
+      "Validate Rust DLL builds on clean checkout"
+    ],
+    "this_week": [
+      "Monitor protobuf for security patch",
+      "Test FunctionGemma training with updated dependencies",
+      "Update documentation for new module structure"
+    ],
+    "tech_debt": [
+      "Remove unused GUID constants in vmm_health.rs",
+      "Add tests for new CLI module",
+      "Document Native/PcaiNative refactored structure"
+    ]
   }
 }
