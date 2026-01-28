@@ -98,12 +98,19 @@ function Get-PublicFunctionInfo {
 }
 
 function Get-CSharpDllImports {
-    param([string]$Path)
+    param([string]$Root)
 
-    if (-not (Test-Path $Path)) { return @() }
-    $content = Get-Content -Path $Path -Raw -Encoding UTF8
-    $matches = [regex]::Matches($content, '\[DllImport\([^\)]*\)\]\s*internal\s+static\s+extern\s+[^\s]+\s+(pcai_[A-Za-z0-9_]+)\s*\(')
-    return @($matches | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+    if (-not (Test-Path $Root)) { return @() }
+    $files = Get-ChildItem -Path $Root -Filter '*.cs' -Recurse -ErrorAction SilentlyContinue
+    $imports = @()
+    foreach ($file in $files) {
+        $content = Get-Content -Path $file.FullName -Raw -Encoding UTF8
+        $matches = [regex]::Matches($content, '\[DllImport\([^\)]*\)\]\s*internal\s+static\s+extern\s+[^\s]+\s+(pcai_[A-Za-z0-9_]+)\s*\(')
+        foreach ($m in $matches) {
+            $imports += $m.Groups[1].Value
+        }
+    }
+    return @($imports | Sort-Object -Unique)
 }
 
 function Get-RustExports {
@@ -163,15 +170,16 @@ $missingHelp = @($psFunctions | Where-Object { -not $_.HelpPresent })
 $missingHelpParams = @($psFunctions | Where-Object { @($_.MissingHelpParameters).Count -gt 0 })
 $extraHelpParams = @($psFunctions | Where-Object { @($_.ExtraHelpParameters).Count -gt 0 })
 
-$csharpPath = Join-Path $RepoRoot 'Native\PcaiNative\PcaiNative.cs'
+$csharpRoot = Join-Path $RepoRoot 'Native\PcaiNative'
+$pcaiCorePath = Join-Path $csharpRoot 'PcaiCore.cs'
 $rustRoot = Join-Path $RepoRoot 'Native\pcai_core\pcai_core_lib\src'
-$csDllImports = Get-CSharpDllImports -Path $csharpPath
+$csDllImports = Get-CSharpDllImports -Root $csharpRoot
 $rustExports = Get-RustExports -Root $rustRoot
 
 $missingRustExports = @($csDllImports | Where-Object { $rustExports -notcontains $_ })
 
 $psPcaiCalls = Get-PowerShellPcaiCalls -ModuleRoot $modulesRoot
-$csCoreMethods = Get-CSharpPcaiCoreMethods -Path $csharpPath
+$csCoreMethods = Get-CSharpPcaiCoreMethods -Path $pcaiCorePath
 $missingCsharpMethods = @($psPcaiCalls | Where-Object { $csCoreMethods -notcontains $_ })
 
 $report = [PSCustomObject]@{

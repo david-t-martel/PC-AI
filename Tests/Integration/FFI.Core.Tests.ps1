@@ -268,6 +268,61 @@ public static class PcaiCoreTest
         }
     }
 
+    Context "FunctionGemma Router Dataset (Native)" -Tag "FunctionGemma" {
+
+        BeforeAll {
+            $script:PcaiNativeDll = Get-DllPath "PcaiNative.dll"
+            if (Test-Path $script:PcaiNativeDll) {
+                $env:PATH = "$BinDir;$env:PATH"
+                try {
+                    Add-Type -Path $script:PcaiNativeDll -ErrorAction SilentlyContinue
+                } catch {
+                    # Ignore load errors, tests will skip
+                }
+            }
+        }
+
+        It "BuildRouterDataset emits dataset JSONL" {
+            if ($PSVersionTable.PSVersion.Major -lt 7) {
+                Set-ItResult -Skipped -Because "PcaiNative requires PowerShell 7+"
+            }
+            elseif (-not (Test-Path $script:PcaiNativeDll)) {
+                Set-ItResult -Skipped -Because "PcaiNative.dll not available"
+            }
+            elseif (-not ([PcaiNative.PcaiCore]::IsAvailable)) {
+                Set-ItResult -Skipped -Because "PcaiCore not available"
+            }
+            else {
+                $tempDir = Join-Path $env:TEMP "pcai_functiongemma_test"
+                if (-not (Test-Path $tempDir)) {
+                    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+                }
+
+                $tools = Join-Path $ProjectRoot "Config\\pcai-tools.json"
+                $diagnose = Join-Path $ProjectRoot "DIAGNOSE.md"
+                $chat = Join-Path $ProjectRoot "CHAT.md"
+                $scenarios = Join-Path $ProjectRoot "Deploy\\functiongemma-finetune\\scenarios.json"
+                $outputJsonl = Join-Path $tempDir "router_dataset.jsonl"
+                $outputVectors = Join-Path $tempDir "router_vectors.json"
+
+                $report = [PcaiNative.FunctionGemmaModule]::BuildRouterDataset(
+                    $tools,
+                    $outputJsonl,
+                    $diagnose,
+                    $chat,
+                    $scenarios,
+                    $outputVectors,
+                    1,
+                    $false
+                )
+
+                $report | Should -Not -BeNullOrEmpty
+                $report.IsSuccess | Should -BeTrue
+                (Test-Path $outputJsonl) | Should -BeTrue
+            }
+        }
+    }
+
     Context "Performance Baseline" -Tag "Performance" {
 
         It "pcai_core_test() completes in <1ms" {
