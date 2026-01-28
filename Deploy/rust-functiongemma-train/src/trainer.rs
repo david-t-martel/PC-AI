@@ -11,6 +11,9 @@ pub struct TrainerConfig {
     pub batch_size: usize,
     pub grad_accum: usize,
     pub lora_r: usize,
+    pub pack_sequences: bool,
+    pub max_seq_len: Option<usize>,
+    pub eos_token_id: u32,
 }
 
 pub struct Trainer<'a> {
@@ -32,7 +35,7 @@ impl<'a> Trainer<'a> {
         }
     }
 
-    pub fn train(&mut self, dataset: &Dataset, tokenizer: &Tokenizer) -> Result<()> {
+    pub fn train(&mut self, dataset: &Dataset, tokenizer: Option<&Tokenizer>) -> Result<()> {
         let mut optimizer = candle_nn::AdamW::new_lr(self.varmap.all_vars(), self.trainer_cfg.lr)?;
         let num_batches = dataset.len() / self.trainer_cfg.batch_size;
 
@@ -40,7 +43,15 @@ impl<'a> Trainer<'a> {
             println!("Epoch {}/{}", epoch + 1, self.trainer_cfg.epochs);
             for i in 0..num_batches {
                 let start_idx = i * self.trainer_cfg.batch_size;
-                let (inputs, targets) = dataset.get_batch(start_idx, self.trainer_cfg.batch_size, tokenizer, &self.device)?;
+                let (inputs, targets) = dataset.get_batch(
+                    start_idx,
+                    self.trainer_cfg.batch_size,
+                    tokenizer,
+                    &self.device,
+                    self.trainer_cfg.pack_sequences,
+                    self.trainer_cfg.max_seq_len,
+                    self.trainer_cfg.eos_token_id,
+                )?;
 
                 let logits = self.model.forward(&inputs)?;
                 let (b, s, v) = logits.dims3()?;

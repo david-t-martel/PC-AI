@@ -7,6 +7,8 @@
   Uses CargoTools via Invoke-RustBuild.ps1 to run the rust-functiongemma-train
   prepare-router command. This keeps dataset generation in Rust while matching
   the Python I/O contract (tool_calls or NO_TOOL).
+
+  Optional: Use PcaiNative.dll to run the same dataset generation via native FFI.
 #>
 
 [CmdletBinding(PositionalBinding = $false)]
@@ -20,7 +22,9 @@ param(
     [int]$MaxCases = 24,
     [switch]$NoToolCoverage,
     [switch]$UseLld,
-    [switch]$LlmDebug
+    [switch]$LlmDebug,
+    [switch]$UseNative,
+    [switch]$NativeOnly
 )
 
 Set-StrictMode -Version Latest
@@ -35,6 +39,95 @@ if (-not $ChatPrompt) { $ChatPrompt = Join-Path $repoRoot 'CHAT.md' }
 if (-not $ScenariosPath) { $ScenariosPath = Join-Path $repoRoot 'Deploy\functiongemma-finetune\scenarios.json' }
 if (-not $Output) { $Output = Join-Path $repoRoot 'Deploy\functiongemma-finetune\data\rust_router_train.jsonl' }
 if (-not $TestVectors) { $TestVectors = Join-Path $repoRoot 'Deploy\functiongemma-finetune\test_vectors.json' }
+
+function Resolve-FullPath {
+    param([string]$Path)
+    if (-not $Path) { return $null }
+    if (Test-Path $Path) {
+        return (Resolve-Path $Path).Path
+    }
+    return [System.IO.Path]::GetFullPath($Path)
+}
+
+function Invoke-NativeRouterDataset {
+    param(
+        [string]$ToolsPath,
+        [string]$DiagnosePrompt,
+        [string]$ChatPrompt,
+        [string]$ScenariosPath,
+        [string]$Output,
+        [string]$TestVectors,
+        [int]$MaxCases,
+        [switch]$NoToolCoverage
+    )
+
+    if ($PSVersionTable.PSVersion.Major -lt 7) {
+        Write-Warning "Native router dataset generation requires PowerShell 7+."
+        return $false
+    }
+
+    $binPath = Join-Path $repoRoot 'bin'
+    $wrapperPath = Join-Path $binPath 'PcaiNative.dll'
+    if (-not (Test-Path $wrapperPath)) {
+        Write-Warning "PcaiNative.dll not found at $wrapperPath."
+        return $false
+    }
+
+    $env:PATH = "$binPath;$env:PATH"
+
+    try {
+        $loadedAssembly = [System.AppDomain]::CurrentDomain.GetAssemblies() |
+            Where-Object { $_.GetName().Name -eq 'PcaiNative' }
+        if (-not $loadedAssembly) {
+            Add-Type -Path $wrapperPath -ErrorAction Stop
+        }
+    } catch {
+        Write-Warning "Failed to load PcaiNative.dll: $_"
+        return $false
+    }
+
+    if (-not [PcaiNative.PcaiCore]::IsAvailable) {
+        Write-Warning "PcaiCore not available via PcaiNative."
+        return $false
+    }
+
+    $report = [PcaiNative.FunctionGemmaModule]::BuildRouterDataset(
+        (Resolve-FullPath $ToolsPath),
+        (Resolve-FullPath $Output),
+        (Resolve-FullPath $DiagnosePrompt),
+        (Resolve-FullPath $ChatPrompt),
+        (Resolve-FullPath $ScenariosPath),
+        (Resolve-FullPath $TestVectors),
+        [uint32]$MaxCases,
+        (-not $NoToolCoverage)
+    )
+
+    if (-not $report -or -not $report.IsSuccess) {
+        Write-Warning "Native router dataset generation returned no report or failure."
+        return $false
+    }
+
+    Write-Host "Native router dataset generation complete." -ForegroundColor Green
+    Write-Host "Items: $($report.Items) | Vectors: $($report.Vectors) | Output: $($report.OutputJsonl)"
+    return $true
+}
+
+if ($UseNative) {
+    $nativeOk = Invoke-NativeRouterDataset `
+        -ToolsPath $ToolsPath `
+        -DiagnosePrompt $DiagnosePrompt `
+        -ChatPrompt $ChatPrompt `
+        -ScenariosPath $ScenariosPath `
+        -Output $Output `
+        -TestVectors $TestVectors `
+        -MaxCases $MaxCases `
+        -NoToolCoverage:$NoToolCoverage
+
+    if ($nativeOk) { return }
+    if ($NativeOnly) { throw "Native router dataset generation failed." }
+
+    Write-Warning "Falling back to Rust CLI router dataset generation."
+}
 
 Write-Host "Preparing FunctionGemma router dataset (Rust)..." -ForegroundColor Cyan
 Write-Host "Tools: $ToolsPath"

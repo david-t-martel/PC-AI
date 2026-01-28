@@ -10,7 +10,7 @@ use rust_functiongemma_train::{Config, Model};
 use rust_functiongemma_train::data_gen::DataGenerator;
 use rust_functiongemma_train::dataset::Dataset;
 use rust_functiongemma_train::trainer::{Trainer, TrainerConfig};
-use rust_functiongemma_train::eval::parse_tool_call;
+use rust_functiongemma_train::eval::{parse_tool_call, evaluate_sample, EvaluationMetrics};
 use rust_functiongemma_train::router_dataset::{
     build_router_dataset,
     build_tool_test_vectors,
@@ -67,6 +67,8 @@ enum Commands {
         #[arg(long)]
         train_data: String,
         #[arg(long)]
+        token_cache: Option<String>,
+        #[arg(long)]
         output: String,
         #[arg(long, default_value = "1")]
         epochs: usize,
@@ -78,6 +80,12 @@ enum Commands {
         batch_size: usize,
         #[arg(long, default_value = "4")]
         grad_accum: usize,
+        #[arg(long)]
+        pack_sequences: bool,
+        #[arg(long)]
+        max_seq_len: Option<usize>,
+        #[arg(long, default_value = "1")]
+        eos_token_id: u32,
     },
     /// Evaluate a trained model or adapter
     Eval {
@@ -89,6 +97,14 @@ enum Commands {
         lora_r: usize,
         #[arg(long)]
         adapters: Option<String>,
+        #[arg(long)]
+        fast_eval: bool,
+        #[arg(long)]
+        metrics_output: Option<String>,
+        #[arg(long, default_value = "64")]
+        max_new_tokens: usize,
+        #[arg(long, default_value_t = true)]
+        schema_validate: bool,
     },
     /// Merge LoRA adapters into the base model
     Merge {
@@ -100,6 +116,15 @@ enum Commands {
         output: String,
         #[arg(long, default_value = "16")]
         lora_r: usize,
+    },
+    /// Build a token cache for faster training
+    PrepareCache {
+        #[arg(long)]
+        input: String,
+        #[arg(long)]
+        tokenizer: String,
+        #[arg(long)]
+        output_dir: String,
     },
 }
 
@@ -183,7 +208,20 @@ fn main() -> Result<()> {
                 );
             }
         }
-        Commands::Train { model_path, train_data, output, epochs, lr, lora_r, batch_size, grad_accum } => {
+        Commands::Train {
+            model_path,
+            train_data,
+            token_cache,
+            output,
+            epochs,
+            lr,
+            lora_r,
+            batch_size,
+            grad_accum,
+            pack_sequences,
+            max_seq_len,
+            eos_token_id,
+        } => {
             let device = Device::new_cuda(0).unwrap_or(Device::Cpu);
             println!("Training on device: {:?}", device);
 
@@ -207,16 +245,42 @@ fn main() -> Result<()> {
                 custom_load(&varmap, &model_file)?;
             }
 
-            let dataset = Dataset::load(&PathBuf::from(train_data))?;
-            let tokenizer = Tokenizer::from_file(model_dir.join("tokenizer.json")).map_err(anyhow::Error::msg)?;
+            let dataset = if let Some(cache_dir) = &token_cache {
+                Dataset::load_cached(&PathBuf::from(cache_dir))?
+            } else {
+                Dataset::load(&PathBuf::from(train_data))?
+            };
+            let tokenizer = if token_cache.is_some() {
+                None
+            } else {
+                Some(Tokenizer::from_file(model_dir.join("tokenizer.json")).map_err(anyhow::Error::msg)?)
+            };
 
-            let t_cfg = TrainerConfig { lr, epochs, batch_size, grad_accum, lora_r };
+            let t_cfg = TrainerConfig {
+                lr,
+                epochs,
+                batch_size,
+                grad_accum,
+                lora_r,
+                pack_sequences,
+                max_seq_len,
+                eos_token_id,
+            };
             let mut trainer = Trainer::new(model, &config, t_cfg, device, varmap);
 
-            trainer.train(&dataset, &tokenizer)?;
+            trainer.train(&dataset, tokenizer.as_ref())?;
             trainer.save_adapters(&PathBuf::from(output))?;
         }
-        Commands::Eval { model_path, test_data, lora_r, adapters } => {
+        Commands::Eval {
+            model_path,
+            test_data,
+            lora_r,
+            adapters,
+            fast_eval,
+            metrics_output,
+            max_new_tokens,
+            schema_validate,
+        } => {
             let device = Device::new_cuda(0).unwrap_or(Device::Cpu);
             let model_dir = PathBuf::from(&model_path);
             let config_raw = fs::read_to_string(model_dir.join("config.json"))?;
@@ -235,6 +299,7 @@ fn main() -> Result<()> {
             let tokenizer = Tokenizer::from_file(model_dir.join("tokenizer.json")).map_err(anyhow::Error::msg)?;
 
             let mut correct = 0;
+            let mut metrics = EvaluationMetrics::default();
             for i in 0..dataset.len() {
                 let item = &dataset.items[i];
                 // For eval, we want to prompt with all messages EXCEPT the last model response
@@ -253,7 +318,7 @@ fn main() -> Result<()> {
                 let user_text = item.messages.get(0).and_then(|m| m.content.as_deref()).unwrap_or("");
                 println!("User: {}", user_text);
 
-                let output_ids = model.generate(&input_tensor, 64, &device)?;
+                let output_ids = model.generate_with_cache(&input_tensor, max_new_tokens, &device)?;
                 let output_text = tokenizer.decode(&output_ids, true).map_err(anyhow::Error::msg)?;
 
                 println!("Model Output: {}", output_text);
@@ -263,8 +328,33 @@ fn main() -> Result<()> {
                 if output_text.contains(expected_text) || expected_text.contains(&output_text) {
                     correct += 1;
                 }
+
+                let sample = evaluate_sample(&output_text, item, fast_eval, schema_validate)?;
+                metrics.total += 1;
+                let expected_tool = item.messages.iter()
+                    .find(|m| m.role == "assistant")
+                    .and_then(|m| m.tool_calls.as_ref());
+                if expected_tool.is_some() {
+                    if sample.tool_match { metrics.tool_name_correct += 1; }
+                    if sample.arg_match { metrics.arg_exact_match += 1; }
+                } else if sample.no_tool_match {
+                    metrics.no_tool_correct += 1;
+                }
+                if schema_validate && !sample.schema_valid {
+                    metrics.schema_failures += 1;
+                }
             }
             println!("\nEvaluation complete: {}/{} correct", correct, dataset.len());
+            println!(
+                "Tool accuracy: {:.2}%, Arg accuracy: {:.2}%, NO_TOOL correct: {}",
+                metrics.tool_accuracy() * 100.0,
+                metrics.arg_accuracy() * 100.0,
+                metrics.no_tool_correct
+            );
+
+            if let Some(out_path) = metrics_output {
+                fs::write(out_path, serde_json::to_string_pretty(&metrics)?)?;
+            }
         }
         Commands::Merge { model_path, adapters, output, lora_r } => {
             let device = Device::Cpu; // Use CPU for merging to avoid OOM
@@ -286,6 +376,18 @@ fn main() -> Result<()> {
             println!("Saving merged model to {}...", output);
             varmap.save(output)?;
             println!("Merged model saved successfully.");
+        }
+        Commands::PrepareCache { input, tokenizer, output_dir } => {
+            println!("Building token cache...");
+            let tokenizer_path = PathBuf::from(&tokenizer);
+            let tokenizer = Tokenizer::from_file(&tokenizer_path).map_err(anyhow::Error::msg)?;
+            let meta = Dataset::build_token_cache(
+                &PathBuf::from(&input),
+                &tokenizer,
+                &tokenizer_path,
+                &PathBuf::from(&output_dir),
+            )?;
+            println!("Cache built: {} items", meta.item_count);
         }
     }
 

@@ -52,6 +52,10 @@ Deploy/functiongemma-finetune (Python) and to enable a Rust-only router runtime.
 - Incremental dataset generation and streaming JSONL output.
 - Memory/throughput metrics in runtime server.
 - Optional GPU selection and memory limits in config.
+- Pre-tokenize datasets and cache token IDs on disk (memmap2) for faster training/eval. (implemented)
+- Add prompt packing (multiple short samples per batch) to improve GPU utilization. (implemented)
+- Add deterministic eval metrics (tool-name accuracy + argument exact match) with JSON output. (implemented)
+- Add JSON schema validation for tool call outputs (reject invalid arguments early). (implemented)
 
 ## Crate candidates (easy wins)
 - hf-hub: download and cache gated models.

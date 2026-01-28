@@ -260,6 +260,58 @@ impl Attention {
         self.o_proj.forward(&attn_output)
     }
 
+    fn forward_with_cache(
+        &self,
+        x: &Tensor,
+        cache: &mut Option<(Tensor, Tensor)>,
+        past_len: usize,
+    ) -> Result<Tensor> {
+        let (b_sz, seq_len, _hidden_size) = x.dims3()?;
+        if seq_len != 1 {
+            return self.forward(x);
+        }
+
+        let q = self.q_proj.forward(x)?;
+        let k = self.k_proj.forward(x)?;
+        let v = self.v_proj.forward(x)?;
+
+        let q = q.reshape((b_sz, seq_len, self.num_heads, self.head_dim))?.transpose(1, 2)?;
+        let k = k.reshape((b_sz, seq_len, self.num_kv_heads, self.head_dim))?.transpose(1, 2)?;
+        let v = v.reshape((b_sz, seq_len, self.num_kv_heads, self.head_dim))?.transpose(1, 2)?;
+
+        let (cos, sin) = self.rotary_emb.forward(&q, past_len + 1)?;
+        let cos = cos.narrow(0, past_len, 1)?;
+        let sin = sin.narrow(0, past_len, 1)?;
+
+        let q = apply_rotary_emb(&q, &cos, &sin)?;
+        let k = apply_rotary_emb(&k, &cos, &sin)?;
+
+        let (k, v) = if let Some((cached_k, cached_v)) = cache {
+            let cached_k = cached_k.clone();
+            let cached_v = cached_v.clone();
+            let k = Tensor::cat(&[&cached_k, &k], 2)?;
+            let v = Tensor::cat(&[&cached_v, &v], 2)?;
+            (k, v)
+        } else {
+            (k, v)
+        };
+        *cache = Some((k.clone(), v.clone()));
+
+        let k = self.repeat_kv(k)?;
+        let v = self.repeat_kv(v)?;
+
+        let scale = 1.0 / (self.head_dim as f64).sqrt();
+        let attn_weights = q.matmul(&k.transpose(2, 3)?)?.affine(scale, 0.0)?;
+        let attn_weights = candle_nn::ops::softmax(&attn_weights, candle_core::D::Minus1)?;
+        let attn_output = attn_weights.matmul(&v)?;
+
+        let attn_output = attn_output
+            .transpose(1, 2)?
+            .reshape((b_sz, seq_len, self.num_heads * self.head_dim))?;
+
+        self.o_proj.forward(&attn_output)
+    }
+
     fn repeat_kv(&self, x: Tensor) -> Result<Tensor> {
         let n_rep = self.num_heads / self.num_kv_heads;
         if n_rep == 1 {
@@ -300,6 +352,23 @@ impl DecoderLayer {
             pre_feedforward_layernorm,
         })
     }
+
+    fn forward_with_cache(
+        &self,
+        x: &Tensor,
+        cache: &mut Option<(Tensor, Tensor)>,
+        past_len: usize,
+    ) -> Result<Tensor> {
+        let residual = x.clone();
+        let x = self.input_layernorm.forward(x)?;
+        let x = self.self_attn.forward_with_cache(&x, cache, past_len)?;
+        let x = (x + residual)?;
+
+        let residual = x.clone();
+        let x = self.pre_feedforward_layernorm.forward(&x)?;
+        let x = self.mlp.forward(&x)?;
+        x + residual
+    }
 }
 
 impl Module for DecoderLayer {
@@ -322,6 +391,21 @@ pub struct Model {
     layers: Vec<DecoderLayer>,
     norm: RmsNorm,
     lm_head: Linear,
+}
+
+#[derive(Debug)]
+pub struct KvCache {
+    pub past_len: usize,
+    pub layers: Vec<Option<(Tensor, Tensor)>>,
+}
+
+impl KvCache {
+    pub fn new(num_layers: usize) -> Self {
+        Self {
+            past_len: 0,
+            layers: vec![None; num_layers],
+        }
+    }
 }
 
 impl Model {
@@ -356,6 +440,54 @@ impl Model {
         }
         let x = self.norm.forward(&x)?;
         self.lm_head.forward(&x)
+    }
+
+    pub fn forward_with_cache(&self, input_ids: &Tensor, cache: &mut KvCache) -> Result<Tensor> {
+        let (_b, seq_len) = input_ids.dims2()?;
+        if seq_len != 1 {
+            return self.forward(input_ids);
+        }
+
+        let mut x = self.embed_tokens.forward(input_ids)?;
+        for (idx, layer) in self.layers.iter().enumerate() {
+            x = layer.forward_with_cache(&x, &mut cache.layers[idx], cache.past_len)?;
+        }
+        let x = self.norm.forward(&x)?;
+        let logits = self.lm_head.forward(&x)?;
+        cache.past_len += 1;
+        Ok(logits)
+    }
+
+    pub fn generate_with_cache(&self, input_ids: &Tensor, max_len: usize, device: &Device) -> Result<Vec<u32>> {
+        let mut generated = Vec::new();
+        let mut cache = KvCache::new(self.layers.len());
+
+        let (_b, seq_len) = input_ids.dims2()?;
+        let mut last_logits = None;
+        for idx in 0..seq_len {
+            let token = input_ids.narrow(1, idx, 1)?;
+            let logits = self.forward_with_cache(&token, &mut cache)?;
+            last_logits = Some(logits);
+        }
+
+        for _ in 0..max_len {
+            let logits = match &last_logits {
+                Some(t) => t.clone(),
+                None => self.forward(input_ids)?,
+            };
+            let last_logits_tensor = logits.squeeze(0)?.squeeze(0)?;
+            let next_id = last_logits_tensor.argmax(0)?.to_scalar::<u32>()?;
+            generated.push(next_id);
+
+            if next_id == 1 || next_id == 107 || next_id == 106 {
+                break;
+            }
+
+            let next_tensor = Tensor::new(&[next_id], device)?.unsqueeze(0)?;
+            let logits = self.forward_with_cache(&next_tensor, &mut cache)?;
+            last_logits = Some(logits);
+        }
+        Ok(generated)
     }
 
     pub fn generate(&self, input_ids: &Tensor, max_len: usize, device: &Device) -> Result<Vec<u32>> {
