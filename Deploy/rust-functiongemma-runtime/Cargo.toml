@@ -1,0 +1,37 @@
+[package]
+name = "rust-functiongemma-runtime"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.100"
+axum = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Optional model/runtime dependencies (enable with --features model)
+minijinja = { version = "2", optional = true }
+tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"], optional = true }
+hf-hub = { version = "0.3", optional = true }
+safetensors = { version = "0.4", optional = true }
+candle-core = { version = "0.9.2", features = ["cuda"], optional = true }
+candle-nn = { version = "0.9.2", features = ["cuda"], optional = true }
+rust-functiongemma-train = { path = "../rust-functiongemma-train", optional = true }
+
+[features]
+default = []
+model = [
+  "minijinja",
+  "tokenizers",
+  "hf-hub",
+  "safetensors",
+  "candle-core",
+  "candle-nn",
+  "rust-functiongemma-train"
+]
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json"] }

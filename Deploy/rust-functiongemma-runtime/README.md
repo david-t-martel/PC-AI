@@ -1,0 +1,57 @@
+# Rust FunctionGemma Runtime (PC_AI)
+
+This is the Rust runtime server intended to replace the Python/vLLM FunctionGemma
+router in PC_AI. It exposes OpenAI-compatible endpoints and returns tool_calls.
+
+## Endpoints
+- GET /health
+- GET /v1/models
+- POST /v1/chat/completions
+
+## Build (CargoTools)
+From repo root:
+
+  .\Tools\Invoke-RustBuild.ps1 -Path Deploy\rust-functiongemma-runtime build
+
+## Tests (CargoTools)
+
+  .\Tools\Invoke-RustBuild.ps1 -Path Deploy\rust-functiongemma-runtime test
+
+## Run
+
+  setx PCAI_ROUTER_ADDR 127.0.0.1:8000
+  setx PCAI_ROUTER_MODEL functiongemma-270m-it
+  setx PCAI_ROUTER_ENGINE heuristic
+
+  .\Deploy\rust-functiongemma-runtime\target\debug\rust-functiongemma-runtime.exe
+
+Notes:
+- Default address is 127.0.0.1:8000 to match Invoke-FunctionGemmaReAct defaults.
+- The default engine is heuristic: it emits tool_calls when the user request
+  mentions a tool name, otherwise it returns NO_TOOL.
+
+## Model inference (experimental)
+Build with model features, then enable model engine:
+
+  .\Tools\Invoke-RustBuild.ps1 -Path Deploy\rust-functiongemma-runtime -CargoArgs @('build','--features','model')
+  setx PCAI_ROUTER_ENGINE model
+  setx PCAI_ROUTER_MODEL_PATH C:\Users\david\PC_AI\Models\functiongemma-270m-it
+
+This path loads the base model and attempts to parse FunctionGemma-style
+tool calls from the generated output. It is functional but not optimized.
+
+## Optional model features
+Enable extra dependencies only when needed:
+
+  cargo build --features model
+
+This enables minijinja, tokenizers, hf-hub, and safetensors for future
+model loading + chat template rendering.
+
+## Router behavior (current)
+This runtime currently returns:
+- tool_calls when the user request mentions a tool name, or
+- NO_TOOL otherwise.
+
+The tool selection logic is intentionally minimal and will be replaced
+by real FunctionGemma inference.
