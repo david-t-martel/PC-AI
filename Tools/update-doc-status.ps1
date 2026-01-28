@@ -34,14 +34,21 @@ $docStatusJson = Join-Path $reportDir 'DOC_STATUS.json'
 $docStatusMd = Join-Path $reportDir 'DOC_STATUS.md'
 
 $markers = 'TODO|FIXME|INCOMPLETE|@status|DEPRECATED'
+# NOTE: Path must come AFTER all glob patterns for ripgrep
 $rgArgs = @(
-    '-n', '-S', $markers, $RepoRoot,
+    '-n', '-S', $markers,
     '-g', '!**/.git/**',
     '-g', '!**/node_modules/**',
     '-g', '!**/bin/**',
     '-g', '!**/obj/**',
     '-g', '!**/target/**',
-    '-g', '!**/dist/**'
+    '-g', '!**/dist/**',
+    # CRITICAL: Prevent self-referential scanning
+    '-g', '!**/Reports/**',
+    '-g', '!**/*.jsonl',
+    '-g', '!**/Models/**/tokenizer*.json',
+    '-g', '!**/.claude/context/**',
+    $RepoRoot
 )
 
 $entries = @()
@@ -82,8 +89,14 @@ if ($sgExe) {
     }
 }
 
-$rgOut = & rg @rgArgs
-if ($LASTEXITCODE -eq 0 -and $rgOut) {
+# Capture stdout only, suppress stderr (handles Windows nul device errors)
+# Temporarily allow errors since rg may emit errors for inaccessible paths
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = 'SilentlyContinue'
+$rgOut = & rg @rgArgs 2>$null
+$ErrorActionPreference = $prevEAP
+# Process any output regardless of exit code (rg may have partial results)
+if ($rgOut) {
     foreach ($line in $rgOut) {
         $parts = $line -split ':', 3
         if ($parts.Count -ge 3) {
