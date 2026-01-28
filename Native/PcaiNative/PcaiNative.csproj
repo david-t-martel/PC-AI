@@ -29,18 +29,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- System.Text.Json for JSON operations -->
+    <PackageReference Include="System.Management.Automation" Version="7.4.6" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
-    <!-- Microsoft.PowerShell.SDK for persistent Runspaces -->
-    <PackageReference Include="Microsoft.PowerShell.SDK" Version="7.5.4" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Ensure Rust DLLs are copied to output directory -->
     <None Include="pcai_core_lib.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_core_lib.dll')" />
-    <None Include="pcai_search.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_search.dll')" />
-    <None Include="pcai_performance.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_performance.dll')" />
-    <None Include="pcai_system.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_system.dll')" />
   </ItemGroup>
 
 </Project>

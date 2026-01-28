@@ -60,15 +60,14 @@ namespace PcaiNative
     /// </summary>
     public static class SystemModule
     {
-        private const string DllName = "pcai_system.dll";
-        private const uint ExpectedMagic = 0x53595354; // "SYST"
+        private const uint ExpectedMagic = 0x50434149; // "PCAI"
 
         // Thread-safe lazy initialization for availability check
         private static readonly Lazy<bool> _isAvailable = new(() =>
         {
             try
             {
-                return pcai_system_test() == ExpectedMagic;
+                return NativeCore.pcai_core_test() == ExpectedMagic;
             }
             catch
             {
@@ -85,11 +84,6 @@ namespace PcaiNative
         // PATH Analysis Functions
         // ====================================================================
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern PathAnalysisStats pcai_analyze_path();
-
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern PcaiStringBuffer pcai_analyze_path_json();
 
         /// <summary>
         /// Analyze the PATH environment variable for issues.
@@ -100,7 +94,7 @@ namespace PcaiNative
             if (!IsAvailable)
                 return new PathAnalysisStats { Status = PcaiStatus.NotImplemented };
 
-            return pcai_analyze_path();
+            return NativeCore.pcai_analyze_path();
         }
 
         /// <summary>
@@ -112,7 +106,7 @@ namespace PcaiNative
             if (!IsAvailable)
                 return null;
 
-            var buffer = pcai_analyze_path_json();
+            var buffer = NativeCore.pcai_analyze_path_json();
             try
             {
                 var json = buffer.ToManagedString();
@@ -129,23 +123,6 @@ namespace PcaiNative
         // Log Search Functions
         // ====================================================================
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern LogSearchStats pcai_search_logs(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string rootPath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string pattern,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string? filePattern,
-            [MarshalAs(UnmanagedType.U1)] bool caseSensitive,
-            uint contextLines,
-            uint maxMatches);
-
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern PcaiStringBuffer pcai_search_logs_json(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string rootPath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string pattern,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string? filePattern,
-            [MarshalAs(UnmanagedType.U1)] bool caseSensitive,
-            uint contextLines,
-            uint maxMatches);
 
         /// <summary>
         /// Search log files for a pattern.
@@ -171,7 +148,7 @@ namespace PcaiNative
             if (string.IsNullOrWhiteSpace(rootPath) || string.IsNullOrWhiteSpace(pattern))
                 return new LogSearchStats { Status = PcaiStatus.InvalidArgument };
 
-            return pcai_search_logs(rootPath, pattern, filePattern, caseSensitive, contextLines, maxMatches);
+            return NativeCore.pcai_search_logs(rootPath, pattern, filePattern, caseSensitive, contextLines, maxMatches);
         }
 
         /// <summary>
@@ -198,7 +175,7 @@ namespace PcaiNative
             if (string.IsNullOrWhiteSpace(rootPath) || string.IsNullOrWhiteSpace(pattern))
                 return null;
 
-            var buffer = pcai_search_logs_json(rootPath, pattern, filePattern, caseSensitive, contextLines, maxMatches);
+            var buffer = NativeCore.pcai_search_logs_json(rootPath, pattern, filePattern, caseSensitive, contextLines, maxMatches);
             try
             {
                 var json = buffer.ToManagedString();
@@ -215,11 +192,6 @@ namespace PcaiNative
         // Utility Functions
         // ====================================================================
 
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern uint pcai_system_version();
-
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        private static extern uint pcai_system_test();
 
         /// <summary>
         /// Get the system module version.
@@ -227,7 +199,7 @@ namespace PcaiNative
         /// <returns>Version encoded as 0xMMmmpp (major.minor.patch).</returns>
         public static uint GetVersion()
         {
-            return pcai_system_version();
+            return 0x010000; // Hardcoded or use PcaiCore.Version
         }
 
         /// <summary>
@@ -236,7 +208,7 @@ namespace PcaiNative
         /// <returns>True if the magic number matches.</returns>
         public static bool Test()
         {
-            return pcai_system_test() == ExpectedMagic;
+            return NativeCore.pcai_core_test() == ExpectedMagic;
         }
 
         /// <summary>

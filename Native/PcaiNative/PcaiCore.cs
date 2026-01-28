@@ -413,6 +413,43 @@ public static class PcaiCore
     }
 
     /// <summary>
+    /// Gets a summarized dashboard snapshot for display or LLM status.
+    /// Aggregates hardware, thermal, and performance data.
+    /// </summary>
+    public static string? GetDashboardSnapshotJson()
+    {
+        if (!IsAvailable) return null;
+
+        var metrics = GetResourceMetrics();
+        var telemetry = GetSystemTelemetryJson();
+        var vmm = GetVmmHealthJson();
+
+        var snapshot = new {
+            Metrics = metrics,
+            Telemetry = !string.IsNullOrEmpty(telemetry) ? JsonSerializer.Deserialize<JsonElement>(telemetry) : (object?)null,
+            VmmHealth = !string.IsNullOrEmpty(vmm) ? JsonSerializer.Deserialize<JsonElement>(vmm) : (object?)null,
+            Timestamp = DateTime.UtcNow,
+            Version = Version
+        };
+
+        return JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    /// <summary>
+    /// Gets disk usage statistics as JSON with detailed breakdown.
+    /// </summary>
+    /// <param name="rootPath">Path to analyze.</param>
+    /// <param name="topN">Number of top subdirectories to include.</param>
+    /// <returns>JSON string with usage details, or null on error.</returns>
+    public static string? GetDiskUsageJson(string? rootPath = null, uint topN = 10)
+    {
+        if (!IsAvailable) return null;
+        var buffer = NativeCore.pcai_get_disk_usage_json(rootPath, topN);
+        try { return buffer.ToManagedString(); }
+        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+    }
+
+    /// <summary>
     /// Gets diagnostic information about the native library.
     /// </summary>
     public static NativeDiagnostics GetDiagnostics()

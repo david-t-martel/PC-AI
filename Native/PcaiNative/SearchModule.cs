@@ -218,69 +218,6 @@ public sealed class ContentSearchResult
     public bool IsSuccess => Status == "Success";
 }
 
-// ============================================================================
-// P/Invoke Declarations
-// ============================================================================
-
-/// <summary>
-/// P/Invoke declarations for pcai_search.dll
-/// </summary>
-internal static partial class NativeSearch
-{
-    private const string SearchDll = "pcai_core_lib.dll";
-
-    // ---- Duplicate Detection ----
-
-    [DllImport(SearchDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern PcaiStringBuffer pcai_find_duplicates(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
-        ulong minSize,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? includePattern,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? excludePattern);
-
-    [DllImport(SearchDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern DuplicateStats pcai_find_duplicates_stats(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
-        ulong minSize,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? includePattern,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? excludePattern);
-
-    // ---- File Search ----
-
-    [DllImport(SearchDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern PcaiStringBuffer pcai_find_files(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string pattern,
-        ulong maxResults);
-
-    [DllImport(SearchDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern FileSearchStats pcai_find_files_stats(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string pattern,
-        ulong maxResults);
-
-    // ---- Content Search ----
-
-    [DllImport(SearchDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern PcaiStringBuffer pcai_search_content(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string pattern,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? filePattern,
-        ulong maxResults,
-        uint contextLines);
-
-    [DllImport(SearchDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern ContentSearchStats pcai_search_content_stats(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string pattern,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? filePattern,
-        ulong maxResults);
-
-    // ---- Version ----
-
-    [DllImport(SearchDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern IntPtr pcai_search_version();
-}
 
 // ============================================================================
 // High-Level Wrapper
@@ -297,7 +234,7 @@ public static class PcaiSearch
     {
         try
         {
-            var version = NativeSearch.pcai_search_version();
+            var version = NativeCore.pcai_core_version();
             return version != IntPtr.Zero;
         }
         catch
@@ -311,7 +248,7 @@ public static class PcaiSearch
     {
         try
         {
-            var ptr = NativeSearch.pcai_search_version();
+            var ptr = NativeCore.pcai_core_version();
             return Marshal.PtrToStringUTF8(ptr) ?? "unknown";
         }
         catch
@@ -350,7 +287,7 @@ public static class PcaiSearch
     {
         if (!IsAvailable) return null;
 
-        var buffer = NativeSearch.pcai_find_duplicates(rootPath, minSize, includePattern, excludePattern);
+        var buffer = NativeCore.pcai_find_duplicates(rootPath, minSize, includePattern, excludePattern);
         try
         {
             var json = buffer.ToManagedString();
@@ -376,7 +313,7 @@ public static class PcaiSearch
         if (!IsAvailable)
             return new DuplicateStats { Status = PcaiStatus.NotImplemented };
 
-        return NativeSearch.pcai_find_duplicates_stats(rootPath, minSize, includePattern, excludePattern);
+        return NativeCore.pcai_find_duplicates_stats(rootPath, minSize, includePattern, excludePattern);
     }
 
     // =========================================================================
@@ -397,7 +334,7 @@ public static class PcaiSearch
     {
         if (!IsAvailable) return null;
 
-        var buffer = NativeSearch.pcai_find_files(rootPath, pattern, maxResults);
+        var buffer = NativeCore.pcai_find_files(rootPath, pattern, maxResults);
         try
         {
             var json = buffer.ToManagedString();
@@ -422,7 +359,7 @@ public static class PcaiSearch
         if (!IsAvailable)
             return new FileSearchStats { Status = PcaiStatus.NotImplemented };
 
-        return NativeSearch.pcai_find_files_stats(rootPath, pattern, maxResults);
+        return NativeCore.pcai_find_files_stats(rootPath, pattern, maxResults);
     }
 
     // =========================================================================
@@ -447,7 +384,7 @@ public static class PcaiSearch
     {
         if (!IsAvailable) return null;
 
-        var buffer = NativeSearch.pcai_search_content(rootPath, pattern, filePattern, maxResults, contextLines);
+        var buffer = NativeCore.pcai_search_content(rootPath, pattern, filePattern, maxResults, contextLines);
         try
         {
             var json = buffer.ToManagedString();
@@ -473,7 +410,7 @@ public static class PcaiSearch
         if (!IsAvailable)
             return new ContentSearchStats { Status = PcaiStatus.NotImplemented };
 
-        return NativeSearch.pcai_search_content_stats(rootPath, pattern, filePattern, maxResults);
+        return NativeCore.pcai_search_content_stats(rootPath, pattern, filePattern, maxResults);
     }
 
     // =========================================================================
