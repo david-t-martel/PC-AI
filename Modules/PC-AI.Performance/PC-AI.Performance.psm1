@@ -12,40 +12,6 @@
     - System memory statistics
 #>
 
-$script:DllPath = $null
-
-function Initialize-PcaiNative {
-    [CmdletBinding()]
-    param()
-
-    if ($script:DllPath -and (Test-Path $script:DllPath)) {
-        return
-    }
-
-    # Search paths for the DLL:
-    # 1. ../../../bin (Standard project layout: Modules/PC-AI.Performance -> Root -> bin)
-    # 2. $PSScriptRoot/bin (Module-local bin)
-    $PossiblePaths = @(
-        (Join-Path $PSScriptRoot '..\..\bin\PcaiNative.dll'),
-        (Join-Path $PSScriptRoot 'bin\PcaiNative.dll')
-    )
-
-    foreach ($path in $PossiblePaths) {
-        $fullPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($path)
-        if (Test-Path $fullPath) {
-            try {
-                Add-Type -Path $fullPath -ErrorAction Stop
-                $script:DllPath = $fullPath
-                Write-Verbose "Loaded PcaiNative.dll from $fullPath"
-                return
-            } catch {
-                Write-Warning "Found DLL at $fullPath but failed to load: $_"
-            }
-        }
-    }
-
-    Write-Warning 'PcaiNative.dll not found. Ensure the project is built (Native/build.ps1).'
-}
 
 function Get-PcaiDiskUsage {
     <#
@@ -64,8 +30,8 @@ function Get-PcaiDiskUsage {
         [int]$Top = 10
     )
 
-    Initialize-PcaiNative
-    if (-not $script:DllPath) { return }
+    Import-Module PC-AI.Common -ErrorAction SilentlyContinue
+    if (-not (Initialize-PcaiNative)) { return }
 
     $Json = [PcaiNative.PerformanceModule]::GetDiskUsageJson($Path, $Top)
     if ($Json) {
@@ -87,8 +53,8 @@ function Get-PcaiTopProcess {
         [int]$Top = 20
     )
 
-    Initialize-PcaiNative
-    if (-not $script:DllPath) { return }
+    Import-Module PC-AI.Common -ErrorAction SilentlyContinue
+    if (-not (Initialize-PcaiNative)) { return }
 
     $Json = [PcaiNative.PerformanceModule]::GetTopProcessesJson($Top, $SortBy)
     if ($Json) {
@@ -104,8 +70,8 @@ function Get-PcaiMemoryStat {
     [CmdletBinding()]
     param()
 
-    Initialize-PcaiNative
-    if (-not $script:DllPath) { return }
+    Import-Module PC-AI.Common -ErrorAction SilentlyContinue
+    if (-not (Initialize-PcaiNative)) { return }
 
     $Json = [PcaiNative.PerformanceModule]::GetMemoryStatsJson()
     if ($Json) {
@@ -121,8 +87,8 @@ function Test-PcaiNative {
     [CmdletBinding()]
     param()
 
-    Initialize-PcaiNative
-    if (-not $script:DllPath) { return $false }
+    Import-Module PC-AI.Common -ErrorAction SilentlyContinue
+    if (-not (Initialize-PcaiNative)) { return $false }
 
     return [PcaiNative.PerformanceModule]::Test()
 }

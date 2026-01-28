@@ -83,21 +83,43 @@ function Get-EnrichedSystemPrompt {
         }
     }
 
-    # Inject Telemetry
-    $metrics = [PcaiNative.PcaiCore]::GetResourceMetrics()
-    if ($null -ne $metrics) {
-        $telemetryBlock = @"
+    # Inject Telemetry using high-performance Native Dashboard call
+    $telemetryBlock = ""
+    try {
+        if ([PcaiNative.PcaiCore]::IsAvailable) {
+            $snapshot = [PcaiNative.PcaiCore]::GetDashboardSnapshotJson()
+            if ($snapshot) {
+                # Add snapshot directly to prompt, or format it
+                $telemetryBlock = "### LIVE SYSTEM TELEMETRY (NATIVE)`n$snapshot"
+            }
+        }
+    } catch {}
 
-[SYSTEM_RESOURCE_STATUS]
+    if (-not $telemetryBlock) {
+        # Fallback to manual resource metrics if available
+        try {
+            if (Get-Command Get-PcaiResourceMetrics -ErrorAction SilentlyContinue) {
+                $metrics = Get-PcaiResourceMetrics
+                $telemetryBlock = @"
 CPU Usage: $($metrics.CpuUsage)%
 Memory Usage: $([math]::Round($metrics.MemoryUsage / 1GB, 2)) GB / $([math]::Round($metrics.TotalMemory / 1GB, 2)) GB
 GPU Usage: $($metrics.GpuUsage)%
 System Uptime: $([TimeSpan]::FromSeconds($metrics.Uptime).ToString("dd'd 'hh'h 'mm'm'"))
 "@
+            } else {
+                # Basic telemetry fallback using built-in commands
+                $cpuUsage = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+                $os = Get-CimInstance Win32_OperatingSystem
+                $telemetryBlock = "CPU Usage: $cpuUsage%`nMemory: $([math]::Round($os.FreePhysicalMemory / 1MB, 2)) GB free / $([math]::Round($os.TotalVisibleMemorySize / 1MB, 2)) GB total"
+            }
+        } catch {}
+    }
+
+    if ($telemetryBlock) {
         if ($prompt -match '\[SYSTEM_RESOURCE_STATUS\]') {
             $prompt = $prompt -replace '\[SYSTEM_RESOURCE_STATUS\]', $telemetryBlock
         } else {
-            $prompt += "`n$telemetryBlock"
+            $prompt += "`n`n[SYSTEM_RESOURCE_STATUS]`n$telemetryBlock"
         }
     }
 
@@ -117,8 +139,8 @@ function Invoke-ToolByName {
         [Parameter()]
         [object]$Args,
 
-        [Parameter(Mandatory)]
-        [array]$Tools,
+        [Parameter()]
+        [array]$Tools = @(),
 
         [Parameter(Mandatory)]
         [string]$ModuleRoot
@@ -133,7 +155,15 @@ function Invoke-ToolByName {
         foreach ($prop in $Args.PSObject.Properties) { $argTable[$prop.Name] = $prop.Value }
     }
 
-    $toolDef = $Tools | Where-Object { $_.function.name -eq $Name }
+    if ($Tools.Count -eq 0) {
+        return "Unhandled tool: $Name (no tools provided)"
+    }
+    $toolDef = $Tools | Where-Object {
+        if ($_.PSObject.Properties['function']) {
+            return $_.function.name -eq $Name
+        }
+        return $_['function']['name'] -eq $Name
+    }
     if (-not $toolDef -or -not $toolDef.pcai_mapping) {
         return "Unhandled tool: $Name (no mapping found)"
     }
@@ -884,11 +914,7 @@ function Invoke-LLMChatWithFallback {
             }
             'vllm' {
                 if (Test-OpenAIConnection -ApiUrl $script:ModuleConfig.VLLMApiUrl) {
-                    if ($Model -and $Model -ne $script:ModuleConfig.DefaultModel) {
-                        $modelToUse = $Model
-                    } else {
-                        $modelToUse = $script:ModuleConfig.VLLMModel
-                    }
+                    $modelToUse = if ($Model) { $Model } else { $script:ModuleConfig.VLLMModel }
                     if ($ShowProgress) {
                         $resp = Invoke-OpenAIChatWithProgress -Messages $Messages -Model $modelToUse -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $script:ModuleConfig.VLLMApiUrl -ProgressIntervalSeconds $ProgressIntervalSeconds
                     } else {

@@ -74,6 +74,31 @@ if (Test-Path -Path $projectConfigPath) {
     }
 }
 
+# Finally, check settings.json for direct overrides
+$settingsPath = Join-Path -Path $projectRoot -ChildPath 'Config\settings.json'
+if (Test-Path -Path $settingsPath) {
+    try {
+        $settings = Get-Content -Path $settingsPath -Raw | ConvertFrom-Json
+        if ($settings.llm) {
+            if ($settings.llm.activeModel) { $script:ModuleConfig.DefaultModel = $settings.llm.activeModel }
+            if ($settings.llm.routerUrl) { $script:ModuleConfig.VLLMApiUrl = $settings.llm.routerUrl }
+            if ($settings.llm.routerModel) { $script:ModuleConfig.VLLMModel = $settings.llm.routerModel }
+            if ($settings.llm.timeoutSeconds) { $script:ModuleConfig.DefaultTimeout = $settings.llm.timeoutSeconds }
+            if ($settings.llm.activeProvider) {
+                # Ensure active provider is at the front of the list
+                $providers = @($settings.llm.activeProvider)
+                if ($script:ModuleConfig.ProviderOrder) {
+                    $providers += ($script:ModuleConfig.ProviderOrder | Where-Object { $_ -ne $settings.llm.activeProvider })
+                }
+                $script:ModuleConfig.ProviderOrder = $providers
+            }
+            Write-Verbose "Applied LLM overrides from settings.json"
+        }
+    } catch {
+        Write-Warning "Failed to load overrides from settings.json: $_"
+    }
+}
+
 # Dot source private functions
 if (Test-Path -Path $PrivatePath) {
     Get-ChildItem -Path $PrivatePath -Filter '*.ps1' -Recurse | ForEach-Object {
@@ -114,6 +139,9 @@ Export-ModuleMember -Function @(
     'Invoke-DocSearch'
     'Get-SystemInfoTool'
     'Invoke-LogSearch'
+    'Resolve-PcaiEndpoint'
+    'Test-OllamaConnection'
+    'Test-OpenAIConnection'
 )
 
 Write-Verbose 'PC-AI.LLM module loaded successfully'

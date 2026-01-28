@@ -55,10 +55,6 @@ function Initialize-PcaiNative {
             $coreDll = Join-Path $resolved.Path 'pcai_core_lib.dll'
             $wrapperDll = Join-Path $resolved.Path 'PcaiNative.dll'
 
-            # Specialized DLLs
-            $fsDll = Join-Path $resolved.Path 'pcai_fs.dll'
-            $perfDll = Join-Path $resolved.Path 'pcai_performance.dll'
-            $sysDll = Join-Path $resolved.Path 'pcai_system.dll'
 
             if ((Test-Path $coreDll) -and (Test-Path $wrapperDll)) {
                 $dllPath = $resolved.Path
@@ -104,10 +100,7 @@ function Initialize-PcaiNative {
             $script:PcaiNativeVersion = [PcaiNative.PcaiCore]::Version
             Write-Verbose "PCAI System version: $($script:PcaiNativeVersion)"
 
-            # Check specialized modules if available
-            $fsAvailable = Test-Path (Join-Path $dllPath 'pcai_fs.dll')
-            $perfAvailable = Test-Path (Join-Path $dllPath 'pcai_performance.dll')
-            Write-Verbose "Specialized Modules: FS=$fsAvailable, Performance=$perfAvailable"
+            Write-Verbose "PCAI Core loaded and functional"
 
             $script:PcaiNativeLoaded = $true
             return $true
@@ -160,15 +153,13 @@ function Get-PcaiNativeStatus {
         CoreAvailable   = if ($available) { [PcaiNative.PcaiCore]::IsAvailable } else { $false }
         Modules         = if ($available) {
             [PSCustomObject]@{
-                FS          = Test-Path (Join-Path $dllPath 'pcai_fs.dll')
-                Performance = Test-Path (Join-Path $dllPath 'pcai_performance.dll')
-                System      = Test-Path (Join-Path $dllPath 'pcai_system.dll')
+                Core = $true
             }
         } else { $null }
     }
 }
 
-function Invoke-PcaiNativeDuplicate {
+function Invoke-PcaiNativeDuplicates {
     <#
     .SYNOPSIS
         Finds duplicate files using native parallel SHA-256 hashing

@@ -61,6 +61,8 @@ function Get-LLMStatus {
             VLLM            = $null
             LMStudio        = $null
             Recommendations = @()
+            ActiveProvider  = $script:ModuleConfig.ProviderOrder[0]
+            ActiveModel     = $script:ModuleConfig.DefaultModel
         }
 
         # Test API connectivity first (supports Dockerized Ollama)
