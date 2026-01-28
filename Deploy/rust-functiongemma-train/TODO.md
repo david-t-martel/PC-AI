@@ -23,7 +23,7 @@ Deploy/functiongemma-finetune (Python) and to enable a Rust-only router runtime.
   - Tool coverage from pcai-tools.json
 - Ensure chat template rendering uses the tokenizer template with tools.
 - Add prompt masking so user/developer content does not contribute to loss.
-- Emit tool test vectors alongside tool-coverage datasets (parity with generate_training_data.py).
+- Emit tool test vectors alongside tool-coverage datasets (parity with generate_training_data.py). Implemented via `prepare-router --test-vectors`.
 
 ## P0 - Training parity
 - LoRA/QLoRA support with target modules (q/k/v/o/gate/up/down).
