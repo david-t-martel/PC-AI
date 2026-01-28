@@ -22,7 +22,7 @@ fn test_model_initialization_cpu_dummy() -> Result<()> {
 
     let varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::F32, &device);
-    let model = Model::new(&config, vb)?;
+    let model = Model::new(&config, 0, vb, true)?;
 
     let input_data: Vec<u32> = (0..10).map(|_| rand::random::<u32>() % 1000).collect();
     let input = Tensor::from_vec(input_data, (1, 10), &device)?;

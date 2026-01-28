@@ -11,6 +11,13 @@ use rust_functiongemma_train::data_gen::DataGenerator;
 use rust_functiongemma_train::dataset::Dataset;
 use rust_functiongemma_train::trainer::{Trainer, TrainerConfig};
 use rust_functiongemma_train::eval::parse_tool_call;
+use rust_functiongemma_train::router_dataset::{
+    build_router_dataset,
+    build_tool_test_vectors,
+    write_jsonl,
+    write_test_vectors,
+    RouterDatasetConfig,
+};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -33,6 +40,25 @@ enum Commands {
         max_cases: usize,
         #[arg(long)]
         system_prompt: Option<String>,
+    },
+    /// Prepare router-only dataset (tool_calls or NO_TOOL)
+    PrepareRouter {
+        #[arg(long)]
+        tools: String,
+        #[arg(long)]
+        output: String,
+        #[arg(long)]
+        diagnose_prompt: String,
+        #[arg(long)]
+        chat_prompt: String,
+        #[arg(long)]
+        scenarios: Option<String>,
+        #[arg(long, default_value = "24")]
+        max_cases: usize,
+        #[arg(long)]
+        no_tool_coverage: bool,
+        #[arg(long)]
+        test_vectors: Option<String>,
     },
     /// Train the model using LoRA
     Train {
@@ -121,6 +147,41 @@ fn main() -> Result<()> {
             }
             fs::write(output, out_text)?;
             println!("Dataset prepared successfully.");
+        }
+        Commands::PrepareRouter {
+            tools,
+            output,
+            diagnose_prompt,
+            chat_prompt,
+            scenarios,
+            max_cases,
+            no_tool_coverage,
+            test_vectors,
+        } => {
+            println!("Preparing router dataset...");
+            let cfg = RouterDatasetConfig {
+                output: PathBuf::from(&output),
+                tools_path: PathBuf::from(&tools),
+                diagnose_prompt: PathBuf::from(&diagnose_prompt),
+                chat_prompt: PathBuf::from(&chat_prompt),
+                scenarios_path: scenarios.map(PathBuf::from),
+                include_tool_coverage: !no_tool_coverage,
+                max_cases,
+            };
+
+            let items = build_router_dataset(&cfg)?;
+            write_jsonl(&cfg.output, &items)?;
+            println!("Wrote {} examples to {}", items.len(), cfg.output.display());
+
+            if let Some(test_vectors_path) = test_vectors {
+                let vectors = build_tool_test_vectors(&cfg.tools_path, cfg.max_cases)?;
+                write_test_vectors(&PathBuf::from(&test_vectors_path), &vectors)?;
+                println!(
+                    "Wrote {} tool test vectors to {}",
+                    vectors.len(),
+                    test_vectors_path
+                );
+            }
         }
         Commands::Train { model_path, train_data, output, epochs, lr, lora_r, batch_size, grad_accum } => {
             let device = Device::new_cuda(0).unwrap_or(Device::Cpu);
