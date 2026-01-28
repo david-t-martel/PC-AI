@@ -116,6 +116,63 @@ release_build_errors.txt
 |-------|------|-------|--------|-------|
 | commit-cluster | Semantic commit clustering | 84 files | Complete | 8 commits pushed |
 | - | .gitignore/.rgignore audit | 2 files | Complete | Reduced 570+ untracked files |
+| - | rust-analyzer memory analysis | - | Complete | Configuration recommendations provided |
+
+## Rust-Analyzer Memory Analysis
+
+### System State (Investigated)
+- **Version**: rust-analyzer 1.93.0
+- **Installations**: 3 copies found (VS Code extension, cargo bin, rustup)
+- **VS Code Extensions**: rust-lang.rust-analyzer, AltinUludagi.cross-rust-analyzer, ArunMani.rust-syntax, ArkM.anycode-rust
+- **Cargo.toml Files**: 8 workspaces contributing to memory usage
+
+### Memory Optimization Tiers
+
+**Minimal (~500MB)** - For constrained systems:
+```json
+{
+  "rust-analyzer.lru.capacity": 32,
+  "rust-analyzer.procMacro.enable": false,
+  "rust-analyzer.cargo.buildScripts.enable": false,
+  "rust-analyzer.checkOnSave": false,
+  "rust-analyzer.server.extraEnv": {"RA_LRU_CAP": "32"}
+}
+```
+
+**Balanced (~1-2GB)** - Recommended for this project:
+```json
+{
+  "rust-analyzer.lru.capacity": 64,
+  "rust-analyzer.procMacro.attributes.enable": true,
+  "rust-analyzer.procMacro.server": null,
+  "rust-analyzer.numThreads": 4,
+  "rust-analyzer.cargo.buildScripts.rebuildOnSave": false,
+  "rust-analyzer.diagnostics.disabled": ["unresolved-proc-macro"]
+}
+```
+
+**Full (~2-4GB+)** - For comprehensive analysis:
+```json
+{
+  "rust-analyzer.cargo.buildScripts.enable": true,
+  "rust-analyzer.procMacro.enable": true,
+  "rust-analyzer.check.command": "clippy"
+}
+```
+
+### MCP Integration Options
+
+| Option | Install | Notes |
+|--------|---------|-------|
+| rust-analyzer-mcp | `cargo install rust-analyzer-mcp` | Native Rust MCP wrapper |
+| cclsp | `npx @anthropic/cclsp setup` | Generic LSP-to-MCP bridge |
+| Claude Code LSP Plugin | Built-in | Requires configuration |
+
+### Recommended Actions
+1. Apply "Balanced" config to `.vscode/settings.json`
+2. Disable unused Rust VS Code extensions
+3. Consider rust-analyzer-mcp for Claude Code integration
+4. Monitor with `cargo metadata --format-version=1` for workspace complexity
 
 ## Key File References
 

@@ -132,6 +132,12 @@
   "agents": {
     "registry": [
       {
+        "agent": "rust-analyzer-analysis",
+        "task": "Comprehensive rust-analyzer memory investigation",
+        "completed_at": "2026-01-28T16:00:00Z",
+        "handoff_notes": "Documented 3 config tiers, MCP options, 8 workspaces found"
+      },
+      {
         "agent": "commit-cluster",
         "task": "Clustered and committed 84 files into 8 semantic commits",
         "completed_at": "2026-01-28T15:31:00Z",
@@ -162,6 +168,7 @@
   },
   "roadmap": {
     "immediate": [
+      "Apply rust-analyzer Balanced config to .vscode/settings.json",
       "Validate Rust workspace builds (cargo build --release)",
       "Run FFI test suite",
       "Review Dependabot high-severity alert"
