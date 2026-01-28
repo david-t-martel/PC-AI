@@ -191,4 +191,19 @@ internal static partial class NativeCore
     internal static extern PcaiStringBuffer pcai_query_prompt_assembly(
         [MarshalAs(UnmanagedType.LPUTF8Str)] string? template,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string? jsonVars);
+
+    // ========================================================================
+    // FunctionGemma Dataset Ops
+    // ========================================================================
+
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern PcaiStringBuffer pcai_build_router_dataset_jsonl(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? toolsPath,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? scenariosPath,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? outputJsonl,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? outputVectors,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? diagnosePrompt,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? chatPrompt,
+        uint maxCases,
+        [MarshalAs(UnmanagedType.U1)] bool includeToolCoverage);
 }

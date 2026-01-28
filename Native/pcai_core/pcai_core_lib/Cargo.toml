@@ -35,6 +35,7 @@ path-slash.workspace = true
 dunce.workspace = true
 winreg.workspace = true
 libc.workspace = true
+rust-functiongemma-train = { path = "../../../Deploy/rust-functiongemma-train" }
 
 # Local crate dependencies (if any remained, but we consolidated them)
 
