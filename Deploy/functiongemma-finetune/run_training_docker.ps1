@@ -30,6 +30,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+if ($env:PCAI_ENABLE_DOCKER_TRAINING -ne '1') {
+    Write-Error "Docker-based FunctionGemma training is disabled. Set PCAI_ENABLE_DOCKER_TRAINING=1 to override."
+    exit 2
+}
+
 if ($Build) {
 	Write-Host "Building Docker image '$ContainerName'..." -ForegroundColor Cyan
 	docker build -t $ContainerName .
