@@ -197,8 +197,7 @@ pub fn search_logs(options: &LogSearchOptions) -> (LogSearchStats, LogSearchJson
     let file_glob = options
         .file_pattern
         .as_ref()
-        .map(|p| globset::Glob::new(p).ok())
-        .flatten()
+        .and_then(|p| globset::Glob::new(p).ok())
         .map(|g| g.compile_matcher());
 
     // Collect files to search

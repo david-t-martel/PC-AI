@@ -55,7 +55,7 @@ where
             match result {
                 Ok(entry) => {
                     stats.files_scanned.fetch_add(1, Ordering::Relaxed);
-                     if entry.file_type().map_or(false, |ft| ft.is_file()) {
+                     if entry.file_type().is_some_and(|ft| ft.is_file()) {
                          return callback(&entry);
                      }
                 }

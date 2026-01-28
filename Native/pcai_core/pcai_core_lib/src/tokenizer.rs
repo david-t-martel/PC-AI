@@ -26,7 +26,7 @@ pub fn estimate_tokens(text: &str) -> usize {
         // Long words are often split, average of 4 chars per token for typical text.
         let len = piece.len();
         if len > 8 {
-            count += (len + 3) / 4;
+            count += len.div_ceil(4);
         } else {
             count += 1;
         }

@@ -3,7 +3,6 @@
 //! Provides optimized multi-phase duplicate detection using SHA-256.
 
 use std::collections::HashMap;
-use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -13,7 +12,6 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::PcaiStatus;
-use crate::string::PcaiStringBuffer;
 
 #[derive(Serialize)]
 pub struct DuplicateGroup {
@@ -61,7 +59,7 @@ pub fn find_duplicates(
     for entry in walker {
         scanned += 1;
         if let Ok(entry) = entry {
-            if entry.file_type().map_or(false, |ft| ft.is_file()) {
+            if entry.file_type().is_some_and(|ft| ft.is_file()) {
                 let metadata = match entry.metadata() {
                     Ok(m) => m,
                     Err(_) => continue,

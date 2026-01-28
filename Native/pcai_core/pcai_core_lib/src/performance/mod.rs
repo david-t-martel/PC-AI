@@ -80,10 +80,7 @@ pub unsafe extern "C" fn pcai_get_top_processes_json(
     let sort_key = if sort_by.is_null() {
         "memory"
     } else {
-        match CStr::from_ptr(sort_by).to_str() {
-            Ok(s) => s,
-            Err(_) => "memory",
-        }
+        CStr::from_ptr(sort_by).to_str().unwrap_or("memory")
     };
 
     let start = Instant::now();

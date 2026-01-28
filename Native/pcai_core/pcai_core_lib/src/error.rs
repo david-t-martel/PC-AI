@@ -19,9 +19,10 @@ use std::os::raw::c_char;
 /// }
 /// ```
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PcaiStatus {
     /// Operation completed successfully
+    #[default]
     Success = 0,
 
     /// Invalid argument provided (e.g., negative value where positive required)
@@ -107,12 +108,6 @@ impl PcaiStatus {
             PcaiStatus::JsonError => "JSON serialization error",
             PcaiStatus::Unknown => "Unknown error",
         }
-    }
-}
-
-impl Default for PcaiStatus {
-    fn default() -> Self {
-        PcaiStatus::Success
     }
 }
 

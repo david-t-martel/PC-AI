@@ -1,4 +1,12 @@
 //! PCAI Core Library - FFI Utilities and Shared Types
+//!
+//! This crate provides FFI entry points for C# P/Invoke interop.
+//! Raw pointer arguments are validated with null checks before dereference.
+
+// Allow raw pointer dereference in non-unsafe FFI functions - this is intentional
+// as all FFI entry points perform null checks before dereferencing.
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 

@@ -114,12 +114,10 @@ pub fn is_wsl_path(path: &str) -> bool {
         || path.starts_with("//wsl$/")
 }
 
-/// Detects if a path uses Windows drive letter format.
+/// Detects if a path uses Windows drive letter format (e.g., "C:\...").
 pub fn is_windows_path(path: &str) -> bool {
     let bytes = path.as_bytes();
-    bytes.len() >= 2
-        && bytes[0].is_ascii_alphabetic()
-        && (bytes[1] == b':' || (bytes.len() >= 3 && bytes[1] == b':'))
+    bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
 }
 
 /// Detects if a path uses Unix absolute format.

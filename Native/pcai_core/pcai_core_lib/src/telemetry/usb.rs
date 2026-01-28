@@ -70,7 +70,7 @@ pub fn collect_usb_diagnostics() -> Vec<UsbDeviceDetail> {
 
             let mut detail = UsbDeviceDetail {
                 name: "Unknown".to_string(),
-                hardware_id: hardware_id,
+                hardware_id,
                 manufacturer: "Unknown".to_string(),
                 driver_version: "Unknown".to_string(),
                 driver_date: "Unknown".to_string(),
