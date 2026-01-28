@@ -155,3 +155,80 @@ jobs:
           name: health-report-${{ github.run_number }}
           path: health-report.json
           retention-days: 90
+
+  documentation-pipeline:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Documentation Pipeline
+        shell: pwsh
+        run: |
+          Write-Host "Running documentation pipeline..." -ForegroundColor Cyan
+          .\Tools\Invoke-DocPipeline.ps1 -Mode Full -SkipRust
+
+      - name: Verify Pipeline Success
+        shell: pwsh
+        run: |
+          $reportPath = "Reports\DOC_PIPELINE_REPORT.json"
+          if (Test-Path $reportPath) {
+              $report = Get-Content $reportPath -Raw | ConvertFrom-Json
+              if ($report.success) {
+                  Write-Host "Pipeline completed successfully" -ForegroundColor Green
+                  Write-Host "Steps:"
+                  foreach ($step in $report.steps) {
+                      $symbol = if ($step.Status -eq 'Success') { '✓' } elseif ($step.Status -eq 'Skipped') { '○' } else { '✗' }
+                      Write-Host "  $symbol $($step.Name): $($step.Status)"
+                  }
+              } else {
+                  Write-Host "Pipeline completed with errors:" -ForegroundColor Red
+                  foreach ($err in $report.errors) {
+                      Write-Host "  - $err" -ForegroundColor Red
+                  }
+                  exit 1
+              }
+          } else {
+              Write-Host "Pipeline report not found" -ForegroundColor Red
+              exit 1
+          }
+
+      - name: Validate Training Data
+        shell: pwsh
+        run: |
+          $trainingFile = "Deploy\rust-functiongemma-train\data\training_data.jsonl"
+          if (Test-Path $trainingFile) {
+              $lines = Get-Content $trainingFile
+              Write-Host "Training data: $($lines.Count) examples" -ForegroundColor Green
+
+              # Validate first few lines
+              $errors = 0
+              $lines | Select-Object -First 5 | ForEach-Object {
+                  try {
+                      $null = $_ | ConvertFrom-Json
+                  } catch {
+                      $errors++
+                  }
+              }
+
+              if ($errors -gt 0) {
+                  Write-Host "Found $errors JSON parsing errors" -ForegroundColor Yellow
+              } else {
+                  Write-Host "Training data format valid" -ForegroundColor Green
+              }
+          } else {
+              Write-Host "Training data not generated" -ForegroundColor Yellow
+          }
+
+      - name: Upload Documentation Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: doc-reports-${{ github.run_number }}
+          path: |
+            Reports/DOC_STATUS.md
+            Reports/DOC_PIPELINE_REPORT.json
+            Reports/DOC_PIPELINE_REPORT.md
+            Reports/API_SIGNATURE_REPORT.json
+            Deploy/rust-functiongemma/TOOLS.md
+            Deploy/rust-functiongemma-train/data/training_data.jsonl
+          retention-days: 30
+          if-no-files-found: warn
