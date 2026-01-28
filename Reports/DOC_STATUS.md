@@ -1,108 +1,37 @@
-# DOC_STATUS
+﻿# DOC_STATUS
 
-Generated: 2026-01-27 04:13:42
+Generated: 2026-01-28 17:29:22
 
 ## Counts
-- @status: 8
-- DEPRECATED: 12
-- FIXME: 12
-- INCOMPLETE: 12
-- Other: 19
-- TODO: 31
+- TODO: 16
+- FIXME: 2
+- INCOMPLETE: 2
+- DEPRECATED: 3
+- @status: 1
 
 ## Matches
+- C:\Users\david\PC_AI\AGENTS.md 56:## Known gaps / TODOs
+- C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\TODO.md 1:# TODO - Rust FunctionGemma (PC_AI)
+- C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\TODO.md 3:This TODO captures the minimum work required to reach feature parity with
 - C:\Users\david\PC_AI\rules\doc-status.yml 7:    - pattern: "TODO"
 - C:\Users\david\PC_AI\rules\doc-status.yml 8:    - pattern: "FIXME"
 - C:\Users\david\PC_AI\rules\doc-status.yml 9:    - pattern: "INCOMPLETE"
 - C:\Users\david\PC_AI\rules\doc-status.yml 10:    - pattern: "DEPRECATED"
 - C:\Users\david\PC_AI\Tools\update-doc-status.ps1 8:  Scans the repo for TODO/FIXME/INCOMPLETE/@status/DEPRECATED markers and writes:
 - C:\Users\david\PC_AI\Tools\update-doc-status.ps1 36:$markers = 'TODO|FIXME|INCOMPLETE|@status|DEPRECATED'
-- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 104:    if ($_.Match -match 'TODO') { 'TODO' }
-- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 105:    elseif ($_.Match -match 'FIXME') { 'FIXME' }
-- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 106:    elseif ($_.Match -match 'INCOMPLETE') { 'INCOMPLETE' }
-- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 107:    elseif ($_.Match -match '@status') { '@status' }
-- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 108:    elseif ($_.Match -match 'DEPRECATED') { 'DEPRECATED' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 6:- @status: 8
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 7:- DEPRECATED: 12
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 8:- FIXME: 12
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 9:- INCOMPLETE: 12
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 11:- TODO: 31
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 14:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 8:  Scans the repo for TODO/FIXME/INCOMPLETE/@status/DEPRECATED markers and writes:
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 15:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 36:$markers = 'TODO|FIXME|INCOMPLETE|@status|DEPRECATED'
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 16:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 104:    if ($_.Match -match 'TODO') { 'TODO' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 17:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 105:    elseif ($_.Match -match 'FIXME') { 'FIXME' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 18:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 106:    elseif ($_.Match -match 'INCOMPLETE') { 'INCOMPLETE' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 19:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 107:    elseif ($_.Match -match '@status') { '@status' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 20:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 108:    elseif ($_.Match -match 'DEPRECATED') { 'DEPRECATED' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 21:- C:\Users\david\PC_AI\rules\doc-status.yml 7:    - pattern: "TODO"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 22:- C:\Users\david\PC_AI\rules\doc-status.yml 8:    - pattern: "FIXME"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 23:- C:\Users\david\PC_AI\rules\doc-status.yml 9:    - pattern: "INCOMPLETE"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 24:- C:\Users\david\PC_AI\rules\doc-status.yml 10:    - pattern: "DEPRECATED"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 25:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 6:- @status: 8
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 26:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 7:- DEPRECATED: 11
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 27:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 8:- FIXME: 12
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 28:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 9:- INCOMPLETE: 11
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 29:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 11:- TODO: 30
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 30:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 14:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 8:  Scans the repo for TODO/FIXME/INCOMPLETE/@status/DEPRECATED markers and writes:
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 31:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 15:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 36:$markers = 'TODO|FIXME|INCOMPLETE|@status|DEPRECATED'
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 32:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 16:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 104:    if ($_.Match -match 'TODO') { 'TODO' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 33:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 17:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 105:    elseif ($_.Match -match 'FIXME') { 'FIXME' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 34:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 18:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 106:    elseif ($_.Match -match 'INCOMPLETE') { 'INCOMPLETE' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 35:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 19:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 107:    elseif ($_.Match -match '@status') { '@status' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 36:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 20:- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 108:    elseif ($_.Match -match 'DEPRECATED') { 'DEPRECATED' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 37:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 21:- C:\Users\david\PC_AI\rules\doc-status.yml 7:    - pattern: "TODO"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 38:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 22:- C:\Users\david\PC_AI\rules\doc-status.yml 8:    - pattern: "FIXME"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 39:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 23:- C:\Users\david\PC_AI\rules\doc-status.yml 9:    - pattern: "INCOMPLETE"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 40:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 24:- C:\Users\david\PC_AI\rules\doc-status.yml 10:    - pattern: "DEPRECATED"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 41:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 25:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 6:- @status: 8
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 42:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 26:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 7:- DEPRECATED: 12
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 43:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 27:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 8:- FIXME: 12
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 44:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 28:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 9:- INCOMPLETE: 12
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 45:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 29:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 11:- TODO: 31
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 46:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 30:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 14:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 8:  Scans the repo for TODO/FIXME/INCOMPLETE/@stat [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 47:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 31:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 15:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 36:$markers = 'TODO|FIXME|INCOMPLETE|@status|DEPRE [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 48:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 32:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 16:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 104:    if ($_.Match -match 'TODO') { 'TODO' }
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 49:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 33:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 17:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 105:    elseif ($_.Match -match 'FIXME') { 'FIXME' [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 50:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 34:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 18:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 106:    elseif ($_.Match -match 'INCOMPLETE') { 'I [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 51:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 35:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 19:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 107:    elseif ($_.Match -match '@status') { '@sta [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 52:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 36:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 20:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 108:    elseif ($_.Match -match 'DEPRECATED') { 'D [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 53:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 37:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 21:- C:\\Users\\david\\PC_AI\Modules\PC-AI.Acceleration\Public\Search-ContentFast.ps1 39:    Search-Content [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 54:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 38:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 22:- C:\\Users\\david\\PC_AI\Modules\PC-AI.Acceleration\Public\Search-ContentFast.ps1 40:    Finds TODO com [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 55:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 39:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 23:- C:\\Users\\david\\PC_AI\rules\doc-status.yml 7:    - pattern: "TODO"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 56:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 40:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 24:- C:\\Users\\david\\PC_AI\rules\doc-status.yml 8:    - pattern: "FIXME"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 57:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 41:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 25:- C:\\Users\\david\\PC_AI\rules\doc-status.yml 9:    - pattern: "INCOMPLETE"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 58:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 42:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 26:- C:\\Users\\david\\PC_AI\rules\doc-status.yml 10:    - pattern: "DEPRECATED"
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 59:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 43:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 27:- C:\\Users\\david\\PC_AI\Native\pcai_core\pcai_core_lib\src\telemetry.rs 31:    // TODO: Integrated NVM [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 60:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 44:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 28:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 6:- @status: 8
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 61:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 45:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 29:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 7:- DEPRECATED: 12
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 62:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 46:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 30:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 8:- FIXME: 12
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 63:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 47:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 31:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 9:- INCOMPLETE: 12
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 64:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 48:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 32:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 11:- TODO: 32
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 65:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 49:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 33:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 14:- C:\\Users\\david\\PC_AI\rules\doc-status.yml 7:     [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 66:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 50:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 34:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 15:- C:\\Users\\david\\PC_AI\rules\doc-status.yml 8:     [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 67:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 51:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 35:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 16:- C:\\Users\\david\\PC_AI\rules\doc-status.yml 9:     [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 68:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 52:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 36:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 17:- C:\\Users\\david\\PC_AI\rules\doc-status.yml 10:    [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 69:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 53:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 37:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 18:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 70:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 54:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 38:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 19:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 71:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 55:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 39:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 20:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 72:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 56:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 40:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 21:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 73:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 57:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 41:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 22:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 74:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 58:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 42:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 23:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 75:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 59:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 43:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 24:- C:\\Users\\david\\PC_AI\Tools\update-doc-status.ps1 [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 77:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 61:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 45:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 26:- C:\\Users\\david\\PC_AI\Modules\PC-AI.Acceleration\ [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 78:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 62:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 46:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 27:- C:\\Users\\david\\PC_AI\Native\pcai_core\pcai_core_ [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 79:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 63:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 47:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 28:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 6:- @ [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 80:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 64:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 48:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 29:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 7:- D [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 81:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 65:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 49:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 30:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 8:- F [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 82:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 66:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 50:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 31:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 9:- I [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 83:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 67:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 51:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 32:- C:\\Users\\david\\PC_AI\Reports\DOC_STATUS.md 11:-  [... omitted end of long line]
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 99:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 105:- C:\Users\david\PC_AI\Modules\PC-AI.Acceleration\Public\Search-ContentFast.ps1 39:    Search-ContentFast -Path "." -LiteralPattern "TODO:" -Context 2
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 100:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 106:- C:\Users\david\PC_AI\Modules\PC-AI.Acceleration\Public\Search-ContentFast.ps1 40:    Finds TODO comments with context
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 101:- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 107:- C:\Users\david\PC_AI\Native\pcai_core\pcai_core_lib\src\telemetry.rs 31:    // TODO: Integrated NVML support for GPU metrics
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 102:- C:\Users\david\PC_AI\Modules\PC-AI.Acceleration\Public\Search-ContentFast.ps1 39:    Search-ContentFast -Path "." -LiteralPattern "TODO:" -Context 2
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 103:- C:\Users\david\PC_AI\Modules\PC-AI.Acceleration\Public\Search-ContentFast.ps1 40:    Finds TODO comments with context
-- C:\Users\david\PC_AI\Reports\DOC_STATUS.md 104:- C:\Users\david\PC_AI\Native\pcai_core\pcai_core_lib\src\telemetry.rs 61:    // TODO: Integrated NVML support for GPU metrics
+- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 117:    if ($_.Match -match 'TODO') { 'TODO' }
+- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 118:    elseif ($_.Match -match 'FIXME') { 'FIXME' }
+- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 119:    elseif ($_.Match -match 'INCOMPLETE') { 'INCOMPLETE' }
+- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 120:    elseif ($_.Match -match '@status') { '@status' }
+- C:\Users\david\PC_AI\Tools\update-doc-status.ps1 121:    elseif ($_.Match -match 'DEPRECATED') { 'DEPRECATED' }
+- C:\Users\david\PC_AI\Tools\Invoke-DocPipeline.ps1 98:# Step 1: Generate DOC_STATUS report (TODO/FIXME/DEPRECATED markers)
+- C:\Users\david\PC_AI\Tools\test-rg.ps1 5:$markers = 'TODO|FIXME|INCOMPLETE|@status|DEPRECATED'
+- C:\Users\david\PC_AI\TODO.md 1:# TODO
+- C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\README.md 20:   - FunctionGemma model inference with tool-call parsing (TODO)
+- C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\README.md 26:   - LoRA/QLoRA fine-tuning (TODO)
+- C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\README.md 27:   - Eval harness + regression checks (TODO)
+- C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\README.md 149:with the Python pipeline and has several TODOs (see TODO.md).
 - C:\Users\david\PC_AI\Modules\PC-AI.Acceleration\Public\Search-ContentFast.ps1 39:    Search-ContentFast -Path "." -LiteralPattern "TODO:" -Context 2
 - C:\Users\david\PC_AI\Modules\PC-AI.Acceleration\Public\Search-ContentFast.ps1 40:    Finds TODO comments with context
-- C:\Users\david\PC_AI\Native\pcai_core\pcai_core_lib\src\telemetry.rs 61:    // TODO: Integrated NVML support for GPU metrics
+- C:\Users\david\PC_AI\Deploy\functiongemma-finetune\tool_router.py 2:# DEPRECATED: prefer native C# routing via PcaiOpenAiClient + Invoke-FunctionGemmaReAct.
 

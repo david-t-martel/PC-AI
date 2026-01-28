@@ -1,0 +1,60 @@
+﻿{
+    "generated":  "2026-01-28 17:29:22",
+    "mode":  "Full",
+    "duration":  "00:01",
+    "steps":  [
+                  {
+                      "Name":  "DOC_STATUS",
+                      "Status":  "Success",
+                      "Output":  "C:\\Users\\david\\PC_AI\\Reports\\DOC_STATUS.md",
+                      "Error":  "",
+                      "Timestamp":  "17:29:22"
+                  },
+                  {
+                      "Name":  "ToolSchema",
+                      "Status":  "Success",
+                      "Output":  "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma\\TOOLS.md",
+                      "Error":  "",
+                      "Timestamp":  "17:29:22"
+                  },
+                  {
+                      "Name":  "RustDocs",
+                      "Status":  "Skipped",
+                      "Output":  "",
+                      "Error":  "",
+                      "Timestamp":  "17:29:22"
+                  },
+                  {
+                      "Name":  "PowerShellDocs",
+                      "Status":  "Success",
+                      "Output":  "C:\\Users\\david\\PC_AI\\Reports\\API_SIGNATURE_REPORT.json",
+                      "Error":  "",
+                      "Timestamp":  "17:29:22"
+                  },
+                  {
+                      "Name":  "TrainingData",
+                      "Status":  "Success",
+                      "Output":  "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma-train\\data\\training_data.jsonl",
+                      "Error":  "",
+                      "Timestamp":  "17:29:22"
+                  },
+                  {
+                      "Name":  "Validation",
+                      "Status":  "Success",
+                      "Output":  "27 examples validated",
+                      "Error":  "",
+                      "Timestamp":  "17:29:22"
+                  }
+              ],
+    "outputs":  [
+                    "C:\\Users\\david\\PC_AI\\Reports\\DOC_STATUS.md",
+                    "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma\\TOOLS.md",
+                    "C:\\Users\\david\\PC_AI\\Reports\\API_SIGNATURE_REPORT.json",
+                    "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma-train\\data\\training_data.jsonl",
+                    "27 examples validated"
+                ],
+    "errors":  [
+
+               ],
+    "success":  true
+}

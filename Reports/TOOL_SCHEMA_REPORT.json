@@ -1,8 +1,9 @@
 {
-  "Generated": "2026-01-27 04:13:48",
-  "ToolSchemaCount": 9,
+  "Generated": "2026-01-28 16:53:49",
+  "ToolSchemaCount": 12,
   "ToolMappingCount": 0,
   "MissingInMapping": [
+    "GetSystemInfo",
     "pcai_get_docker_status",
     "pcai_get_wsl_health",
     "pcai_optimize_model_host",
@@ -11,7 +12,9 @@
     "pcai_run_wsl_network_tool",
     "pcai_set_provider_order",
     "pcai_start_service",
-    "pcai_stop_service"
+    "pcai_stop_service",
+    "SearchDocs",
+    "SearchLogs"
   ],
   "ExtraMapping": []
 }
