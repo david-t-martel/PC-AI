@@ -19,9 +19,9 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use pcai_core_lib::path::parse_path_ffi;
-use pcai_core_lib::string::{json_to_buffer, PcaiStringBuffer};
-use pcai_core_lib::PcaiStatus;
+use crate::path::parse_path_ffi;
+use crate::string::{json_to_buffer, PcaiStringBuffer};
+use crate::PcaiStatus;
 
 /// Statistics returned by duplicate detection operations.
 #[repr(C)]

@@ -18,9 +18,9 @@ use rayon::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use pcai_core_lib::path::parse_path_ffi;
-use pcai_core_lib::string::{json_to_buffer, PcaiStringBuffer};
-use pcai_core_lib::PcaiStatus;
+use crate::path::parse_path_ffi;
+use crate::string::{json_to_buffer, PcaiStringBuffer};
+use crate::PcaiStatus;
 
 /// Statistics returned by content search operations.
 #[repr(C)]

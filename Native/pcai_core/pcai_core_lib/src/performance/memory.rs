@@ -2,7 +2,7 @@
 //!
 //! System memory and swap usage monitoring.
 
-use pcai_core_lib::PcaiStatus;
+use crate::PcaiStatus;
 use serde::Serialize;
 use sysinfo::System;
 

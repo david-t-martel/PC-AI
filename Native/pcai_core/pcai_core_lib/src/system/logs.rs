@@ -4,7 +4,7 @@
 //! structured JSON output optimized for LLM consumption.
 
 use ignore::WalkBuilder;
-use pcai_core_lib::PcaiStatus;
+use crate::PcaiStatus;
 use rayon::prelude::*;
 use regex::Regex;
 use serde::Serialize;

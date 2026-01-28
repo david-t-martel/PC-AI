@@ -21,14 +21,14 @@ pub struct UsbDeviceDetail {
 pub fn collect_usb_diagnostics() -> Vec<UsbDeviceDetail> {
     let mut devices = Vec::new();
 
-    // GUID for USB Devices
+    /* GUID for USB Devices
     // {A5DCBF10-6530-11D2-901F-00C04FB951ED}
     let guid = GUID {
         data1: 0xA5DCBF10,
         data2: 0x6530,
         data3: 0x11D2,
         data4: [0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED],
-    };
+    }; */
 
     unsafe {
         // Use DIGCF_ALLCLASSES to see all devices, then filter for USB enumerator.

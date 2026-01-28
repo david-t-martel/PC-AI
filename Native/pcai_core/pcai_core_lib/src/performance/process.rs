@@ -2,7 +2,7 @@
 //!
 //! Process enumeration and statistics gathering using sysinfo crate.
 
-use pcai_core_lib::PcaiStatus;
+use crate::PcaiStatus;
 use serde::Serialize;
 use sysinfo::{Pid, ProcessesToUpdate, System};
 

@@ -14,6 +14,8 @@ pub mod tokenizer;
 pub mod telemetry;
 pub mod vmm_health;
 pub mod prompt_engine;
+pub mod performance;
+pub mod fs;
 
 pub use error::PcaiStatus;
 pub use json::{extract_json_from_markdown, pcai_extract_json, pcai_is_valid_json};
@@ -66,7 +68,7 @@ pub extern "C" fn pcai_cpu_count() -> u32 {
 }
 
 #[no_mangle]
-pub extern "C" fn pcai_estimate_tokens(text: *const c_char) -> libc::size_t {
+pub extern "C" fn pcai_estimate_tokens(text: *const c_char) -> usize {
     let text = unsafe {
         if text.is_null() {
             return 0;
@@ -81,7 +83,7 @@ pub extern "C" fn pcai_estimate_tokens(text: *const c_char) -> libc::size_t {
 }
 
 #[no_mangle]
-pub extern "C" fn pcai_check_resource_safety(gpu_limit: f32) -> libc::c_int {
+pub extern "C" fn pcai_check_resource_safety(gpu_limit: f32) -> i32 {
     if telemetry::check_resource_safety(gpu_limit) { 1 } else { 0 }
 }
 

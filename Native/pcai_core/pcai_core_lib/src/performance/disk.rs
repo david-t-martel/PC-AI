@@ -2,7 +2,7 @@
 //!
 //! Parallel directory traversal for calculating disk usage with top-N breakdown.
 
-use pcai_core_lib::PcaiStatus;
+use crate::PcaiStatus;
 use parking_lot::Mutex;
 use rayon::prelude::*;
 use serde::Serialize;

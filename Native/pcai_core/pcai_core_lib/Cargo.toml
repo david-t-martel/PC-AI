@@ -4,35 +4,70 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Core FFI utilities and shared types for PC_AI native modules"
+repository.workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+log.workspace = true
+env_logger.workspace = true
+chrono.workspace = true
+regex.workspace = true
+globset.workspace = true
+ignore.workspace = true
+num_cpus.workspace = true
+sysinfo.workspace = true
+sha2.workspace = true
+hex.workspace = true
+memmap2.workspace = true
+walkdir.workspace = true
+base64.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+parking_lot.workspace = true
+path-slash.workspace = true
+dunce.workspace = true
+winreg.workspace = true
 libc.workspace = true
-serde = { workspace = true }
-serde_json = { workspace = true }
-rayon = { workspace = true }
-ignore = { workspace = true }
-sha2 = { workspace = true }
-globset = { workspace = true }
-regex = { workspace = true }
-windows-sys = { workspace = true, features = [
-    "Win32_Networking_WinSock",
+
+# Local crate dependencies (if any remained, but we consolidated them)
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
     "Win32_Foundation",
-    "Win32_System_SystemServices",
+    "Win32_System_SystemInformation",
+    "Win32_System_Performance",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Threading",
+    "Win32_Storage_FileSystem",
+    "Win32_Security",
+    "Win32_Networking_WinSock",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_UI_WindowsAndMessaging",
+] }
+# We use a specific version for windows-sys in this crate to ensure compatibility with our FFI
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
     "Win32_Devices_DeviceAndDriverInstallation",
     "Win32_NetworkManagement_IpHelper",
     "Win32_System_ProcessStatus",
     "Win32_System_Threading",
-    "Win32_Security",
+    "Win32_Networking_WinSock",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_SystemInformation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Devices",
+    "Win32_NetworkManagement",
+    "Win32_System",
+    "Win32_Networking",
 ] }
-widestring = { workspace = true }
-sysinfo = { workspace = true }
-walkdir = { workspace = true }
-parking_lot = { workspace = true }
-
-# Cross-platform path normalization
-dunce = "1.0"      # Removes \\?\ prefix on Windows
-path-slash = "0.2" # Convert between / and \ path separators

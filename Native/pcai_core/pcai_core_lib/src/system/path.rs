@@ -3,7 +3,7 @@
 //! Analyzes system and user PATH environment variables for issues including
 //! duplicates, non-existent directories, empty entries, and trailing slashes.
 
-use pcai_core_lib::PcaiStatus;
+use crate::PcaiStatus;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -132,7 +132,7 @@ fn normalize_path(path: &str) -> String {
 /// Get User and Machine PATH separately on Windows
 #[cfg(windows)]
 fn get_user_and_machine_paths() -> (Vec<String>, Vec<String>) {
-    use winreg::enums::*;
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
     use winreg::RegKey;
 
     let mut user_paths = Vec::new();
