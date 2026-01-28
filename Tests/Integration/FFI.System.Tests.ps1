@@ -41,7 +41,7 @@ BeforeAll {
     # Load the C# assembly
     $BinDir = Join-Path $PSScriptRoot "..\..\bin"
     $PcaiNativeDll = Join-Path $BinDir "PcaiNative.dll"
-    $SystemDll = Join-Path $BinDir "pcai_system.dll"
+    $SystemDll = Join-Path $BinDir "pcai_core_lib.dll"
 
     if (-not (Test-Path $PcaiNativeDll)) {
         throw "PcaiNative.dll not found at: $PcaiNativeDll"
@@ -71,8 +71,8 @@ BeforeAll {
 }
 
 Describe "System Module - DLL Loading" -Tag "FFI", "System", "Unit" {
-    It "Should have pcai_system.dll in bin directory" {
-        $dll = Join-Path $PSScriptRoot "..\..\bin\pcai_system.dll"
+    It "Should have pcai_core_lib.dll in bin directory" {
+        $dll = Join-Path $PSScriptRoot "..\..\bin\pcai_core_lib.dll"
         $dll | Should -Exist
     }
 

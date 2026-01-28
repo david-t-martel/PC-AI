@@ -86,7 +86,7 @@ Describe "PCAI Search Native Library - Phase 2" -Tag "FFI", "Search", "Phase2" {
 
         BeforeAll {
             # Build if DLL doesn't exist
-            if (-not (Test-DllExists "pcai_search.dll")) {
+            if (-not (Test-DllExists "pcai_core_lib.dll")) {
                 Write-Host "Building native modules..." -ForegroundColor Yellow
                 Push-Location $NativeDir
                 try {
@@ -98,12 +98,12 @@ Describe "PCAI Search Native Library - Phase 2" -Tag "FFI", "Search", "Phase2" {
             }
         }
 
-        It "pcai_search.dll exists after build" {
+        It "pcai_core_lib.dll exists after build" {
             if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
                 Set-ItResult -Skipped -Because "Rust toolchain not installed"
             }
 
-            $dllPath = Get-DllPath "pcai_search.dll"
+            $dllPath = Get-DllPath "pcai_core_lib.dll"
             if (Test-Path $dllPath) {
                 $true | Should -Be $true
             }
@@ -128,7 +128,7 @@ Describe "PCAI Search Native Library - Phase 2" -Tag "FFI", "Search", "Phase2" {
     Context "Search Module P/Invoke" -Tag "PInvoke" {
 
         BeforeAll {
-            $script:DllAvailable = (Test-DllExists "pcai_search.dll") -and (Test-DllExists "pcai_core_lib.dll")
+            $script:DllAvailable = Test-DllExists "pcai_core_lib.dll"
 
             if ($DllAvailable) {
                 # Add DLL directory to PATH for P/Invoke
@@ -192,7 +192,7 @@ public struct ContentSearchStats
 
 public static class PcaiSearchTest
 {
-    private const string SearchDll = "pcai_search.dll";
+    private const string SearchDll = "pcai_core_lib.dll";
     private const string CoreDll = "pcai_core_lib.dll";
 
     [DllImport(SearchDll, CallingConvention = CallingConvention.Cdecl)]
@@ -609,4 +609,3 @@ AfterAll {
         Remove-Item -Path $TestDataDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
-
