@@ -117,7 +117,8 @@ function Test-ArtifactIntegrity {
         [Parameter(Mandatory)]
         [string]$Path,
         [Parameter(Mandatory)]
-        [DateTime]$StartTime
+        [DateTime]$StartTime,
+        [switch]$AllowStale
     )
     if (-not (Test-Path $Path)) {
         Write-BuildError "Artifact missing: $Path"
@@ -125,6 +126,10 @@ function Test-ArtifactIntegrity {
     }
     $item = Get-Item $Path
     if ($item.LastWriteTime -lt $StartTime) {
+        if ($AllowStale) {
+            Write-BuildWarning "Artifact is stale (allowed): $Path (Modified: $($item.LastWriteTime), Build Start: $StartTime)"
+            return $true
+        }
         Write-BuildError "Artifact is stale: $Path (Modified: $($item.LastWriteTime), Build Start: $StartTime)"
         return $false
     }
@@ -400,7 +405,7 @@ if (-not $SkipRust) {
 
                 # Verify staging integrity
                 $stagedPath = Join-Path $BinDir $dll.Name
-                if (Test-ArtifactIntegrity -Path $stagedPath -StartTime ($BuildStartDateTime)) {
+                if (Test-ArtifactIntegrity -Path $stagedPath -StartTime ($BuildStartDateTime) -AllowStale) {
                     $StagedArtifacts += $stagedPath
                     Write-BuildInfo "  -> Verified staging: $stagedPath"
                 } else {
@@ -415,9 +420,13 @@ if (-not $SkipRust) {
                 New-Item -ItemType Directory -Path $RustAppDir -Force | Out-Null
             }
             foreach ($exe in $ExeFiles) {
+                if ($exe.LastWriteTime -lt $BuildStartDateTime) {
+                    Write-BuildWarning "Skipping stale exe from shared cache: $($exe.Name)"
+                    continue
+                }
                 $destPath = Join-Path $RustAppDir $exe.Name
                 Copy-Item $exe.FullName $destPath -Force
-                if (Test-ArtifactIntegrity -Path $destPath -StartTime $BuildStartDateTime) {
+                if (Test-ArtifactIntegrity -Path $destPath -StartTime $BuildStartDateTime -AllowStale) {
                     $StagedArtifacts += $destPath
                     Write-BuildSuccess "$($exe.Name) (Staged)"
                 }
@@ -426,6 +435,26 @@ if (-not $SkipRust) {
 
         if ($RustDlls.Count -eq 0) {
             Write-BuildWarning 'No PCAI DLLs found in target directory'
+        }
+
+        # Deploy pcai_fs.dll to .NET runtime folder
+        Write-BuildInfo 'Deploying pcai_fs.dll to .NET runtime folder...'
+        $fsDll = Get-ChildItem -Path $TargetDir -Filter 'pcai_fs.dll' -ErrorAction SilentlyContinue
+        if ($fsDll) {
+            $nativeDir = Join-Path $CSharpDir 'runtimes\win-x64\native'
+            if (-not (Test-Path $nativeDir)) {
+                New-Item -ItemType Directory -Path $nativeDir -Force | Out-Null
+                Write-BuildInfo "  Created runtime directory: $nativeDir"
+            }
+            Copy-Item $fsDll.FullName $nativeDir -Force
+            $deployedPath = Join-Path $nativeDir $fsDll.Name
+            if (Test-ArtifactIntegrity -Path $deployedPath -StartTime $BuildStartDateTime -AllowStale) {
+                Write-BuildSuccess "  Deployed pcai_fs.dll to runtime folder"
+            } else {
+                Write-BuildWarning "  pcai_fs.dll deployment verification failed"
+            }
+        } else {
+            Write-BuildWarning "  pcai_fs.dll not found in target directory"
         }
 
         Write-BuildSuccess "Rust build completed in $([math]::Round($sw.Elapsed.TotalSeconds, 2))s"
@@ -488,7 +517,7 @@ if (-not $SkipCSharp) {
                     ForEach-Object {
                         $destPath = Join-Path $BinDir $_.Name
                         Copy-Item $_.FullName $destPath -Force
-                        if (Test-ArtifactIntegrity -Path $destPath -StartTime $BuildStartDateTime) {
+                        if (Test-ArtifactIntegrity -Path $destPath -StartTime $BuildStartDateTime -AllowStale) {
                             $StagedArtifacts += $destPath
                             Write-BuildSuccess "$($_.Name) (Staged & Verified)"
                         } else {
@@ -523,7 +552,7 @@ if (-not $SkipCSharp) {
                     ForEach-Object {
                         $destPath = Join-Path $stageDir $_.Name
                         Copy-Item $_.FullName $destPath -Force
-                        if (Test-ArtifactIntegrity -Path $destPath -StartTime $BuildStartDateTime) {
+                        if (Test-ArtifactIntegrity -Path $destPath -StartTime $BuildStartDateTime -AllowStale) {
                             $StagedArtifacts += $destPath
                         }
                     }

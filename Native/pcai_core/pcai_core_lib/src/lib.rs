@@ -24,7 +24,8 @@ pub mod vmm_health;
 pub mod prompt_engine;
 pub mod performance;
 pub mod fs;
-pub mod functiongemma;
+// Temporarily disabled due to CUDA build issues - TODO: make CUDA optional
+// pub mod functiongemma;
 
 pub use error::PcaiStatus;
 pub use json::{extract_json_from_markdown, pcai_extract_json, pcai_is_valid_json};

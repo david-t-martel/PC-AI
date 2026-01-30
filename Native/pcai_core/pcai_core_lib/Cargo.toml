@@ -35,7 +35,8 @@ path-slash.workspace = true
 dunce.workspace = true
 winreg.workspace = true
 libc.workspace = true
-rust-functiongemma-train = { path = "../../../Deploy/rust-functiongemma-train" }
+# Temporarily disabled due to CUDA build issues - TODO: make CUDA optional
+# rust-functiongemma-train = { path = "../../../Deploy/rust-functiongemma-train" }
 
 # Local crate dependencies (if any remained, but we consolidated them)
 
