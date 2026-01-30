@@ -1,15 +1,27 @@
 # Rust Context Slice - PC_AI
 
-**Updated**: 2026-01-28 (Session 4)
+**Updated**: 2026-01-30 (Session 1)
 **For Agents**: rust-pro, architect-reviewer
 
-## Completed This Session
+## Current Status Summary
 
-- ✅ FunctionGemma runtime OpenAI API compatibility (commit 95f9b5e)
-- ✅ Error handling with HTTP status codes
-- ✅ Request validation (messages, roles, tool_choice)
-- ✅ Usage statistics (token counts)
-- ✅ Proper finish_reason logic
+All Rust components compile cleanly with **0 warnings** and all tests pass.
+
+| Component | Status | Tests | Warnings |
+|-----------|--------|-------|----------|
+| rust-functiongemma-train | ✅ Clean | 46 pass | 0 |
+| rust-functiongemma-runtime | ✅ Production | - | 0 |
+| pcai_fs | ✅ Clean | 14 pass | 0 |
+| pcai_core_lib | ✅ Clean | 0 | 0 |
+
+## Completed This Session (2026-01-30)
+
+- ✅ Fixed Rust edition (2024 → 2021)
+- ✅ Removed CUDA features (no cicc available)
+- ✅ Fixed orphan rule violations (moved Default impls)
+- ✅ Fixed early_stopping test logic
+- ✅ Cleaned all unused imports
+- ✅ All 46 tests passing in rust-functiongemma-train
 
 ## Active Rust Projects
 
@@ -17,89 +29,120 @@
 **Path**: `Deploy/rust-functiongemma-runtime/`
 **Status**: OpenAI-compatible, verified with PowerShell TUI
 **Build**: `cargo build --release`
-**Binary**: `T:\RustCache\cargo-target\release\rust-functiongemma-runtime.exe`
 
 **Endpoints**:
 - `GET /health` → `{"status":"ok"}`
 - `GET /v1/models` → Model list
 - `POST /v1/chat/completions` → Full OpenAI-compatible response
 
-**Features**:
-- Error handling with proper HTTP status codes (400/500)
-- Request validation (empty messages, invalid roles, tool_choice)
-- Usage statistics (prompt_tokens, completion_tokens, total_tokens)
-- Finish reason: "tool_calls" or "stop"
-- Heuristic engine (default) or model inference
-
-**Deferred**:
-- Streaming (SSE) - not needed for PowerShell TUI
-
-### 2. rust-functiongemma-train
+### 2. rust-functiongemma-train ✅ COMPILES CLEAN
 **Path**: `Deploy/rust-functiongemma-train/`
-**Status**: Dataset generation complete, training loop needs LoRA
-**Build**: `.\Tools\Invoke-RustBuild.ps1 -Path Deploy\rust-functiongemma-train build`
+**Status**: All compilation issues fixed, 46 tests pass
+**Build**: `cargo build --manifest-path Deploy/rust-functiongemma-train/Cargo.toml`
 
-**P0 TODO**:
-- LoRA/QLoRA with target modules (q/k/v/o/gate/up/down)
-- Warmup + LR scheduling
-- Checkpoint resume
-- Save PEFT-style adapter outputs
+**Modules**:
+- `lora.rs` - LoRA layer with A/B decomposition
+- `trainer.rs` - Training loop with gradient accumulation
+- `scheduler.rs` - LR schedulers (Cosine, Linear, Constant) + warmup
+- `checkpoint.rs` - Model checkpoint save/load/cleanup
+- `early_stopping.rs` - Patience-based early stopping
+- `dataset.rs` - JSONL loading with token caching
+- `router_dataset.rs` - Tool routing dataset builder
 
-### 3. pcai_core_lib (Native Acceleration)
+**Test Breakdown**:
+```
+lib.rs unit tests:        11 passed
+checkpoint_test.rs:        5 passed
+early_stopping_test.rs:    5 passed
+full_training_test.rs:     9 passed
+integration_test.rs:       1 passed
+lora_test.rs:              1 passed
+peft_output_test.rs:       2 passed
+router_dataset.rs:         1 passed
+scheduler_test.rs:         6 passed
+trainer_lora_test.rs:      4 passed
+```
+
+### 3. pcai_fs (FFI for .NET)
+**Path**: `Native/pcai_core/pcai_fs/`
+**Status**: Complete, 14 tests pass
+**Build**: `cargo build --manifest-path Native/pcai_core/Cargo.toml`
+
+**FFI Exports**:
+- `pcai_delete_fs_item` - Safe file/directory deletion
+- `pcai_replace_in_file` - Regex/literal text replacement
+- `pcai_replace_in_files` - Batch replacement with parallel processing
+
+### 4. pcai_core_lib
 **Path**: `Native/pcai_core/pcai_core_lib/`
-**Status**: Complete, tested
+**Status**: Complete
 **Modules**: fs, performance, search, system, telemetry, functiongemma (stubs)
 
-## Crate Dependencies (Recommended)
+## Crate Dependencies
 
 ```toml
-# Runtime
-axum = "0.7"          # HTTP server
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tracing = "0.1"
-tracing-subscriber = "0.3"
+# Training (rust-functiongemma-train)
+candle-core = "0.9.2"        # CPU tensors (CUDA disabled)
+candle-nn = "0.9.2"          # Neural network layers
+candle-transformers = "0.9.2" # Transformer models
+tokenizers = "0.22"          # Fast tokenization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
 
-# Training (optional)
-hf-hub = "0.4"        # HF model downloads
-tokenizers = "0.21"   # Fast tokenization
-safetensors = "0.5"   # Model weights IO
-candle-core = "0.8"   # Tensor ops
-candle-nn = "0.8"     # Neural network layers
+# FFI (pcai_fs)
+rayon = "1.10"       # Parallel processing
+ignore = "0.4"       # Gitignore-aware walking
+walkdir = "2.5"      # Directory traversal
+regex = "1.11"       # Pattern matching
+memmap2 = "0.9"      # Memory-mapped files
 ```
 
 ## Build Environment
 
-- Use CargoTools wrapper: `Tools/Invoke-RustBuild.ps1`
-- Default linker: link.exe (lld-link optional)
-- Cache root: `T:\RustCache\` or `$LOCALAPPDATA\RustCache\`
-- Target: `T:\RustCache\cargo-target\`
+- **Rust Edition**: 2021 (stable)
+- **CUDA**: Disabled (no cicc compiler)
+- **Linker**: link.exe (lld-link optional)
+- **Cache Root**: `T:\RustCache\`
+- **Target Dir**: `T:\RustCache\cargo-target\`
 
-## Key Files
-
-- `Deploy/rust-functiongemma-runtime/src/lib.rs` - Runtime implementation (95f9b5e)
-- `Deploy/rust-functiongemma-train/TODO.md` - Full training task list
-- `.claude/plans/rust-llm-tooling-enhancement.md` - CargoTools LLM plan
-
-## Test Commands
+## Key Commands
 
 ```bash
-# Runtime tests
-cd Deploy/rust-functiongemma-runtime
-cargo test
+# Build training crate
+cargo build --manifest-path Deploy/rust-functiongemma-train/Cargo.toml
 
-# Manual endpoint test
-curl http://127.0.0.1:8000/health
-curl -X POST http://127.0.0.1:8000/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model":"test","messages":[{"role":"user","content":"Use GetSystemInfo"}],"tools":[...]}'
+# Run all tests
+cargo test --manifest-path Deploy/rust-functiongemma-train/Cargo.toml
+
+# Check for warnings
+cargo clippy --manifest-path Deploy/rust-functiongemma-train/Cargo.toml
+
+# Build FFI library
+cargo build --manifest-path Native/pcai_core/Cargo.toml --release
 ```
 
 ## Recent Commits
 
 ```
-95f9b5e feat(rust): enhance FunctionGemma runtime with OpenAI API compatibility
-cd49560 feat(rust): add FunctionGemma runtime and workspace tooling
-c32d6cb fix(rust): resolve clippy errors and warnings in pcai_core_lib
+e7f815c chore(context): update project context and planning docs
+63ec504 chore(rust-train): remove unused imports
+3f2e066 fix(rust-train): fix compilation and test issues
+1a778cf test(train): add full training pipeline integration test
+070897a build(native): add pcai_fs to build pipeline
+967847c feat(train): integrate scheduler and checkpoint
+1138e13 feat(train): add PEFT-compatible adapter output
+95f9b5e feat(rust): enhance FunctionGemma runtime with OpenAI API
 ```
+
+## Known Issues
+
+1. **CUDA disabled**: No CUDA compiler available; using CPU only
+2. **Dependabot Alert**: protobuf CVE (high severity, monitoring)
+
+## Next Steps
+
+- [ ] Enable CUDA when compiler available
+- [ ] Add streaming support to runtime (SSE)
+- [ ] Performance benchmarks for training
