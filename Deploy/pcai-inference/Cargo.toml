@@ -1,0 +1,50 @@
+[package]
+name = "pcai-inference"
+version = "0.1.0"
+edition = "2021"
+authors = ["PC_AI Team"]
+description = "Dual-backend LLM inference engine for PC diagnostics (llama.cpp and mistral.rs)"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Core dependencies
+anyhow = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.41", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-trait = "0.1"
+uuid = { version = "1.11", features = ["v4"] }
+
+# HTTP server (optional)
+axum = { version = "0.7", optional = true }
+tower-http = { version = "0.6", features = ["trace", "cors"], optional = true }
+
+# Backend: llama.cpp (optional)
+llama-cpp-2 = { version = "0.1", optional = true }
+
+# Backend: mistral.rs (optional)
+# mistralrs = { version = "TBD", optional = true }
+
+[dev-dependencies]
+tempfile = "3.14"
+
+[features]
+default = ["llamacpp", "server"]
+llamacpp = ["dep:llama-cpp-2"]
+mistralrs-backend = [] # ["dep:mistralrs"]
+cuda = []
+server = ["dep:axum", "dep:tower-http"]
+ffi = []
+
+[build-dependencies]
+
+[[bin]]
+name = "pcai-inference"
+path = "src/main.rs"
+required-features = ["server"]
