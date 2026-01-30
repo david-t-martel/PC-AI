@@ -50,3 +50,7 @@ pub enum Error {
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
+
+// Candle error conversion for mistral.rs backend
+// Note: candle_core::Error is not directly accessible, but we can convert via anyhow
+// which is already implemented in the Other variant
