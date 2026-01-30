@@ -68,6 +68,34 @@ if (Get-Module -ListAvailable CargoTools) {
     Write-Warning 'CargoTools module not found. Build optimizations (sccache) will be disabled.'
 }
 
+# Configure CUDA environment for GPU-accelerated builds
+$cudaVersions = @('v13.1', 'v13.0', 'v12.6', 'v12.5')
+$cudaBase = $null
+foreach ($ver in $cudaVersions) {
+    $candidatePath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\$ver"
+    if (Test-Path $candidatePath) {
+        $cudaBase = $candidatePath
+        break
+    }
+}
+
+if ($cudaBase) {
+    # Set CUDA_PATH for cudarc/bindgen_cuda
+    $env:CUDA_PATH = $cudaBase
+
+    # Add CUDA bin to PATH for nvcc
+    $cudaBin = "$cudaBase\bin"
+    if ($env:PATH -notlike "*$cudaBin*") {
+        $env:PATH = "$cudaBin;$env:PATH"
+    }
+
+    # Add nvvm/bin to PATH for cicc (CUDA intermediate compiler)
+    $nvvmBin = "$cudaBase\nvvm\bin"
+    if ((Test-Path $nvvmBin) -and ($env:PATH -notlike "*$nvvmBin*")) {
+        $env:PATH = "$nvvmBin;$env:PATH"
+    }
+}
+
 # Colors for output
 $Colors = @{
     Success = 'Green'
