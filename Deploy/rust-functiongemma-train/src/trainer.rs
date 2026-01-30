@@ -1,12 +1,11 @@
 use anyhow::Result;
-use candle_core::{Device, Tensor};
+use candle_core::Device;
 use candle_nn::{Optimizer, VarMap};
 use crate::model::{Model, Config};
 use crate::dataset::Dataset;
 use tokenizers::Tokenizer;
 use crate::scheduler::{LRScheduler, SchedulerConfig, SchedulerType};
 use crate::checkpoint::{Checkpoint, CheckpointConfig};
-use crate::early_stopping::{EarlyStopping, EarlyStoppingConfig};
 use std::path::PathBuf;
 
 pub struct TrainerConfig {
@@ -236,6 +235,69 @@ impl<'a> Trainer<'a> {
         fs::write(&config_path, serde_json::to_string_pretty(&adapter_config)?)?;
 
         println!("PEFT adapter saved to {:?}", output_path);
+        Ok(())
+    }
+
+    /// Save checkpoint to disk
+    fn save_checkpoint(&self, epoch: usize, best_loss: f64) -> Result<()> {
+        use std::fs;
+
+        let checkpoint_dir = self.checkpoint_config.output_dir.join(format!("checkpoint-{}", self.global_step));
+        fs::create_dir_all(&checkpoint_dir)?;
+
+        // Save model weights (LoRA adapters)
+        let weights_path = checkpoint_dir.join("adapter_model.safetensors");
+        let mut lora_vars = std::collections::HashMap::new();
+        for (name, var) in self.varmap.data().lock().unwrap().iter() {
+            if name.contains("lora_a") || name.contains("lora_b") {
+                lora_vars.insert(name.clone(), var.as_tensor().clone());
+            }
+        }
+        candle_core::safetensors::save(&lora_vars, &weights_path)?;
+
+        // Create checkpoint metadata
+        let checkpoint = Checkpoint {
+            epoch,
+            global_step: self.global_step,
+            best_loss,
+            optimizer_state: vec![], // TODO: Save optimizer state if needed
+            rng_state: None, // TODO: Save RNG state for reproducibility
+        };
+
+        checkpoint.save(&checkpoint_dir)?;
+        println!("Checkpoint saved to {:?}", checkpoint_dir);
+
+        Ok(())
+    }
+
+    /// Resume training from a checkpoint
+    pub fn resume_from_checkpoint(&mut self, checkpoint_path: &std::path::Path) -> Result<()> {
+        // Load checkpoint metadata
+        let checkpoint = Checkpoint::load(checkpoint_path)?;
+        self.global_step = checkpoint.global_step;
+
+        println!("Resuming from checkpoint at step {}", self.global_step);
+        println!("Previous best loss: {:.4}", checkpoint.best_loss);
+
+        // Load model weights
+        let weights_path = checkpoint_path.join("adapter_model.safetensors");
+        if weights_path.exists() {
+            let tensors = candle_core::safetensors::load(&weights_path, &self.device)?;
+
+            // Update varmap with loaded tensors
+            for (name, tensor) in tensors {
+                if let Some(var) = self.varmap.data().lock().unwrap().get_mut(&name) {
+                    var.set(&tensor)?;
+                } else {
+                    println!("Warning: Checkpoint contains tensor '{}' not found in model", name);
+                }
+            }
+
+            println!("Loaded adapter weights from {:?}", weights_path);
+        } else {
+            println!("Warning: No adapter weights found at {:?}", weights_path);
+        }
+
         Ok(())
     }
 }
