@@ -11,9 +11,34 @@ pub struct TrainerConfig {
     pub batch_size: usize,
     pub grad_accum: usize,
     pub lora_r: usize,
+    pub lora_alpha: f64,
+    pub lora_dropout: f64,
     pub pack_sequences: bool,
     pub max_seq_len: Option<usize>,
     pub eos_token_id: u32,
+    pub use_lora: bool,
+    pub warmup_steps: usize,
+    pub scheduler_type: String,
+}
+
+impl Default for TrainerConfig {
+    fn default() -> Self {
+        Self {
+            lr: 1e-4,
+            epochs: 3,
+            batch_size: 4,
+            grad_accum: 4,
+            lora_r: 8,
+            lora_alpha: 16.0,
+            lora_dropout: 0.0,
+            pack_sequences: true,
+            max_seq_len: Some(512),
+            eos_token_id: 2,
+            use_lora: true,
+            warmup_steps: 100,
+            scheduler_type: "cosine".to_string(),
+        }
+    }
 }
 
 pub struct Trainer<'a> {

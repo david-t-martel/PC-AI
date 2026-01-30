@@ -76,6 +76,10 @@ enum Commands {
         lr: f64,
         #[arg(long, default_value = "16")]
         lora_r: usize,
+        #[arg(long, default_value = "32.0")]
+        lora_alpha: f64,
+        #[arg(long, default_value = "0.0")]
+        lora_dropout: f64,
         #[arg(long, default_value = "1")]
         batch_size: usize,
         #[arg(long, default_value = "4")]
@@ -86,6 +90,12 @@ enum Commands {
         max_seq_len: Option<usize>,
         #[arg(long, default_value = "1")]
         eos_token_id: u32,
+        #[arg(long)]
+        use_lora: bool,
+        #[arg(long, default_value = "100")]
+        warmup_steps: usize,
+        #[arg(long, default_value = "cosine")]
+        scheduler_type: String,
     },
     /// Evaluate a trained model or adapter
     Eval {
@@ -216,11 +226,16 @@ fn main() -> Result<()> {
             epochs,
             lr,
             lora_r,
+            lora_alpha,
+            lora_dropout,
             batch_size,
             grad_accum,
             pack_sequences,
             max_seq_len,
             eos_token_id,
+            use_lora,
+            warmup_steps,
+            scheduler_type,
         } => {
             let device = Device::new_cuda(0).unwrap_or(Device::Cpu);
             println!("Training on device: {:?}", device);
@@ -262,9 +277,14 @@ fn main() -> Result<()> {
                 batch_size,
                 grad_accum,
                 lora_r,
+                lora_alpha,
+                lora_dropout,
                 pack_sequences,
                 max_seq_len,
                 eos_token_id,
+                use_lora,
+                warmup_steps,
+                scheduler_type: scheduler_type.clone(),
             };
             let mut trainer = Trainer::new(model, &config, t_cfg, device, varmap);
 
