@@ -12,9 +12,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
+use uuid::Uuid;
 
 use crate::{
-    backends::{GenerateRequest, InferenceBackend},
+    backends::{FinishReason, GenerateRequest, InferenceBackend},
     config::ServerConfig,
     Error, Result,
 };
@@ -77,25 +78,30 @@ async fn health_check(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 async fn completions(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CompletionRequest>,
-) -> Result<Response, AppError> {
+) -> std::result::Result<Response, AppError> {
     let backend = state.backend.read().await;
 
     if !backend.is_loaded() {
         return Err(AppError::ModelNotLoaded);
     }
 
+    let prompt_tokens = estimate_tokens(&req.prompt);
+    let stop = req.stop.clone();
     let generate_req = GenerateRequest {
         prompt: req.prompt,
         max_tokens: req.max_tokens,
         temperature: req.temperature,
         top_p: req.top_p,
-        stop: req.stop.unwrap_or_default(),
+        stop: stop.clone().unwrap_or_default(),
     };
 
     let response = backend.generate(generate_req).await?;
 
+    let (text, finish_reason) =
+        apply_stop_sequences(&response.text, &stop, response.finish_reason);
+
     let completion_response = CompletionResponse {
-        id: format!("cmpl-{}", uuid::Uuid::new_v4()),
+        id: format!("cmpl-{}", Uuid::new_v4()),
         object: "text_completion".to_string(),
         created: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -103,27 +109,77 @@ async fn completions(
             .as_secs(),
         model: "pcai-inference".to_string(),
         choices: vec![Choice {
-            text: response.text,
+            text,
             index: 0,
-            finish_reason: Some(format!("{:?}", response.finish_reason).to_lowercase()),
+            finish_reason: Some(finish_reason_to_string(finish_reason)),
         }],
         usage: Usage {
-            prompt_tokens: 0, // TODO: Implement token counting
+            prompt_tokens,
             completion_tokens: response.tokens_generated,
-            total_tokens: response.tokens_generated,
+            total_tokens: prompt_tokens + response.tokens_generated,
         },
     };
 
     Ok(Json(completion_response).into_response())
 }
 
-/// Chat completions endpoint (stub)
+/// Chat completions endpoint
 async fn chat_completions(
-    State(_state): State<Arc<AppState>>,
-    Json(_req): Json<serde_json::Value>,
-) -> Result<Response, AppError> {
-    // TODO: Implement chat completions
-    Err(AppError::NotImplemented)
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ChatCompletionRequest>,
+) -> std::result::Result<Response, AppError> {
+    if req.stream.unwrap_or(false) {
+        return Err(AppError(Error::InvalidInput(
+            "Streaming is not supported".to_string(),
+        )));
+    }
+
+    let backend = state.backend.read().await;
+
+    if !backend.is_loaded() {
+        return Err(AppError::ModelNotLoaded);
+    }
+
+    let prompt = build_chat_prompt(&req.messages)?;
+    let prompt_tokens = estimate_tokens(&prompt);
+
+    let stop = req.stop.clone();
+    let generate_req = GenerateRequest {
+        prompt,
+        max_tokens: req.max_tokens,
+        temperature: req.temperature,
+        top_p: req.top_p,
+        stop: stop.clone().unwrap_or_default(),
+    };
+
+    let response = backend.generate(generate_req).await?;
+    let (content, finish_reason) =
+        apply_stop_sequences(&response.text, &stop, response.finish_reason);
+
+    let completion_response = ChatCompletionResponse {
+        id: format!("chatcmpl-{}", Uuid::new_v4()),
+        object: "chat.completion".to_string(),
+        created: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        model: req.model.unwrap_or_else(|| "pcai-inference".to_string()),
+        choices: vec![ChatChoice {
+            index: 0,
+            message: ChatMessageResponse {
+                role: "assistant".to_string(),
+                content,
+            },
+            finish_reason: Some(finish_reason_to_string(finish_reason)),
+        }],
+        usage: Usage {
+            prompt_tokens,
+            completion_tokens: response.tokens_generated,
+            total_tokens: prompt_tokens + response.tokens_generated,
+        },
+    };
+
+    Ok(Json(completion_response).into_response())
 }
 
 // Request/Response types
@@ -138,6 +194,28 @@ struct CompletionRequest {
     top_p: Option<f32>,
     #[serde(default)]
     stop: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatCompletionRequest {
+    model: Option<String>,
+    messages: Vec<ChatMessage>,
+    #[serde(default)]
+    max_tokens: Option<usize>,
+    #[serde(default)]
+    temperature: Option<f32>,
+    #[serde(default)]
+    top_p: Option<f32>,
+    #[serde(default)]
+    stop: Option<Vec<String>>,
+    #[serde(default)]
+    stream: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ChatMessage {
+    role: String,
+    content: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -164,7 +242,31 @@ struct Usage {
     total_tokens: usize,
 }
 
+#[derive(Debug, Serialize)]
+struct ChatCompletionResponse {
+    id: String,
+    object: String,
+    created: u64,
+    model: String,
+    choices: Vec<ChatChoice>,
+    usage: Usage,
+}
+
+#[derive(Debug, Serialize)]
+struct ChatChoice {
+    index: usize,
+    message: ChatMessageResponse,
+    finish_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ChatMessageResponse {
+    role: String,
+    content: String,
+}
+
 // Error handling
+#[derive(Debug)]
 struct AppError(Error);
 
 impl From<Error> for AppError {
@@ -179,7 +281,6 @@ impl AppError {
     }
 
     const ModelNotLoaded: Self = AppError(Error::ModelNotLoaded);
-    const NotImplemented: Self = AppError(Error::Backend("Not implemented".to_string()));
 }
 
 impl IntoResponse for AppError {
@@ -202,5 +303,120 @@ impl IntoResponse for AppError {
     }
 }
 
-// Add uuid dependency for request IDs
-use uuid::Uuid;
+fn build_chat_prompt(messages: &[ChatMessage]) -> std::result::Result<String, AppError> {
+    if messages.is_empty() {
+        return Err(AppError(Error::InvalidInput(
+            "messages must not be empty".to_string(),
+        )));
+    }
+
+    let mut prompt = String::new();
+    for message in messages {
+        let role = message.role.to_lowercase();
+        let role_label = match role.as_str() {
+            "system" => "System",
+            "user" => "User",
+            "assistant" => "Assistant",
+            "tool" => "Tool",
+            _ => "User",
+        };
+
+        if !prompt.is_empty() {
+            prompt.push('\n');
+        }
+
+        prompt.push_str(role_label);
+        prompt.push_str(": ");
+        prompt.push_str(message.content.trim());
+    }
+
+    prompt.push_str("\nAssistant: ");
+    Ok(prompt)
+}
+
+fn estimate_tokens(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+
+    let char_count = text.chars().count();
+    let char_tokens = (char_count + 3) / 4;
+    let word_tokens = text.split_whitespace().count();
+    char_tokens.max(word_tokens).max(1)
+}
+
+fn apply_stop_sequences(
+    text: &str,
+    stop: &Option<Vec<String>>,
+    finish_reason: FinishReason,
+) -> (String, FinishReason) {
+    let Some(stops) = stop else {
+        return (text.to_string(), finish_reason);
+    };
+
+    let mut earliest: Option<usize> = None;
+    for stop_seq in stops {
+        if stop_seq.is_empty() {
+            continue;
+        }
+        if let Some(idx) = text.find(stop_seq) {
+            earliest = Some(match earliest {
+                Some(prev) => prev.min(idx),
+                None => idx,
+            });
+        }
+    }
+
+    match earliest {
+        Some(idx) => (text[..idx].to_string(), FinishReason::Stop),
+        None => (text.to_string(), finish_reason),
+    }
+}
+
+fn finish_reason_to_string(reason: FinishReason) -> String {
+    match reason {
+        FinishReason::Stop => "stop".to_string(),
+        FinishReason::Length => "length".to_string(),
+        FinishReason::Error => "error".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_chat_prompt() {
+        let messages = vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content: "You are helpful.".to_string(),
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: "Hello".to_string(),
+            },
+        ];
+
+        let prompt = build_chat_prompt(&messages).unwrap();
+        assert!(prompt.contains("System: You are helpful."));
+        assert!(prompt.contains("User: Hello"));
+        assert!(prompt.ends_with("Assistant: "));
+    }
+
+    #[test]
+    fn test_estimate_tokens() {
+        assert_eq!(estimate_tokens(""), 0);
+        assert!(estimate_tokens("hello") >= 1);
+        assert!(estimate_tokens("hello world") >= 2);
+    }
+
+    #[test]
+    fn test_apply_stop_sequences() {
+        let input = "Hello world STOP and more";
+        let stops = Some(vec!["STOP".to_string()]);
+        let (text, reason) = apply_stop_sequences(input, &stops, FinishReason::Length);
+        assert_eq!(text.trim_end(), "Hello world");
+        assert!(matches!(reason, FinishReason::Stop));
+    }
+}

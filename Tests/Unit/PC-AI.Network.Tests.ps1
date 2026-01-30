@@ -435,12 +435,34 @@ Describe "Watch-VSockPerformance" -Tag 'Unit', 'Network', 'Slow' {
                         Status = "Up"
                         LinkSpeed = "10 Gbps"
                         Virtual = $true
+                    },
+                    [PSCustomObject]@{
+                        Name = "Ethernet"
+                        Status = "Up"
+                        LinkSpeed = "1 Gbps"
+                        Virtual = $false
                     }
                 )
             } -ModuleName PC-AI.Network
 
             Mock Get-NetAdapterStatistics {
-                [PSCustomObject]@{
+                param([string]$Name)
+
+                if ($Name -eq "Ethernet") {
+                    return [PSCustomObject]@{
+                        Name = "Ethernet"
+                        SentBytes = 1500000
+                        ReceivedBytes = 2500000
+                        SentUnicastPackets = 1500
+                        ReceivedUnicastPackets = 2500
+                        OutboundDiscardedPackets = 0
+                        InboundDiscardedPackets = 0
+                        OutboundPacketErrors = 0
+                        InboundPacketErrors = 0
+                    }
+                }
+
+                return [PSCustomObject]@{
                     Name = "vEthernet (WSL)"
                     SentBytes = 1000000
                     ReceivedBytes = 2000000
@@ -472,6 +494,33 @@ Describe "Watch-VSockPerformance" -Tag 'Unit', 'Network', 'Slow' {
             Mock Start-Sleep {} -ModuleName PC-AI.Network
             Mock Clear-Host {} -ModuleName PC-AI.Network
             Mock Format-BytesPerSecond { "1.23 MB/s" } -ModuleName PC-AI.Network
+
+            Mock Get-Date {
+                param([string]$Format)
+
+                if ($script:dateIndex -ge $script:dates.Count) {
+                    $value = $script:dates[-1]
+                } else {
+                    $value = $script:dates[$script:dateIndex]
+                    $script:dateIndex++
+                }
+
+                if ($Format) {
+                    return $value.ToString($Format)
+                }
+                return $value
+            } -ModuleName PC-AI.Network
+        }
+
+        BeforeEach {
+            $baseTime = [DateTime]::UtcNow
+            $script:dates = @(
+                $baseTime,
+                $baseTime,
+                $baseTime.AddSeconds(1),
+                $baseTime.AddSeconds(2)
+            )
+            $script:dateIndex = 0
         }
 
         It "Should use correct parameters (Duration and RefreshInterval)" {
@@ -480,7 +529,8 @@ Describe "Watch-VSockPerformance" -Tag 'Unit', 'Network', 'Slow' {
 
         It "Should return array of PSCustomObjects" {
             $result = Watch-VSockPerformance -Duration 2 -RefreshInterval 1 -Quiet
-            $result | Should -BeOfType [PSCustomObject]
+            @($result).Count | Should -BeGreaterThan 0
+            ($result | Select-Object -First 1) | Should -BeOfType [PSCustomObject]
         }
 
         It "Should query network adapters" {
@@ -514,7 +564,8 @@ Describe "Watch-VSockPerformance" -Tag 'Unit', 'Network', 'Slow' {
 
         It "Should support IncludeVirtual parameter" {
             $result = Watch-VSockPerformance -Duration 1 -IncludeVirtual:$false -Quiet
-            # Should filter virtual adapters
+            @($result).Count | Should -BeGreaterThan 0
+            ($result | Where-Object { $_.Interface -match 'vEthernet' }).Count | Should -Be 0
         }
     }
 
@@ -524,11 +575,37 @@ Describe "Watch-VSockPerformance" -Tag 'Unit', 'Network', 'Slow' {
             Mock Get-NetTCPConnection { @() } -ModuleName PC-AI.Network
             Mock Start-Sleep {} -ModuleName PC-AI.Network
             Mock Clear-Host {} -ModuleName PC-AI.Network
+            Mock Get-Date {
+                param([string]$Format)
+
+                if ($script:dateIndex -ge $script:dates.Count) {
+                    $value = $script:dates[-1]
+                } else {
+                    $value = $script:dates[$script:dateIndex]
+                    $script:dateIndex++
+                }
+
+                if ($Format) {
+                    return $value.ToString($Format)
+                }
+                return $value
+            } -ModuleName PC-AI.Network
+        }
+
+        BeforeEach {
+            $baseTime = [DateTime]::UtcNow
+            $script:dates = @(
+                $baseTime,
+                $baseTime,
+                $baseTime.AddSeconds(1),
+                $baseTime.AddSeconds(2)
+            )
+            $script:dateIndex = 0
         }
 
         It "Should handle no matching adapters gracefully" {
-            $result = Watch-VSockPerformance -Duration 1 -InterfaceFilter "NonExistent*" -Quiet
-            # Should complete without error
+            { $script:lastResult = Watch-VSockPerformance -Duration 1 -InterfaceFilter "NonExistent*" -Quiet } | Should -Not -Throw
+            $script:lastResult | Should -BeNullOrEmpty
         }
     }
 }
@@ -604,7 +681,8 @@ Describe "Optimize-VSock" -Tag 'Unit', 'Network', 'Slow', 'RequiresAdmin' {
         It "Should create backup before changes" -Skip:(-not $script:IsAdmin) {
             Mock Get-RegistryValueSafe { return 10 } -ModuleName PC-AI.Network
             $result = Optimize-VSock -Profile Balanced -SkipWSLRestart -Confirm:$false
-            # Backup should be attempted
+            $result.BackupCreated | Should -Be $true
+            Should -Invoke Out-File -ModuleName PC-AI.Network
         }
 
         It "Should apply registry settings" -Skip:(-not $script:IsAdmin) {
@@ -633,8 +711,12 @@ Describe "Optimize-VSock" -Tag 'Unit', 'Network', 'Slow', 'RequiresAdmin' {
         }
 
         It "Should require Administrator privileges" {
-            # This test requires actual admin context
-            # Documenting expected behavior: function checks admin and exits early
+            if ($script:IsAdmin) {
+                Set-ItResult -Skipped -Because "Test requires non-admin context"
+            }
+
+            $result = Optimize-VSock -WhatIf -ErrorAction SilentlyContinue
+            $result | Should -BeNullOrEmpty
         }
     }
 

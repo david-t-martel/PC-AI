@@ -11,13 +11,35 @@ Describe "PC-AI Agentic Verification (Phase 6)" {
 
     Context "Diagnostic Triage" {
         It "Should invoke Triage mode when report is oversized" {
-            Mock Send-OllamaRequest {
+            $script:capturedMessages = $null
+
+            Mock Invoke-FunctionGemmaReAct {
+                return [PSCustomObject]@{
+                    ToolResults = @(
+                        [PSCustomObject]@{
+                            Tool = "Get-UsbDeviceList"
+                            Result = [PSCustomObject]@{
+                                Devices = @(
+                                    [PSCustomObject]@{
+                                        DeviceID = "USB\\VID_1234&PID_5678\\GARY_BROKEN"
+                                        Status = "Error"
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
+            } -ModuleName PC-AI.LLM
+
+            Mock Invoke-LLMChatWithFallback {
+                param([object[]]$Messages)
+                $script:capturedMessages = $Messages
                 return @{
                     message = @{
-                        content = '{"analysis": "triage needed", "partitions": [{"id": 1, "topic": "USB Faults"}]}'
+                        content = '{"summary":"triage needed","issues":[{"id":"USB-1","severity":"High"}]}'
                     }
                 }
-            }
+            } -ModuleName PC-AI.LLM
 
             $largeReport = [PSCustomObject]@{
                 ReportId = "TEST-123"
@@ -25,13 +47,17 @@ Describe "PC-AI Agentic Verification (Phase 6)" {
                 Sections = @("USB", "Network", "Performance")
             }
 
-            # We mock the internal triage trigger or check if Invoke-PCDiagnosis calls it
-            # For integration test, we verify the command exists and basic response structure
-            Test-Path function:Invoke-PCDiagnosis | Should -Be $true
+            $result = Invoke-PCDiagnosis -ReportText ($largeReport | ConvertTo-Json -Depth 4) -UseRouter -RouterExecuteTools -TimeoutSeconds 30
 
-            # Simple functional check of the public interface
-            $diagnosis = Get-Command Invoke-PCDiagnosis
-            $diagnosis | Should -Not -BeNull
+            $result.JsonValid | Should -Be $true
+            $result.AnalysisJson | Should -Not -BeNullOrEmpty
+            $result.AnalysisJson.summary | Should -Be "triage needed"
+
+            $script:capturedMessages | Should -Not -BeNullOrEmpty
+            $script:capturedMessages[1].content | Should -Match "\[TOOL_RESULTS\]"
+
+            Should -Invoke Invoke-FunctionGemmaReAct -ModuleName PC-AI.LLM
+            Should -Invoke Invoke-LLMChatWithFallback -ModuleName PC-AI.LLM
         }
     }
 }

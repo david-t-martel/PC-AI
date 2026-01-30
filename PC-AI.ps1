@@ -50,7 +50,24 @@ param(
     [string]$Command,
 
     [Parameter(Position = 1, ValueFromRemainingArguments)]
-    [string[]]$Arguments
+    [string[]]$Arguments,
+
+    # Inference backend selection
+    [Parameter()]
+    [ValidateSet('auto', 'llamacpp', 'mistralrs', 'http')]
+    [string]$InferenceBackend = 'auto',
+
+    # Model path for native inference
+    [Parameter()]
+    [string]$ModelPath,
+
+    # GPU layers for native inference (-1 = all, 0 = CPU only)
+    [Parameter()]
+    [int]$GpuLayers = -1,
+
+    # Use native inference via FFI instead of HTTP
+    [Parameter()]
+    [switch]$UseNativeInference
 )
 
 #region Script Configuration
@@ -61,6 +78,8 @@ $script:ReportsPath = Join-Path $PSScriptRoot 'Reports'
 $script:LoadedModules = @{}
 $script:Settings = $null
 $script:LLMConfig = $null
+$script:InferenceMode = 'http'  # 'http' or 'native'
+$script:NativeInferenceReady = $false
 #endregion
 
 #region Output Formatting Functions
@@ -182,6 +201,92 @@ function Load-LLMConfig {
     }
 
     return $null
+}
+
+function Initialize-InferenceBackend {
+    <#
+    .SYNOPSIS
+        Initialize the inference backend based on parameters
+    #>
+    param(
+        [string]$Backend,
+        [string]$ModelPath,
+        [int]$GpuLayers
+    )
+
+    # Skip if HTTP mode
+    if ($Backend -eq 'http') {
+        Write-Verbose "Using HTTP inference backend"
+        $script:InferenceMode = 'http'
+        return $true
+    }
+
+    # Try native inference
+    Write-Verbose "Attempting to initialize native inference backend..."
+
+    try {
+        # Load PcaiInference module
+        $modulePath = Join-Path $script:ModulesPath 'PcaiInference.psm1'
+
+        if (-not (Test-Path $modulePath)) {
+            Write-Warning "PcaiInference module not found. Falling back to HTTP."
+            $script:InferenceMode = 'http'
+            return $false
+        }
+
+        Import-Module $modulePath -Force -ErrorAction Stop
+
+        # Check DLL availability
+        $status = Get-PcaiInferenceStatus
+        if (-not $status.DllExists) {
+            Write-Warning "pcai_inference.dll not found. Build instructions:"
+            Write-Warning "  cd Deploy\pcai-inference"
+            Write-Warning "  cargo build --features ffi,mistralrs-backend --release"
+            Write-Warning "Falling back to HTTP inference."
+            $script:InferenceMode = 'http'
+            return $false
+        }
+
+        # Initialize backend
+        $backendName = if ($Backend -eq 'auto') { 'mistralrs' } else { $Backend }
+        $initResult = Initialize-PcaiInference -Backend $backendName -Verbose:$VerbosePreference
+
+        if (-not $initResult.Success) {
+            Write-Warning "Failed to initialize native backend. Falling back to HTTP."
+            $script:InferenceMode = 'http'
+            return $false
+        }
+
+        # Load model if path provided
+        if ($ModelPath) {
+            Write-Verbose "Loading model: $ModelPath"
+            $loadResult = Import-PcaiModel -ModelPath $ModelPath -GpuLayers $GpuLayers -Verbose:$VerbosePreference
+
+            if (-not $loadResult.Success) {
+                Write-Warning "Failed to load model. Falling back to HTTP."
+                Close-PcaiInference
+                $script:InferenceMode = 'http'
+                return $false
+            }
+
+            Write-Info "Native inference ready (backend: $backendName, model: $ModelPath)"
+            $script:InferenceMode = 'native'
+            $script:NativeInferenceReady = $true
+            return $true
+        }
+        else {
+            Write-Info "Native backend initialized (backend: $backendName). Model not loaded yet."
+            Write-Info "Use Import-PcaiModel to load a model, or inference will fall back to HTTP."
+            $script:InferenceMode = 'http'  # Fall back until model is loaded
+            return $false
+        }
+    }
+    catch {
+        Write-Warning "Error initializing native inference: $_"
+        Write-Warning "Falling back to HTTP inference."
+        $script:InferenceMode = 'http'
+        return $false
+    }
 }
 #endregion
 
@@ -1585,8 +1690,23 @@ function Invoke-StatusCommand {
         Write-Bullet "$moduleName`: $status" -Color $color
     }
 
-    # LLM status (quick check)
-    Write-SubHeader "LLM Provider"
+    # Inference backend status
+    Write-SubHeader "Inference Backend"
+    Write-Bullet "Mode: $script:InferenceMode"
+
+    if ($script:InferenceMode -eq 'native') {
+        try {
+            $status = Get-PcaiInferenceStatus
+            Write-Bullet "Native Backend: $($status.CurrentBackend)" -Color Green
+            Write-Bullet "Model Loaded: $($status.ModelLoaded)" -Color $(if ($status.ModelLoaded) { 'Green' } else { 'Yellow' })
+        }
+        catch {
+            Write-Bullet "Native Backend: Error" -Color Red
+        }
+    }
+
+    # LLM status (quick check for HTTP mode)
+    Write-SubHeader "LLM Provider (HTTP)"
     try {
         $ollamaTest = Invoke-RestMethod -Uri 'http://localhost:11434/api/tags' -Method Get -TimeoutSec 2 -ErrorAction SilentlyContinue
         Write-Bullet "Ollama: Running" -Color Green
@@ -1641,6 +1761,16 @@ function Main {
     # Load settings
     $null = Load-Settings
 
+    # Initialize inference backend if requested
+    if ($UseNativeInference -or ($InferenceBackend -ne 'auto' -and $InferenceBackend -ne 'http')) {
+        Write-Verbose "Inference backend: $InferenceBackend"
+        if ($ModelPath) {
+            Write-Verbose "Model path: $ModelPath"
+        }
+
+        $null = Initialize-InferenceBackend -Backend $InferenceBackend -ModelPath $ModelPath -GpuLayers $GpuLayers
+    }
+
     # Handle empty command
     if (-not $Command) {
         Show-MainHelp
@@ -1648,24 +1778,33 @@ function Main {
     }
 
     # Route to command handler
-    switch ($Command) {
-        'diagnose' { Invoke-DiagnoseCommand -CmdArgs $Arguments }
-        'optimize' { Invoke-OptimizeCommand -CmdArgs $Arguments }
-        'usb' { Invoke-UsbCommand -CmdArgs $Arguments }
-        'analyze' { Invoke-AnalyzeCommand -CmdArgs $Arguments }
-        'chat' { Invoke-ChatCommand -CmdArgs $Arguments }
-        'llm' { Invoke-LLMCommand -CmdArgs $Arguments }
-        'cleanup' { Invoke-CleanupCommand -CmdArgs $Arguments }
-        'perf' { Invoke-PerfCommand -CmdArgs $Arguments }
-        'status' { Invoke-StatusCommand }
-        'version' { Invoke-VersionCommand }
-        'help' {
-            $topic = if ($Arguments) { $Arguments[0] } else { $null }
-            Show-Help -Topic $topic
+    try {
+        switch ($Command) {
+            'diagnose' { Invoke-DiagnoseCommand -CmdArgs $Arguments }
+            'optimize' { Invoke-OptimizeCommand -CmdArgs $Arguments }
+            'usb' { Invoke-UsbCommand -CmdArgs $Arguments }
+            'analyze' { Invoke-AnalyzeCommand -CmdArgs $Arguments }
+            'chat' { Invoke-ChatCommand -CmdArgs $Arguments }
+            'llm' { Invoke-LLMCommand -CmdArgs $Arguments }
+            'cleanup' { Invoke-CleanupCommand -CmdArgs $Arguments }
+            'perf' { Invoke-PerfCommand -CmdArgs $Arguments }
+            'status' { Invoke-StatusCommand }
+            'version' { Invoke-VersionCommand }
+            'help' {
+                $topic = if ($Arguments) { $Arguments[0] } else { $null }
+                Show-Help -Topic $topic
+            }
+            default {
+                Write-Error "Unknown command: $Command"
+                Show-MainHelp
+            }
         }
-        default {
-            Write-Error "Unknown command: $Command"
-            Show-MainHelp
+    }
+    finally {
+        # Clean up native inference if initialized
+        if ($script:NativeInferenceReady) {
+            Write-Verbose "Cleaning up native inference backend..."
+            Close-PcaiInference
         }
     }
 }
