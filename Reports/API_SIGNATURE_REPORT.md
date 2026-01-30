@@ -1,11 +1,11 @@
 # API_SIGNATURE_REPORT
 
-Generated: 2026-01-27 11:39:03
+Generated: 2026-01-30 13:28:18
 
-PowerShell functions: 109
-Missing help blocks: 56
-C# DllImports: 0
-Missing Rust exports: 0
+PowerShell functions: 110
+Missing help blocks: 58
+C# DllImports: 42
+Missing Rust exports: 7
 
 ## Missing help parameters
 - Compare-ToolPerformance: missing Detailed
@@ -48,7 +48,9 @@ Missing Rust exports: 0
 - Get-LLMStatus: missing IncludeLMStudio, IncludeVLLM, TestConnection
 - Get-SystemInfoTool: missing Category, Detail
 - Invoke-DocSearch: missing Query, Source
-- Invoke-LLMChat: missing Message, Model, System, Temperature, MaxTokens, TimeoutSeconds, Interactive, ToJson, History, Provider, UseRouter, RouterMode, Stream, ShowProgress, ShowMetrics, ProgressIntervalSeconds
+- Invoke-FunctionGemmaChat: missing Messages, Tools, BaseUrl, Model, TimeoutSeconds
+- Invoke-FunctionGemmaReAct: missing Prompt, BaseUrl, Model, ToolsPath, ExecuteTools, ReturnFinal, MaxToolCalls, ResultLimit, TimeoutSeconds, ShowProgress, ShowMetrics, ProgressIntervalSeconds
+- Invoke-LLMChat: missing Message, Model, System, Temperature, MaxTokens, TimeoutSeconds, Interactive, ToJson, History, Provider, UseRouter, RouterMode, Stream, ShowProgress, ShowMetrics, ProgressIntervalSeconds, ResultLimit
 - Invoke-LLMChatRouted: missing EnforceJson
 - Invoke-LLMChatTui: missing Arguments
 - Invoke-LogSearch: missing Pattern, RootPath, FilePattern, CaseSensitive, ContextLines, MaxMatches
@@ -92,22 +94,13 @@ Missing Rust exports: 0
 ## Extra help parameters
 - Search-ContentFast: extra IgnoreCase
 
-## Missing C# methods referenced by PowerShell
-- CheckResourceSafety
-- DeleteFsItem
-- EstimateTokens
-- ExtractJson
-- FindDuplicates
-- FindFiles
-- GetSystemTelemetryJson
-- GetUsbDeepDiagnostics
-- GetUsbProblemInfo
-- IsAvailable
-- IsValidJson
-- QueryFullContextJson
-- QueryHardwareMetrics
-- QuerySystemInfo
-- SearchContent
-- Version
+## Missing Rust exports for C# DllImports
+- pcai_delete_fs_item
+- pcai_fs_version
+- pcai_get_disk_usage
+- pcai_get_disk_usage_json
+- pcai_get_top_processes_json
+- pcai_replace_in_file
+- pcai_replace_in_files
 
 

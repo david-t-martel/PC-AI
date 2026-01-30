@@ -1,60 +1,67 @@
-﻿{
-    "generated":  "2026-01-28 17:29:22",
-    "mode":  "Full",
-    "duration":  "00:01",
-    "steps":  [
-                  {
-                      "Name":  "DOC_STATUS",
-                      "Status":  "Success",
-                      "Output":  "C:\\Users\\david\\PC_AI\\Reports\\DOC_STATUS.md",
-                      "Error":  "",
-                      "Timestamp":  "17:29:22"
-                  },
-                  {
-                      "Name":  "ToolSchema",
-                      "Status":  "Success",
-                      "Output":  "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma\\TOOLS.md",
-                      "Error":  "",
-                      "Timestamp":  "17:29:22"
-                  },
-                  {
-                      "Name":  "RustDocs",
-                      "Status":  "Skipped",
-                      "Output":  "",
-                      "Error":  "",
-                      "Timestamp":  "17:29:22"
-                  },
-                  {
-                      "Name":  "PowerShellDocs",
-                      "Status":  "Success",
-                      "Output":  "C:\\Users\\david\\PC_AI\\Reports\\API_SIGNATURE_REPORT.json",
-                      "Error":  "",
-                      "Timestamp":  "17:29:22"
-                  },
-                  {
-                      "Name":  "TrainingData",
-                      "Status":  "Success",
-                      "Output":  "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma-train\\data\\training_data.jsonl",
-                      "Error":  "",
-                      "Timestamp":  "17:29:22"
-                  },
-                  {
-                      "Name":  "Validation",
-                      "Status":  "Success",
-                      "Output":  "27 examples validated",
-                      "Error":  "",
-                      "Timestamp":  "17:29:22"
-                  }
-              ],
-    "outputs":  [
-                    "C:\\Users\\david\\PC_AI\\Reports\\DOC_STATUS.md",
-                    "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma\\TOOLS.md",
-                    "C:\\Users\\david\\PC_AI\\Reports\\API_SIGNATURE_REPORT.json",
-                    "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma-train\\data\\training_data.jsonl",
-                    "27 examples validated"
-                ],
-    "errors":  [
-
-               ],
-    "success":  true
+{
+  "generated": "2026-01-28 19:30:16",
+  "mode": "Full",
+  "duration": "00:05",
+  "steps": [
+    {
+      "Name": "DOC_STATUS",
+      "Status": "Success",
+      "Output": "C:\\Users\\david\\PC_AI\\Reports\\DOC_STATUS.md",
+      "Error": "",
+      "Timestamp": "19:30:11"
+    },
+    {
+      "Name": "ToolSchema",
+      "Status": "Success",
+      "Output": "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma\\TOOLS.md",
+      "Error": "",
+      "Timestamp": "19:30:11"
+    },
+    {
+      "Name": "RustDocs",
+      "Status": "Success",
+      "Output": "T:\\RustCache\\cargo-target\\doc",
+      "Error": "",
+      "Timestamp": "19:30:15"
+    },
+    {
+      "Name": "PowerShellDocs",
+      "Status": "Success",
+      "Output": "C:\\Users\\david\\PC_AI\\Reports\\POWERSHELL_EXPORTS.json",
+      "Error": "",
+      "Timestamp": "19:30:15"
+    },
+    {
+      "Name": "ApiSignatures",
+      "Status": "Success",
+      "Output": "C:\\Users\\david\\PC_AI\\Reports\\API_SIGNATURE_REPORT.md",
+      "Error": "",
+      "Timestamp": "19:30:16"
+    },
+    {
+      "Name": "TrainingData",
+      "Status": "Success",
+      "Output": "dataset: C:\\Users\\david\\PC_AI\\Deploy\\functiongemma-finetune\\data\\rust_router_train.jsonl | vectors: C:\\Users\\david\\PC_AI\\Deploy\\functiongemma-finetune\\test_vectors.json",
+      "Error": "",
+      "Timestamp": "19:30:16"
+    },
+    {
+      "Name": "Validation",
+      "Status": "Success",
+      "Output": "Router dataset + vectors validated",
+      "Error": "",
+      "Timestamp": "19:30:16"
+    }
+  ],
+  "outputs": [
+    "C:\\Users\\david\\PC_AI\\Reports\\DOC_STATUS.md",
+    "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma\\TOOLS.md",
+    "T:\\RustCache\\cargo-target\\doc",
+    "C:\\Users\\david\\PC_AI\\Reports\\POWERSHELL_EXPORTS.json",
+    "C:\\Users\\david\\PC_AI\\Reports\\API_SIGNATURE_REPORT.md",
+    "dataset: C:\\Users\\david\\PC_AI\\Deploy\\functiongemma-finetune\\data\\rust_router_train.jsonl | vectors: C:\\Users\\david\\PC_AI\\Deploy\\functiongemma-finetune\\test_vectors.json",
+    "Router dataset + vectors validated"
+  ],
+  "errors": [],
+  "success": true
 }

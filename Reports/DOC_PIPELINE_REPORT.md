@@ -1,9 +1,9 @@
-﻿# Documentation Pipeline Report
+# Documentation Pipeline Report
 
-Generated: 2026-01-28 17:29:22
+Generated: 2026-01-28 19:30:16
 Mode: Full
-Duration: 00:01
-Status: âœ… Success
+Duration: 00:05
+Status: ✅ Success
 
 ## Steps
 
@@ -11,19 +11,22 @@ Status: âœ… Success
 |------|--------|--------|
 | DOC_STATUS | Success | C:\Users\david\PC_AI\Reports\DOC_STATUS.md |
 | ToolSchema | Success | C:\Users\david\PC_AI\Deploy\rust-functiongemma\TOOLS.md |
-| RustDocs | Skipped |  |
-| PowerShellDocs | Success | C:\Users\david\PC_AI\Reports\API_SIGNATURE_REPORT.json |
-| TrainingData | Success | C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\data\training_data.jsonl |
-| Validation | Success | 27 examples validated |
+| RustDocs | Success | T:\RustCache\cargo-target\doc |
+| PowerShellDocs | Success | C:\Users\david\PC_AI\Reports\POWERSHELL_EXPORTS.json |
+| ApiSignatures | Success | C:\Users\david\PC_AI\Reports\API_SIGNATURE_REPORT.md |
+| TrainingData | Success | dataset: C:\Users\david\PC_AI\Deploy\functiongemma-finetune\data\rust_router_train.jsonl | vectors: C:\Users\david\PC_AI\Deploy\functiongemma-finetune\test_vectors.json |
+| Validation | Success | Router dataset + vectors validated |
 
 
 ## Outputs
 
 - `C:\Users\david\PC_AI\Reports\DOC_STATUS.md`
 - `C:\Users\david\PC_AI\Deploy\rust-functiongemma\TOOLS.md`
-- `C:\Users\david\PC_AI\Reports\API_SIGNATURE_REPORT.json`
-- `C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\data\training_data.jsonl`
-- `27 examples validated`
+- `T:\RustCache\cargo-target\doc`
+- `C:\Users\david\PC_AI\Reports\POWERSHELL_EXPORTS.json`
+- `C:\Users\david\PC_AI\Reports\API_SIGNATURE_REPORT.md`
+- `dataset: C:\Users\david\PC_AI\Deploy\functiongemma-finetune\data\rust_router_train.jsonl | vectors: C:\Users\david\PC_AI\Deploy\functiongemma-finetune\test_vectors.json`
+- `Router dataset + vectors validated`
 
 
 
