@@ -1,49 +1,4 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Uses FunctionGemma (via vLLM OpenAI API) to plan tool calls and optionally executes them.
-
-.DESCRIPTION
-    Sends a prompt + tool schema to FunctionGemma and returns tool calls. When -ExecuteTools
-    is specified, executes mapped PC_AI tools and optionally returns a final response from
-    FunctionGemma after tool results are provided.
-
-.PARAMETER Prompt
-    The user request or prompt.
-
-.PARAMETER BaseUrl
-    Base URL for the vLLM OpenAI-compatible API.
-
-.PARAMETER Model
-    Model name to use.
-
-.PARAMETER ToolsPath
-    Path to the tools configuration JSON file.
-
-.PARAMETER ExecuteTools
-    Whether to execute the recommended tools.
-
-.PARAMETER ReturnFinal
-    Whether to return a final synthesized response after tool execution.
-
-.PARAMETER MaxToolCalls
-    Maximum number of tool calls to process.
-
-.PARAMETER TimeoutSeconds
-    timeout for API requests.
-
-.PARAMETER ShowProgress
-    Whether to show progress bars.
-
-.PARAMETER ShowMetrics
-    Whether to show token usage metrics.
-
-.PARAMETER ProgressIntervalSeconds
-    Interval for progress updates.
-
-.EXAMPLE
-    Invoke-FunctionGemmaReAct -Prompt "What is the status of my USB devices?" -ExecuteTools
-#>
 
 function Invoke-FunctionGemmaChat {
     param(
@@ -93,6 +48,59 @@ function Invoke-FunctionGemmaChat {
 
 
 function Invoke-FunctionGemmaReAct {
+    <#
+    .SYNOPSIS
+        Uses FunctionGemma (via vLLM OpenAI API) to plan tool calls and optionally executes them.
+
+    .DESCRIPTION
+        Sends a prompt + tool schema to FunctionGemma and returns tool calls. When -ExecuteTools
+        is specified, executes mapped PC_AI tools and optionally returns a final response from
+        FunctionGemma after tool results are provided.
+
+    .PARAMETER Prompt
+        The user request or prompt.
+
+    .PARAMETER BaseUrl
+        Base URL for the vLLM OpenAI-compatible API.
+
+    .PARAMETER Model
+        Model name to use.
+
+    .PARAMETER ToolsPath
+        Path to the tools configuration JSON file.
+
+    .PARAMETER ExecuteTools
+        Whether to execute the recommended tools.
+
+    .PARAMETER ReturnFinal
+        Whether to return a final synthesized response after tool execution.
+
+    .PARAMETER MaxToolCalls
+        Maximum number of tool calls to process.
+
+    .PARAMETER ResultLimit
+        Maximum length in bytes for tool results before truncation. Prevents context window overflow. Default: 8192
+
+    .PARAMETER TimeoutSeconds
+        Timeout for API requests in seconds.
+
+    .PARAMETER ShowProgress
+        Whether to show progress bars during generation.
+
+    .PARAMETER ShowMetrics
+        Whether to show token usage metrics (prompt tokens, generation tokens, tokens/second, KV cache).
+
+    .PARAMETER ProgressIntervalSeconds
+        Interval for progress updates in seconds (1-10). Default: 1
+
+    .EXAMPLE
+        Invoke-FunctionGemmaReAct -Prompt "What is the status of my USB devices?" -ExecuteTools
+        Routes the query to FunctionGemma for tool planning and executes recommended diagnostic tools
+
+    .EXAMPLE
+        Invoke-FunctionGemmaReAct -Prompt "Analyze disk health" -ExecuteTools -ReturnFinal -ShowMetrics
+        Executes tools and returns a final synthesized response with performance metrics
+    #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
     param(

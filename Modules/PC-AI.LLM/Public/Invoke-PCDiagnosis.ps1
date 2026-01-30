@@ -30,6 +30,38 @@ function Invoke-PCDiagnosis {
 
     .PARAMETER OutputPath
         Path to save the analysis report (default: Desktop\PC-Diagnosis-Analysis.txt)
+
+    .PARAMETER TimeoutSeconds
+        Request timeout in seconds (30-1800). Default: 300
+
+    .PARAMETER UseRouter
+        Routes the diagnostic report through FunctionGemma for tool call planning before analysis
+
+    .PARAMETER RouterBaseUrl
+        Base URL for the FunctionGemma vLLM API. Default: http://localhost:11434
+
+    .PARAMETER RouterModel
+        Model name to use for FunctionGemma routing. Default: qwen2.5-coder:7b
+
+    .PARAMETER RouterToolsPath
+        Path to the tools configuration JSON file for FunctionGemma routing
+
+    .PARAMETER RouterMaxCalls
+        Maximum number of tool calls to process during routing (1-10). Default: 3
+
+    .PARAMETER RouterExecuteTools
+        Whether to execute tools recommended by FunctionGemma router
+
+    .PARAMETER EnforceJson
+        Require valid JSON output from the diagnostic analysis. Throws error if JSON is invalid.
+
+    .EXAMPLE
+        Invoke-PCDiagnosis -DiagnosticReportPath "C:\Reports\Hardware-Diagnostics-Report.txt"
+        Analyzes a diagnostic report with default settings
+
+    .EXAMPLE
+        Get-Content report.txt | Invoke-PCDiagnosis -ReportText {$_} -SaveReport -UseRouter -RouterExecuteTools
+        Pipes report text, enables routing and tool execution, and saves the analysis
     #>
     [CmdletBinding(DefaultParameterSetName = 'FromFile')]
     [OutputType([PSCustomObject])]

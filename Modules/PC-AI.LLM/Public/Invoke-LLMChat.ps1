@@ -3,7 +3,87 @@
 function Invoke-LLMChat {
     <#
     .SYNOPSIS
-        Interactive chat interface with Ollama LLM
+        Interactive chat interface with LLM providers (Ollama, vLLM, LM Studio)
+
+    .DESCRIPTION
+        Provides a unified chat interface supporting single-shot and interactive modes with automatic
+        provider fallback, tool calling via ReAct pattern, streaming responses, and detailed metrics.
+        Supports multiple LLM providers including Ollama, vLLM (OpenAI-compatible), and LM Studio.
+
+    .PARAMETER Message
+        The user message to send to the LLM. Can be piped in for single-shot mode.
+
+    .PARAMETER Model
+        The model to use for generation. Default is configured in module settings (qwen2.5-coder:7b).
+
+    .PARAMETER System
+        System prompt to guide the model's behavior and set context.
+
+    .PARAMETER Temperature
+        Controls randomness in generation (0.0-2.0). Lower values are more deterministic. Default: 0.7
+
+    .PARAMETER MaxTokens
+        Maximum number of tokens to generate. Optional, uses model default if not specified.
+
+    .PARAMETER TimeoutSeconds
+        Request timeout in seconds. Default is configured in module settings (120).
+
+    .PARAMETER Interactive
+        Starts an interactive chat session with conversation history. Type 'exit', 'quit', or 'q' to end.
+        Type 'clear' to reset conversation history.
+
+    .PARAMETER ToJson
+        Extracts and returns JSON content from the LLM response using the ConvertFrom-LLMJson parser.
+
+    .PARAMETER History
+        Array of message objects (@{role='user/assistant'; content='text'}) to initialize conversation context.
+
+    .PARAMETER Provider
+        LLM provider to use: 'auto' (tries all configured), 'ollama', 'vllm', or 'lmstudio'. Default: 'auto'
+
+    .PARAMETER UseRouter
+        Routes the request through FunctionGemma for tool call planning before sending to the main LLM.
+
+    .PARAMETER RouterMode
+        Routing mode when UseRouter is enabled: 'chat' (general) or 'diagnose' (diagnostic-specific). Default: 'chat'
+
+    .PARAMETER Stream
+        Enables streaming output for Ollama provider (tokens displayed as they are generated).
+
+    .PARAMETER ShowProgress
+        Displays a progress bar during generation with elapsed time updates.
+
+    .PARAMETER ShowMetrics
+        Shows detailed performance metrics including prompt tokens, generation tokens, tokens/second, and KV cache usage.
+
+    .PARAMETER ProgressIntervalSeconds
+        Update interval for progress display in seconds (1-10). Default: 1
+
+    .PARAMETER ResultLimit
+        Maximum length in bytes for tool results before truncation. Prevents context window overflow. Default: 8192
+
+    .EXAMPLE
+        Invoke-LLMChat -Message "Explain how DNS works"
+        Single-shot query with default model
+
+    .EXAMPLE
+        Invoke-LLMChat -Interactive -Model "deepseek-r1:8b" -ShowMetrics
+        Start interactive session with specific model and metrics display
+
+    .EXAMPLE
+        "Analyze this error" | Invoke-LLMChat -System "You are a debugging expert" -ToJson
+        Pipe input with system prompt and JSON extraction
+
+    .EXAMPLE
+        Invoke-LLMChat -Message "What USB devices have errors?" -UseRouter -RouterMode diagnose
+        Use FunctionGemma to route and plan diagnostic tool calls
+
+    .EXAMPLE
+        Invoke-LLMChat -Message "Write a story" -Stream -Provider ollama
+        Stream tokens as they are generated using Ollama
+
+    .OUTPUTS
+        PSCustomObject containing Response, RawResponse, Model, History, TotalDuration, Metrics, and Timestamp
     #>
     [CmdletBinding()]
     [OutputType([PSCustomObject])]
