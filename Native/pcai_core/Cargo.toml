@@ -3,7 +3,7 @@
 
 [workspace]
 resolver = "2"
-members = ["pcai_core_lib"]
+members = ["pcai_core_lib", "pcai_fs"]
 
 [workspace.package]
 version = "0.1.0"
