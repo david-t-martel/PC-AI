@@ -5,23 +5,32 @@
 
 ## Current Status Summary
 
-All Rust components compile cleanly with **0 warnings** and all tests pass.
+All Rust components compile cleanly with CUDA support enabled.
 
-| Component | Status | Tests | Warnings |
-|-----------|--------|-------|----------|
-| rust-functiongemma-train | ✅ Clean | 46 pass | 0 |
-| rust-functiongemma-runtime | ✅ Production | - | 0 |
-| pcai_fs | ✅ Clean | 14 pass | 0 |
-| pcai_core_lib | ✅ Clean | 0 | 0 |
+| Component | Status | Tests | CUDA |
+|-----------|--------|-------|------|
+| rust-functiongemma-train | ✅ Clean | 48 pass | ✅ Enabled |
+| rust-functiongemma-runtime | ✅ Production | - | ✅ Ready |
+| pcai_fs | ✅ Clean | 14 pass | N/A |
+| pcai_core_lib | ✅ Clean | 0 | N/A |
 
 ## Completed This Session (2026-01-30)
 
+**CUDA Integration:**
+- ✅ CUDA Toolkit v13.1 environment properly configured
+- ✅ Added CUDA env setup to `Tools/Invoke-RustBuild.ps1`
+- ✅ Added CUDA env setup to `Native/build.ps1`
+- ✅ candle-core/candle-nn CUDA features enabled
+- ✅ CUDA device detection verified (DeviceId 2)
+- ✅ GPU tensor operations tested and working
+- ✅ Fixed runtime Cargo.toml edition (2024 → 2021)
+
+**Previous Fixes:**
 - ✅ Fixed Rust edition (2024 → 2021)
-- ✅ Removed CUDA features (no cicc available)
 - ✅ Fixed orphan rule violations (moved Default impls)
 - ✅ Fixed early_stopping test logic
 - ✅ Cleaned all unused imports
-- ✅ All 46 tests passing in rust-functiongemma-train
+- ✅ All 48 tests passing in rust-functiongemma-train
 
 ## Active Rust Projects
 
@@ -82,9 +91,9 @@ trainer_lora_test.rs:      4 passed
 
 ```toml
 # Training (rust-functiongemma-train)
-candle-core = "0.9.2"        # CPU tensors (CUDA disabled)
-candle-nn = "0.9.2"          # Neural network layers
-candle-transformers = "0.9.2" # Transformer models
+candle-core = { version = "0.9.2", features = ["cuda"] }  # GPU tensors
+candle-nn = { version = "0.9.2", features = ["cuda"] }    # Neural network layers
+candle-transformers = { version = "0.9.2", features = ["cuda"] } # Transformer models
 tokenizers = "0.22"          # Fast tokenization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -102,7 +111,8 @@ memmap2 = "0.9"      # Memory-mapped files
 ## Build Environment
 
 - **Rust Edition**: 2021 (stable)
-- **CUDA**: Disabled (no cicc compiler)
+- **CUDA**: v13.1 (Ada/Blackwell compute 8.9/12.0)
+- **GPUs**: RTX 2000 Ada (8GB) + RTX 5060 Ti (16GB)
 - **Linker**: link.exe (lld-link optional)
 - **Cache Root**: `T:\RustCache\`
 - **Target Dir**: `T:\RustCache\cargo-target\`
@@ -138,11 +148,13 @@ e7f815c chore(context): update project context and planning docs
 
 ## Known Issues
 
-1. **CUDA disabled**: No CUDA compiler available; using CPU only
+1. **sccache + ring crate**: sccache has path spacing issues with ring crate builds
+   - Workaround: Build runtime without `model` feature, or disable sccache
 2. **Dependabot Alert**: protobuf CVE (high severity, monitoring)
 
 ## Next Steps
 
-- [ ] Enable CUDA when compiler available
+- [x] Enable CUDA (completed 2026-01-30)
+- [ ] Fix sccache/ring compatibility for runtime model feature
 - [ ] Add streaming support to runtime (SSE)
-- [ ] Performance benchmarks for training
+- [ ] Performance benchmarks for CUDA training

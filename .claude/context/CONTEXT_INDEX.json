@@ -1,7 +1,17 @@
 {
   "schema_version": "2.0",
-  "latest": "ctx-pcai-20260130-s1",
+  "latest": "ctx-pcai-20260130-s2",
   "contexts": [
+    {
+      "id": "ctx-pcai-20260130-s2",
+      "file": "pcai-context-20260130-session2.md",
+      "created": "2026-01-30T16:00:00Z",
+      "project": "PC_AI",
+      "agents_involved": [],
+      "summary": "CUDA environment integration for Rust ML training - device detection verified",
+      "supersedes": ["ctx-pcai-20260130-s1"],
+      "commit": "pending"
+    },
     {
       "id": "ctx-pcai-20260130-s1",
       "file": "pcai-context-20260130-session1.md",
@@ -10,7 +20,8 @@
       "agents_involved": [],
       "summary": "Rust compilation fixes, unused import cleanup, 5-group commit clustering",
       "supersedes": ["ctx-pcai-20260128-s4"],
-      "commit": "e7f815c"
+      "commit": "e7f815c",
+      "status": "superseded"
     },
     {
       "id": "ctx-pcai-20260128-s4",
@@ -63,6 +74,24 @@
   ],
   "completed_goals": [
     {
+      "goal": "Enable CUDA support for rust-functiongemma-train",
+      "completed": "2026-01-30",
+      "context": "ctx-pcai-20260130-s2",
+      "commit": "pending"
+    },
+    {
+      "goal": "Configure CUDA environment in build scripts",
+      "completed": "2026-01-30",
+      "context": "ctx-pcai-20260130-s2",
+      "commit": "pending"
+    },
+    {
+      "goal": "Verify CUDA device detection and tensor operations",
+      "completed": "2026-01-30",
+      "context": "ctx-pcai-20260130-s2",
+      "commit": "pending"
+    },
+    {
       "goal": "Fix Rust compilation issues in rust-functiongemma-train",
       "completed": "2026-01-30",
       "context": "ctx-pcai-20260130-s1",
@@ -114,14 +143,28 @@
       "severity": "high",
       "status": "monitoring",
       "notes": "No patch available yet"
+    },
+    {
+      "blocker": "sccache + ring crate incompatibility",
+      "severity": "low",
+      "status": "workaround available",
+      "notes": "Disable sccache or build without model feature for runtime"
     }
   ],
   "rust_status": {
     "rust-functiongemma-train": {
       "status": "clean",
       "warnings": 0,
-      "tests": 46,
-      "last_verified": "2026-01-30T14:30:00Z"
+      "tests": 48,
+      "cuda_enabled": true,
+      "last_verified": "2026-01-30T16:00:00Z"
+    },
+    "rust-functiongemma-runtime": {
+      "status": "clean",
+      "warnings": 1,
+      "tests": 0,
+      "cuda_enabled": true,
+      "last_verified": "2026-01-30T16:00:00Z"
     },
     "pcai_fs": {
       "status": "clean",
@@ -135,5 +178,14 @@
       "tests": 0,
       "last_verified": "2026-01-30T14:30:00Z"
     }
+  },
+  "cuda_status": {
+    "toolkit_version": "v13.1",
+    "gpus": [
+      {"name": "RTX 2000 Ada", "vram": "8GB", "compute": "8.9"},
+      {"name": "RTX 5060 Ti", "vram": "16GB", "compute": "12.0"}
+    ],
+    "device_detected": true,
+    "tensor_ops_verified": true
   }
 }
