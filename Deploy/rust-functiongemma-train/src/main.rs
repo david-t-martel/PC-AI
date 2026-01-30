@@ -10,7 +10,7 @@ use rust_functiongemma_train::{Config, Model};
 use rust_functiongemma_train::data_gen::DataGenerator;
 use rust_functiongemma_train::dataset::Dataset;
 use rust_functiongemma_train::trainer::{Trainer, TrainerConfig};
-use rust_functiongemma_train::eval::{parse_tool_call, evaluate_sample, EvaluationMetrics};
+use rust_functiongemma_train::eval::{evaluate_sample, EvaluationMetrics};
 use rust_functiongemma_train::router_dataset::{
     build_router_dataset,
     build_tool_test_vectors,
@@ -306,7 +306,7 @@ fn main() -> Result<()> {
             let config_raw = fs::read_to_string(model_dir.join("config.json"))?;
             let config: Config = serde_json::from_str(&config_raw)?;
 
-            let mut varmap = VarMap::new();
+            let varmap = VarMap::new();
             let vb = VarBuilder::from_varmap(&varmap, DType::BF16, &device);
             let model = Model::new(&config, lora_r, vb, true)?;
 

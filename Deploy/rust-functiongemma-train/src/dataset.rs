@@ -2,10 +2,9 @@ use anyhow::{Result, Context};
 use candle_core::{Device, Tensor};
 use memmap2::Mmap;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tokenizers::Tokenizer;
 use crate::data_gen::TrainingItem;
 

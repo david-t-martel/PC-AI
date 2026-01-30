@@ -2,7 +2,6 @@ use serde_json::{Value, Map};
 use itertools::Itertools;
 use std::collections::HashSet;
 use crate::data_gen::{TrainingItem, Message};
-use serde_json::json;
 
 pub fn generate_arg_sets(parameters: &Map<String, Value>, max_cases: usize) -> Vec<Map<String, Value>> {
     let props = parameters.get("properties").and_then(|v| v.as_object());
