@@ -19,6 +19,9 @@
 .PARAMETER LlmDebug
   Enable CargoTools LLM debug defaults (RUST_BACKTRACE, verbose traces).
 
+.PARAMETER RaPreflight
+  Enable rust-analyzer diagnostics during CargoTools preflight.
+
 .PARAMETER Preflight
   Enable CargoTools preflight checks (cargo check/clippy/fmt).
 
@@ -40,6 +43,7 @@ param(
     [switch]$UseLld,
     [switch]$NoLld,
     [switch]$LlmDebug,
+    [switch]$RaPreflight,
     [switch]$Preflight,
     [ValidateSet('check','clippy','fmt','all')]
     [string]$PreflightMode = 'check',
@@ -79,6 +83,13 @@ if ($Preflight) {
     $env:CARGO_PREFLIGHT_MODE = $PreflightMode
 } else {
     $env:CARGO_PREFLIGHT = '0'
+}
+
+# rust-analyzer diagnostics are opt-in to avoid singleton contention by default
+if ($RaPreflight) {
+    $env:CARGO_RA_PREFLIGHT = '1'
+} elseif (-not $env:CARGO_RA_PREFLIGHT) {
+    $env:CARGO_RA_PREFLIGHT = '0'
 }
 
 if ($PreflightBlocking) {

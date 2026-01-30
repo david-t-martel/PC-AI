@@ -1,4 +1,4 @@
-﻿# FunctionGemma Tool Catalog
+# FunctionGemma Tool Catalog
 
 Source: `Config/pcai-tools.json`
 

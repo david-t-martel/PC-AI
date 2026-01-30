@@ -256,11 +256,13 @@ function Invoke-TrainingDataGeneration {
     }
 
     try {
-        $args = @('-MaxCases', $RouterMaxCases)
-        if ($UseNativeRouter) { $args += '-UseNative' }
-        if ($NoToolCoverage) { $args += '-NoToolCoverage' }
+        $routerParams = @{
+            MaxCases = $RouterMaxCases
+        }
+        if ($UseNativeRouter) { $routerParams.UseNative = $true }
+        if ($NoToolCoverage) { $routerParams.NoToolCoverage = $true }
 
-        & $script @args
+        & $script @routerParams
         if ($LASTEXITCODE -ne 0) {
             Add-PipelineStep -Name 'TrainingData' -Status 'Error' -Error "Router dataset generation failed (exit $LASTEXITCODE)"
             return

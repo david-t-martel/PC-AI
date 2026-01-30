@@ -1,0 +1,412 @@
+[
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Get-RustToolStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Test-RustToolAvailable",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Search-LogsFast",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Find-FilesFast",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Get-ProcessesFast",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Get-FileHashParallel",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Find-DuplicatesFast",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Get-DiskUsageFast",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Search-ContentFast",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Measure-CommandPerformance",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Compare-ToolPerformance",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Initialize-PcaiNative",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Test-PcaiNativeAvailable",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Get-PcaiNativeStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Invoke-PcaiNativeDuplicates",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Invoke-PcaiNativeFileSearch",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Acceleration",
+    "Function": "Invoke-PcaiNativeContentSearch",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Cleanup",
+    "Function": "Get-PathDuplicates",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Cleanup",
+    "Function": "Repair-MachinePath",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Cleanup",
+    "Function": "Find-DuplicateFiles",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Cleanup",
+    "Function": "Clear-TempFiles",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.CLI",
+    "Function": "Get-PCCommandMap",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.CLI",
+    "Function": "Get-PCCommandModules",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.CLI",
+    "Function": "Get-PCCommandList",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.CLI",
+    "Function": "Get-PCCommandSummary",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.CLI",
+    "Function": "Get-PCModuleHelpIndex",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.CLI",
+    "Function": "Get-PCModuleHelpEntry",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.CLI",
+    "Function": "Parse-PCArguments",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.CLI",
+    "Function": "Resolve-PCArguments",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Hardware",
+    "Function": "Get-PcDeviceError",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Hardware",
+    "Function": "Get-PcDiskStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Hardware",
+    "Function": "Get-PcUsbStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Hardware",
+    "Function": "Get-PcNetworkStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Hardware",
+    "Function": "Get-PcSystemEvent",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Get-LLMStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Send-OllamaRequest",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Invoke-LLMChat",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Invoke-LLMChatRouted",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Invoke-LLMChatTui",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Invoke-FunctionGemmaReAct",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Invoke-PCDiagnosis",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Set-LLMConfig",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Set-LLMProviderOrder",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Invoke-SmartDiagnosis",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Invoke-NativeSearch",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Invoke-DocSearch",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Get-SystemInfoTool",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.LLM",
+    "Function": "Invoke-LogSearch",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Network",
+    "Function": "Get-NetworkDiagnostics",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Network",
+    "Function": "Optimize-VSock",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Network",
+    "Function": "Watch-VSockPerformance",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Network",
+    "Function": "Test-WSLConnectivity",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Performance",
+    "Function": "Get-PcaiDiskUsage",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Performance",
+    "Function": "Get-PcaiTopProcess",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Performance",
+    "Function": "Get-PcaiMemoryStat",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Performance",
+    "Function": "Test-PcaiNative",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.USB",
+    "Function": "Get-UsbDeviceList",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.USB",
+    "Function": "Mount-UsbToWSL",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.USB",
+    "Function": "Dismount-UsbFromWSL",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.USB",
+    "Function": "Get-UsbWSLStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.USB",
+    "Function": "Invoke-UsbBind",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.USB",
+    "Function": "Get-PcaiNativeUsbDiagnostics",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Get-WSLStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Optimize-WSLConfig",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Set-WSLDefenderExclusions",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Repair-WSLNetworking",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Get-HyperVStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Get-DockerStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Backup-WSLConfig",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Get-WSLEnvironmentHealth",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Enable-WSLSystemd",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Install-WSLVsockBridge",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Get-WSLVsockBridgeStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Invoke-WSLNetworkToolkit",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Invoke-WSLDockerHealthCheck",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Install-HVSockProxy",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Register-HVSockServices",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Start-HVSockProxy",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Stop-HVSockProxy",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Get-HVSockProxyStatus",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Invoke-PcaiServiceHost",
+    "Type": "Exported"
+  },
+  {
+    "Module": "PC-AI.Virtualization",
+    "Function": "Set-PCaiServiceState",
+    "Type": "Exported"
+  }
+]

@@ -1,56 +1,56 @@
 {
-  "generated": "2026-01-28 19:30:16",
+  "generated": "2026-01-30 13:36:04",
   "mode": "Full",
-  "duration": "00:05",
+  "duration": "10:01",
   "steps": [
     {
       "Name": "DOC_STATUS",
       "Status": "Success",
       "Output": "C:\\Users\\david\\PC_AI\\Reports\\DOC_STATUS.md",
       "Error": "",
-      "Timestamp": "19:30:11"
+      "Timestamp": "13:26:04"
     },
     {
       "Name": "ToolSchema",
       "Status": "Success",
       "Output": "C:\\Users\\david\\PC_AI\\Deploy\\rust-functiongemma\\TOOLS.md",
       "Error": "",
-      "Timestamp": "19:30:11"
+      "Timestamp": "13:26:04"
     },
     {
       "Name": "RustDocs",
       "Status": "Success",
       "Output": "T:\\RustCache\\cargo-target\\doc",
       "Error": "",
-      "Timestamp": "19:30:15"
+      "Timestamp": "13:28:17"
     },
     {
       "Name": "PowerShellDocs",
       "Status": "Success",
       "Output": "C:\\Users\\david\\PC_AI\\Reports\\POWERSHELL_EXPORTS.json",
       "Error": "",
-      "Timestamp": "19:30:15"
+      "Timestamp": "13:28:17"
     },
     {
       "Name": "ApiSignatures",
       "Status": "Success",
       "Output": "C:\\Users\\david\\PC_AI\\Reports\\API_SIGNATURE_REPORT.md",
       "Error": "",
-      "Timestamp": "19:30:16"
+      "Timestamp": "13:28:18"
     },
     {
       "Name": "TrainingData",
-      "Status": "Success",
-      "Output": "dataset: C:\\Users\\david\\PC_AI\\Deploy\\functiongemma-finetune\\data\\rust_router_train.jsonl | vectors: C:\\Users\\david\\PC_AI\\Deploy\\functiongemma-finetune\\test_vectors.json",
-      "Error": "",
-      "Timestamp": "19:30:16"
+      "Status": "Error",
+      "Output": "",
+      "Error": "Router dataset generation failed (exit 101)",
+      "Timestamp": "13:36:04"
     },
     {
       "Name": "Validation",
       "Status": "Success",
       "Output": "Router dataset + vectors validated",
       "Error": "",
-      "Timestamp": "19:30:16"
+      "Timestamp": "13:36:04"
     }
   ],
   "outputs": [
@@ -59,9 +59,10 @@
     "T:\\RustCache\\cargo-target\\doc",
     "C:\\Users\\david\\PC_AI\\Reports\\POWERSHELL_EXPORTS.json",
     "C:\\Users\\david\\PC_AI\\Reports\\API_SIGNATURE_REPORT.md",
-    "dataset: C:\\Users\\david\\PC_AI\\Deploy\\functiongemma-finetune\\data\\rust_router_train.jsonl | vectors: C:\\Users\\david\\PC_AI\\Deploy\\functiongemma-finetune\\test_vectors.json",
     "Router dataset + vectors validated"
   ],
-  "errors": [],
-  "success": true
+  "errors": [
+    "Router dataset generation failed (exit 101)"
+  ],
+  "success": false
 }

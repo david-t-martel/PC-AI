@@ -38,6 +38,9 @@ function Get-PublicFunctionInfo {
     $functions = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)
 
     $content = Get-Content -Path $Path -Raw -Encoding UTF8
+    if ([string]::IsNullOrEmpty($content)) {
+        return @()
+    }
     $helpMatches = [regex]::Matches($content, '(?s)<#(.*?)#>\s*function\s+([A-Za-z0-9_-]+)')
     $helpMap = @{}
     foreach ($m in $helpMatches) {
@@ -105,6 +108,7 @@ function Get-CSharpDllImports {
     $imports = @()
     foreach ($file in $files) {
         $content = Get-Content -Path $file.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($content)) { continue }
         $matches = [regex]::Matches($content, '\[DllImport\([^\)]*\)\]\s*internal\s+static\s+extern\s+[^\s]+\s+(pcai_[A-Za-z0-9_]+)\s*\(')
         foreach ($m in $matches) {
             $imports += $m.Groups[1].Value
@@ -121,6 +125,7 @@ function Get-RustExports {
     $exports = @()
     foreach ($file in $files) {
         $content = Get-Content -Path $file.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($content)) { continue }
         $matches = [regex]::Matches($content, 'pub\s+extern\s+"C"\s+fn\s+(pcai_[A-Za-z0-9_]+)')
         foreach ($m in $matches) {
             $exports += $m.Groups[1].Value
@@ -136,6 +141,7 @@ function Get-PowerShellPcaiCalls {
     $calls = @()
     foreach ($file in $files) {
         $content = Get-Content -Path $file.FullName -Raw -Encoding UTF8
+        if ([string]::IsNullOrEmpty($content)) { continue }
         $matches = [regex]::Matches($content, '\[PcaiNative\.PcaiCore\]::([A-Za-z0-9_]+)')
         foreach ($m in $matches) {
             $calls += $m.Groups[1].Value
@@ -149,6 +155,7 @@ function Get-CSharpPcaiCoreMethods {
 
     if (-not (Test-Path $Path)) { return @() }
     $content = Get-Content -Path $Path -Raw -Encoding UTF8
+    if ([string]::IsNullOrEmpty($content)) { return @() }
     $methodMatches = [regex]::Matches($content, 'public\s+static\s+[^\s]+\s+([A-Za-z0-9_]+)\s*\(')
     $propertyMatches = [regex]::Matches($content, 'public\s+static\s+[^\s]+\s+([A-Za-z0-9_]+)\s*=>')
     $names = @()
