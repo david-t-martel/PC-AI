@@ -8,6 +8,15 @@ pub struct EarlyStoppingConfig {
     pub min_delta: f64,
 }
 
+impl Default for EarlyStoppingConfig {
+    fn default() -> Self {
+        Self {
+            patience: 5,
+            min_delta: 0.001,
+        }
+    }
+}
+
 /// Early stopping monitor to prevent overfitting.
 ///
 /// Tracks validation loss and stops training when loss stops improving

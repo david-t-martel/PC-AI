@@ -5,42 +5,7 @@ use rust_functiongemma_train::{
     early_stopping::{EarlyStopping, EarlyStoppingConfig},
     trainer::TrainerConfig,
 };
-use std::path::PathBuf;
 use tempfile::TempDir;
-
-/// Default implementation for CheckpointConfig
-impl Default for CheckpointConfig {
-    fn default() -> Self {
-        Self {
-            output_dir: PathBuf::from("./checkpoints"),
-            save_every_n_steps: 500,
-            max_checkpoints: 3,
-        }
-    }
-}
-
-/// Default implementation for SchedulerConfig
-impl Default for SchedulerConfig {
-    fn default() -> Self {
-        Self {
-            scheduler_type: SchedulerType::Cosine,
-            warmup_steps: 100,
-            total_steps: 1000,
-            min_lr: 1e-6,
-            max_lr: 1e-4,
-        }
-    }
-}
-
-/// Default implementation for EarlyStoppingConfig
-impl Default for EarlyStoppingConfig {
-    fn default() -> Self {
-        Self {
-            patience: 5,
-            min_delta: 0.001,
-        }
-    }
-}
 
 #[test]
 fn test_full_training_config_integration() {
@@ -204,14 +169,15 @@ fn test_early_stopping_integration() {
     let mut stopper = EarlyStopping::new(config);
 
     // Simulate training losses
-    assert!(!stopper.should_stop(1.0)); // First epoch - no stop
-    assert!(!stopper.should_stop(0.8)); // Improvement - no stop
-    assert!(!stopper.should_stop(0.79)); // Small improvement - no stop (within min_delta)
-    assert!(!stopper.should_stop(0.78)); // Small improvement - counter increments
-    assert!(!stopper.should_stop(0.77)); // Small improvement - counter increments
-    assert!(stopper.should_stop(0.76)); // Patience exceeded - should stop
+    // For counter to increment, improvement must be <= min_delta (0.01)
+    // improvement = best_loss - val_loss
+    assert!(!stopper.should_stop(1.0)); // First epoch: best=1.0, counter=0
+    assert!(!stopper.should_stop(0.8)); // Improvement: 1.0-0.8=0.2 > 0.01, best=0.8, counter=0
+    assert!(!stopper.should_stop(0.795)); // Improvement: 0.8-0.795=0.005 <= 0.01, counter=1
+    assert!(!stopper.should_stop(0.793)); // Improvement: 0.8-0.793=0.007 <= 0.01, counter=2
+    assert!(stopper.should_stop(0.791)); // Improvement: 0.8-0.791=0.009 <= 0.01, counter=3 >= patience
 
-    // Verify best loss tracked correctly
+    // Verify best loss tracked correctly (stayed at 0.8 since no significant improvement)
     assert_eq!(stopper.best_loss(), 0.8);
 }
 

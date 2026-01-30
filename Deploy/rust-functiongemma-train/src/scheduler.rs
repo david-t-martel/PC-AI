@@ -27,6 +27,18 @@ pub struct SchedulerConfig {
     pub max_lr: f64,
 }
 
+impl Default for SchedulerConfig {
+    fn default() -> Self {
+        Self {
+            scheduler_type: SchedulerType::Cosine,
+            warmup_steps: 100,
+            total_steps: 1000,
+            min_lr: 1e-6,
+            max_lr: 1e-4,
+        }
+    }
+}
+
 /// Learning rate scheduler implementing warmup + decay strategies
 pub struct LRScheduler {
     config: SchedulerConfig,

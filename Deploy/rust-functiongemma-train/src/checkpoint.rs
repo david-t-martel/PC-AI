@@ -29,6 +29,16 @@ pub struct CheckpointConfig {
     pub max_checkpoints: usize,
 }
 
+impl Default for CheckpointConfig {
+    fn default() -> Self {
+        Self {
+            output_dir: PathBuf::from("./checkpoints"),
+            save_every_n_steps: 500,
+            max_checkpoints: 3,
+        }
+    }
+}
+
 impl Checkpoint {
     /// Save checkpoint to disk
     ///
