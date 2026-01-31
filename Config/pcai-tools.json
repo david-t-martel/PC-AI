@@ -49,7 +49,7 @@
 						"category": {
 							"type": "string",
 							"description": "Information category.",
-							"enum": ["Storage", "Network", "USB", "BIOS", "OS"]
+							"enum": ["Storage", "Network", "USB", "BIOS", "OS", "GPU", "DiskDrive", "Net", "Display", "Media", "HIDClass"]
 						},
 						"detail": {
 							"type": "string",
@@ -115,6 +115,283 @@
 					"ContextLines": "$contextLines",
 					"MaxMatches": "$maxMatches"
 				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_device_errors",
+				"description": "Get devices reporting ConfigManager errors (Device Manager).",
+				"parameters": {
+					"type": "object",
+					"properties": {}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Hardware",
+				"cmdlet": "Get-PcDeviceError",
+				"params": {}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_disk_status",
+				"description": "Get disk SMART/status details for physical drives.",
+				"parameters": {
+					"type": "object",
+					"properties": {}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Hardware",
+				"cmdlet": "Get-PcDiskStatus",
+				"params": {}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_system_events",
+				"description": "Get recent system events related to disk/USB/storage issues.",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"days": {
+							"type": "integer",
+							"description": "Look-back window in days."
+						}
+					}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Hardware",
+				"cmdlet": "Get-PcSystemEvent",
+				"params": {
+					"Days": "$days"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_usb_status",
+				"description": "Get USB device and controller status (optionally errors only).",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"errors_only": {
+							"type": "boolean",
+							"description": "Only return devices with errors."
+						}
+					}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Hardware",
+				"cmdlet": "Get-PcUsbStatus",
+				"params": {
+					"ErrorsOnly": "$errors_only"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_network_status",
+				"description": "Get physical network adapter status.",
+				"parameters": {
+					"type": "object",
+					"properties": {}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Hardware",
+				"cmdlet": "Get-PcNetworkStatus",
+				"params": {}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_llm_status",
+				"description": "Get status of local LLM endpoints/providers.",
+				"parameters": {
+					"type": "object",
+					"properties": {}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.LLM",
+				"cmdlet": "Get-LLMStatus",
+				"params": {}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_service_health",
+				"description": "Check pcai-inference, FunctionGemma, WSL, Docker, and GPU health.",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"distribution": {
+							"type": "string",
+							"description": "WSL distribution to check."
+						},
+						"pcai_inference_url": {
+							"type": "string",
+							"description": "pcai-inference base URL."
+						},
+						"functiongemma_url": {
+							"type": "string",
+							"description": "FunctionGemma base URL."
+						},
+						"check_legacy_providers": {
+							"type": "boolean",
+							"description": "Also check legacy Ollama/vLLM providers."
+						}
+					}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Virtualization",
+				"cmdlet": "Get-PcaiServiceHealth",
+				"params": {
+					"Distribution": "$distribution",
+					"PcaiInferenceUrl": "$pcai_inference_url",
+					"FunctionGemmaUrl": "$functiongemma_url",
+					"CheckLegacyProviders": "$check_legacy_providers"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_wsl_status",
+				"description": "Get WSL status, versions, and distributions.",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"detailed": {
+							"type": "boolean",
+							"description": "Include .wslconfig details."
+						}
+					}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Virtualization",
+				"cmdlet": "Get-WSLStatus",
+				"params": {
+					"Detailed": "$detailed"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_run_wsl_docker_health_check",
+				"description": "Run WSL/Docker health check (with fallback if script is missing).",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"auto_recover": {
+							"type": "boolean",
+							"description": "Attempt auto-recovery if failures are detected."
+						},
+						"quick": {
+							"type": "boolean",
+							"description": "Run a quick health check."
+						},
+						"verbose": {
+							"type": "boolean",
+							"description": "Enable verbose output."
+						}
+					}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Virtualization",
+				"cmdlet": "Invoke-WSLDockerHealthCheck",
+				"params": {
+					"AutoRecover": "$auto_recover",
+					"Quick": "$quick",
+					"Verbose": "$verbose"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_disk_usage",
+				"description": "Get high-performance disk usage summary for a path.",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"path": {
+							"type": "string",
+							"description": "Directory to analyze."
+						},
+						"top": {
+							"type": "integer",
+							"description": "Number of top entries to return."
+						}
+					}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Performance",
+				"cmdlet": "Get-PcaiDiskUsage",
+				"params": {
+					"Path": "$path",
+					"Top": "$top"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_top_processes",
+				"description": "Get top resource-consuming processes.",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"sort_by": {
+							"type": "string",
+							"description": "Sort by memory or cpu.",
+							"enum": ["memory", "cpu"]
+						},
+						"top": {
+							"type": "integer",
+							"description": "Number of processes to return."
+						}
+					}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Performance",
+				"cmdlet": "Get-PcaiTopProcess",
+				"params": {
+					"SortBy": "$sort_by",
+					"Top": "$top"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_get_memory_stats",
+				"description": "Get system memory statistics (native).",
+				"parameters": {
+					"type": "object",
+					"properties": {}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Performance",
+				"cmdlet": "Get-PcaiMemoryStat",
+				"params": {}
 			}
 		},
 		{
@@ -310,6 +587,110 @@
 				"params": {
 					"Service": "$service",
 					"Action": "Restart"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_native_inference_status",
+				"description": "Get the status of native inference backend (PcaiInference FFI).",
+				"parameters": {
+					"type": "object",
+					"properties": {}
+				}
+			},
+			"pcai_mapping": {
+				"module": "PcaiInference",
+				"cmdlet": "Get-PcaiInferenceStatus",
+				"params": {}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_switch_inference_backend",
+				"description": "Switch the active native inference backend (llamacpp or mistralrs).",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"backend": {
+							"type": "string",
+							"description": "Backend to switch to.",
+							"enum": ["llamacpp", "mistralrs", "auto"]
+						}
+					},
+					"required": ["backend"]
+				}
+			},
+			"pcai_mapping": {
+				"module": "PcaiInference",
+				"cmdlet": "Initialize-PcaiInference",
+				"params": {
+					"Backend": "$backend"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_load_model",
+				"description": "Load a GGUF or SafeTensors model into the native inference backend.",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"model_path": {
+							"type": "string",
+							"description": "Path to the model file (GGUF or SafeTensors format)."
+						},
+						"gpu_layers": {
+							"type": "integer",
+							"description": "GPU layers to offload (-1 = all, 0 = CPU only)."
+						}
+					},
+					"required": ["model_path"]
+				}
+			},
+			"pcai_mapping": {
+				"module": "PcaiInference",
+				"cmdlet": "Import-PcaiModel",
+				"params": {
+					"ModelPath": "$model_path",
+					"GpuLayers": "$gpu_layers"
+				}
+			}
+		},
+		{
+			"type": "function",
+			"function": {
+				"name": "pcai_run_evaluation",
+				"description": "Run an evaluation suite against the active inference backend.",
+				"parameters": {
+					"type": "object",
+					"properties": {
+						"suite_name": {
+							"type": "string",
+							"description": "Name for the evaluation suite."
+						},
+						"dataset": {
+							"type": "string",
+							"description": "Dataset name or path to use for evaluation."
+						},
+						"metrics": {
+							"type": "string",
+							"description": "Comma-separated metrics to collect (latency,throughput,similarity)."
+						}
+					},
+					"required": ["suite_name"]
+				}
+			},
+			"pcai_mapping": {
+				"module": "PC-AI.Evaluation",
+				"cmdlet": "Invoke-EvaluationSuite",
+				"params": {
+					"Suite": "$suite_name",
+					"Dataset": "$dataset",
+					"Metrics": "$metrics"
 				}
 			}
 		}

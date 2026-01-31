@@ -95,7 +95,7 @@ public static class Program
         var react = string.Equals(mode, "react", StringComparison.OrdinalIgnoreCase) || mode == "diagnose";
         var toolsPath = options.ToolsPath ?? config.ToolsPath ?? "C:\\Users\\david\\PC_AI\\Config\\pcai-tools.json";
 
-        await RunInteractiveAsync(http, baseUrl, model, provider, systemPrompt, stream, react, toolsPath, mode);
+        await RunInteractiveAsync(http, baseUrl, model, provider, systemPrompt, stream, react, toolsPath, mode, options.JsonOutput);
         return 0;
     }
 
@@ -143,7 +143,8 @@ public static class Program
         bool stream,
         bool react,
         string toolsPath,
-        string initialMode)
+        string initialMode,
+        bool jsonOutput)
     {
         var mode = initialMode;
         var history = new List<ChatMessage>();
@@ -164,7 +165,37 @@ public static class Program
         orchestrator.OnThought += (thought) => Console.WriteLine($"thought> {thought}");
         orchestrator.OnToolCall += (name, args) => Console.WriteLine($"executing> {name}({args})");
         orchestrator.OnToolResult += (name, result) => Console.WriteLine($"result> {name} completed.");
-        orchestrator.OnFinalAnswer += (answer) => Console.WriteLine($"assistant> {answer}\n");
+        orchestrator.OnFinalAnswer += (answer) =>
+        {
+            if (string.Equals(mode, "diagnose", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryValidateDiagnoseJson(answer, out var error))
+                {
+                    Console.WriteLine($"error> Diagnose mode requires valid JSON output. {error}");
+                    Console.WriteLine($"raw> {answer}");
+                    return;
+                }
+
+                if (jsonOutput)
+                {
+                    using var doc = JsonDocument.Parse(answer);
+                    Console.WriteLine(JsonSerializer.Serialize(doc.RootElement, JsonOptions));
+                    Console.WriteLine();
+                    return;
+                }
+
+                var summary = BuildDiagnoseSummary(answer);
+                if (!string.IsNullOrWhiteSpace(summary))
+                {
+                    Console.WriteLine("assistant>");
+                    Console.WriteLine(summary);
+                    Console.WriteLine();
+                    return;
+                }
+            }
+
+            Console.WriteLine($"assistant> {answer}\n");
+        };
         orchestrator.OnError += (error) => Console.WriteLine($"error> {error}");
 
         while (true)
@@ -353,6 +384,171 @@ public static class Program
 
         var payload = await response.Content.ReadFromJsonAsync<OllamaChatResponse>(JsonOptions);
         return payload?.Message?.Content ?? string.Empty;
+    }
+
+    private static bool TryValidateDiagnoseJson(string content, out string error)
+    {
+        error = string.Empty;
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            error = "Response is empty.";
+            return false;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(content);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                error = "Root JSON must be an object.";
+                return false;
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static string BuildDiagnoseSummary(string content)
+    {
+        using var doc = JsonDocument.Parse(content);
+        var root = doc.RootElement;
+        var sb = new StringBuilder();
+        const int maxItems = 5;
+
+        AppendStringArray(root, "summary", "Summary", sb, maxItems);
+        AppendFindings(root, sb, maxItems);
+        AppendRecommendations(root, sb, maxItems);
+        AppendStringArray(root, "what_is_missing", "Missing Data", sb, maxItems);
+
+        return sb.ToString().TrimEnd();
+    }
+
+    private static void AppendStringArray(JsonElement root, string propName, string title, StringBuilder sb, int maxItems)
+    {
+        if (!root.TryGetProperty(propName, out var array) || array.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var count = array.GetArrayLength();
+        if (count == 0)
+        {
+            return;
+        }
+
+        sb.AppendLine($"{title}:");
+        var i = 0;
+        foreach (var item in array.EnumerateArray())
+        {
+            if (i >= maxItems)
+            {
+                sb.AppendLine($"- ... ({count - maxItems} more)");
+                break;
+            }
+            var text = item.ValueKind == JsonValueKind.String ? item.GetString() : item.ToString();
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                sb.AppendLine($"- {text}");
+            }
+            i++;
+        }
+        sb.AppendLine();
+    }
+
+    private static void AppendFindings(JsonElement root, StringBuilder sb, int maxItems)
+    {
+        if (!root.TryGetProperty("findings", out var findings) || findings.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var count = findings.GetArrayLength();
+        if (count == 0)
+        {
+            return;
+        }
+
+        sb.AppendLine("Findings:");
+        var i = 0;
+        foreach (var item in findings.EnumerateArray())
+        {
+            if (i >= maxItems)
+            {
+                sb.AppendLine($"- ... ({count - maxItems} more)");
+                break;
+            }
+
+            var criticality = GetStringProperty(item, "criticality");
+            var category = GetStringProperty(item, "category");
+            var issue = GetStringProperty(item, "issue");
+
+            var line = new StringBuilder("- ");
+            if (!string.IsNullOrWhiteSpace(criticality))
+            {
+                line.Append($"[{criticality}] ");
+            }
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                line.Append($"{category}: ");
+            }
+            line.Append(string.IsNullOrWhiteSpace(issue) ? item.ToString() : issue);
+            sb.AppendLine(line.ToString());
+            i++;
+        }
+        sb.AppendLine();
+    }
+
+    private static void AppendRecommendations(JsonElement root, StringBuilder sb, int maxItems)
+    {
+        if (!root.TryGetProperty("recommendations", out var recs) || recs.ValueKind != JsonValueKind.Array)
+        {
+            return;
+        }
+
+        var count = recs.GetArrayLength();
+        if (count == 0)
+        {
+            return;
+        }
+
+        sb.AppendLine("Recommendations:");
+        var i = 0;
+        foreach (var item in recs.EnumerateArray())
+        {
+            if (i >= maxItems)
+            {
+                sb.AppendLine($"- ... ({count - maxItems} more)");
+                break;
+            }
+
+            var step = GetStringProperty(item, "step");
+            var action = GetStringProperty(item, "action");
+            var risk = GetStringProperty(item, "risk");
+
+            var prefix = string.IsNullOrWhiteSpace(step) ? $"{i + 1}." : $"{step}.";
+            var line = new StringBuilder($"{prefix} ");
+            line.Append(string.IsNullOrWhiteSpace(action) ? item.ToString() : action);
+            if (!string.IsNullOrWhiteSpace(risk))
+            {
+                line.Append($" (risk: {risk})");
+            }
+            sb.AppendLine(line.ToString());
+            i++;
+        }
+        sb.AppendLine();
+    }
+
+    private static string GetStringProperty(JsonElement element, string name)
+    {
+        if (!element.TryGetProperty(name, out var value))
+        {
+            return string.Empty;
+        }
+        return value.ValueKind == JsonValueKind.String ? (value.GetString() ?? string.Empty) : value.ToString();
     }
 
     private static async Task<string> StreamOllamaChatAsync(HttpClient http, string baseUrl, string model, List<ChatMessage> messages)

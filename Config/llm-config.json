@@ -1,12 +1,21 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "providers": {
     "pcai-inference": {
       "enabled": true,
       "baseUrl": "http://127.0.0.1:8080",
       "defaultModel": "pcai-inference",
       "timeout": 120000
+    },
+    "pcai-native": {
+      "enabled": true,
+      "type": "ffi",
+      "backend": "auto",
+      "modelPath": null,
+      "gpuLayers": -1,
+      "defaultTemperature": 0.7,
+      "defaultMaxTokens": 2048
     },
     "functiongemma": {
       "enabled": true,
@@ -47,6 +56,24 @@
     "markdownFormatting": true
   },
   "fallbackOrder": [
+    "pcai-native",
     "pcai-inference"
-  ]
+  ],
+  "nativeInference": {
+    "preferNative": true,
+    "dllSearchPaths": [
+      "bin/pcai_inference.dll",
+      "Deploy/pcai-inference/target/release/pcai_inference.dll"
+    ],
+    "backends": {
+      "mistralrs": {
+        "priority": 1,
+        "description": "Rust mistral.rs backend (optimized for Mistral models)"
+      },
+      "llamacpp": {
+        "priority": 2,
+        "description": "llama.cpp backend (GGUF models, CUDA support)"
+      }
+    }
+  }
 }

@@ -29,14 +29,30 @@ public sealed class PowerShellHost : IDisposable
     /// <summary>
     /// Executes a PowerShell command/script and returns the result as a JSON string.
     /// </summary>
-    public async Task<string> ExecuteAsync(string script)
+    public Task<string> ExecuteAsync(string script) => ExecuteAsync(script, timeout: null);
+
+    /// <summary>
+    /// Executes a PowerShell command/script with an optional timeout.
+    /// </summary>
+    public async Task<string> ExecuteAsync(string script, TimeSpan? timeout)
     {
         _ps.Commands.Clear();
         _ps.AddScript(script);
 
         try
         {
-            var results = await _ps.InvokeAsync();
+            var invokeTask = _ps.InvokeAsync();
+            if (timeout.HasValue)
+            {
+                var winner = await Task.WhenAny(invokeTask, Task.Delay(timeout.Value));
+                if (winner != invokeTask)
+                {
+                    _ps.Stop();
+                    return "{\"error\": \"PowerShell execution timed out.\"}";
+                }
+            }
+
+            var results = await invokeTask;
 
             if (_ps.HadErrors)
             {
