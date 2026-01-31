@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "1.0.0",
-  "lastUpdated": "2026-01-23T00:00:00Z",
+  "lastUpdated": "2026-01-31T00:00:00Z",
   "contextFormat": "pc-ai-v1",
 
   "projectOverview": {
     "name": "PC_AI",
     "fullName": "Local LLM-Powered PC Diagnostics Framework",
     "location": "C:\\Users\\david\\PC_AI",
-    "description": "A comprehensive PowerShell 7+ framework for Windows PC diagnostics, optimization, and system analysis powered by local LLMs via Ollama/LM Studio",
+    "description": "A comprehensive PowerShell 7+ framework for Windows PC diagnostics, optimization, and system analysis powered by local LLMs via pcai-inference",
     "targetPlatform": "Windows 10/11 with WSL2 integration",
     "targetUsers": "Development workstations with Docker, Hyper-V, and cross-platform tooling",
     "primaryGoals": [
@@ -138,7 +138,7 @@
       "version": "1.0.0",
       "psVersion": "5.1",
       "requiresAdmin": false,
-      "description": "Ollama/LM Studio integration for AI-powered analysis",
+      "description": "pcai-inference + FunctionGemma integration for AI-powered analysis",
       "functions": [
         "Get-LLMStatus",
         "Send-OllamaRequest",
@@ -146,15 +146,15 @@
         "Invoke-PCDiagnosis",
         "Set-LLMConfig"
       ],
-      "dependencies": ["Ollama or LM Studio"],
+      "dependencies": ["pcai-inference", "FunctionGemma (optional)"],
       "supportedModels": {
-        "default": "qwen2.5-coder:7b",
-        "fallback": ["mistral:7b", "deepseek-r1:8b"],
+        "default": "pcai-inference",
+        "fallback": [],
         "recommended": [
-          {"model": "qwen2.5-coder:7b", "size": "4GB", "use": "Technical analysis"},
-          {"model": "deepseek-r1:8b", "size": "5GB", "use": "Complex reasoning"},
-          {"model": "mistral:7b", "size": "4GB", "use": "Fast general analysis"},
-          {"model": "gemma3:12b", "size": "7GB", "use": "High-quality responses"}
+          {"model": "GGUF: Llama 3", "size": "Varies", "use": "General analysis"},
+          {"model": "GGUF: Mistral", "size": "Varies", "use": "Fast general analysis"},
+          {"model": "GGUF: Phi", "size": "Varies", "use": "Lightweight local analysis"},
+          {"model": "GGUF: Gemma", "size": "Varies", "use": "High-quality responses"}
         ]
       }
     },
@@ -245,15 +245,15 @@
     "thresholds": "Config/diagnostic-thresholds.json",
     "llmSettings": {
       "providers": {
-        "ollama": {
-          "baseUrl": "http://localhost:11434",
-          "defaultModel": "qwen2.5-coder:7b",
+        "pcai-inference": {
+          "baseUrl": "http://127.0.0.1:8080",
+          "defaultModel": "pcai-inference",
           "timeout": 120000,
           "retryAttempts": 3
         },
-        "lmstudio": {
-          "baseUrl": "http://localhost:1234",
-          "priority": 2,
+        "functiongemma": {
+          "baseUrl": "http://127.0.0.1:8000",
+          "defaultModel": "functiongemma-270m-it",
           "timeout": 120000
         }
       },
@@ -269,7 +269,7 @@
     "completedTasks": [
       "Initial framework creation with 8 modules",
       "199 Pester tests with 100% pass rate",
-      "Ollama integration with 11+ model support",
+      "pcai-inference integration with FunctionGemma routing",
       "USB module PS version fix (7.0 -> 5.1)",
       "Network test assertion fixes for WSL connectivity",
       "Legacy scripts archived with README documentation",
@@ -320,8 +320,8 @@
       "rationale": "Broader compatibility while maintaining Windows 10 support"
     },
     "llmIntegration": {
-      "decision": "Local-only LLM via Ollama/LM Studio",
-      "rationale": "Privacy, no internet dependency, faster response times"
+      "decision": "Local-only LLM via pcai-inference (OpenAI-compatible HTTP + native FFI)",
+      "rationale": "Privacy, no internet dependency, unified local inference with streaming"
     },
     "accelerationLayer": {
       "decision": "Rust tools with PowerShell fallback",
@@ -341,12 +341,12 @@
     "identified": [
       "Coverage tracking not fully implemented in CI",
       "Some integration tests require real hardware",
-      "LM Studio provider not fully tested"
+      "Router availability not fully validated in all environments"
     ],
     "planned": [
       "Add codecov integration",
       "Mock hardware dependencies in integration tests",
-      "Complete LM Studio provider parity"
+      "Complete pcai-inference + router parity across environments"
     ]
   },
 

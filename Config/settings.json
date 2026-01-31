@@ -52,8 +52,8 @@
     "createBackups": true
   },
   "llm": {
-    "activeProvider": "vllm",
-    "activeModel": "functiongemma-270m-it",
+    "activeProvider": "pcai-inference",
+    "activeModel": "pcai-inference",
     "routerModel": "functiongemma-270m-it",
     "routerUrl": "http://127.0.0.1:8000",
     "temperature": 0.4,
