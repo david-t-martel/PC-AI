@@ -116,6 +116,21 @@ Describe 'PcaiInference Module' {
             $status.ModelLoaded | Should -BeFalse
         }
     }
+
+    Context 'DLL Availability' {
+        It 'Get-PcaiInferenceStatus should report DllExists false when path is missing' {
+            InModuleScope PcaiInference {
+                $script:DllPath = Join-Path $env:TEMP 'pcai_inference_missing.dll'
+                $status = Get-PcaiInferenceStatus
+                $status.DllExists | Should -BeFalse
+            }
+        }
+
+        It 'Initialize-PcaiInference should throw when DLL is missing' {
+            $missingPath = Join-Path $env:TEMP 'pcai_inference_missing.dll'
+            { Initialize-PcaiInference -Backend llamacpp -DllPath $missingPath } | Should -Throw -ExpectedMessage "*DLL not found*"
+        }
+    }
 }
 
 Describe 'PC-AI.ps1 Inference Parameters' {

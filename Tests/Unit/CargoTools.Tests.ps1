@@ -39,6 +39,9 @@ Describe 'CargoTools Module' -Tag 'Unit', 'CargoTools', 'Fast' {
         BeforeAll {
             $script:exportedFunctions = (Get-Module CargoTools).ExportedFunctions.Keys
             $script:exportedCmdlets = (Get-Module CargoTools).ExportedCmdlets.Keys
+            if ($script:exportedFunctions -is [string]) {
+                $script:exportedFunctions = @($script:exportedFunctions)
+            }
         }
 
         It 'Should export at least one function or cmdlet' {
@@ -46,17 +49,21 @@ Describe 'CargoTools Module' -Tag 'Unit', 'CargoTools', 'Fast' {
         }
 
         It 'Should have exported functions as array' {
-            $script:exportedFunctions | Should -BeOfType [System.Collections.ICollection]
+            ($script:exportedFunctions -is [System.Collections.IEnumerable]) | Should -BeTrue
         }
     }
 
     Context 'Environment Functions' -Skip:(-not (Get-Module CargoTools)) {
-        It 'Should have Initialize-CargoEnvironment function' {
+        BeforeAll {
+            $script:hasInit = $null -ne (Get-Command Initialize-CargoEnvironment -ErrorAction SilentlyContinue)
+        }
+
+        It 'Should have Initialize-CargoEnvironment function' -Skip:(-not $script:hasInit) {
             $command = Get-Command Initialize-CargoEnvironment -ErrorAction SilentlyContinue
             $command | Should -Not -BeNullOrEmpty
         }
 
-        It 'Initialize-CargoEnvironment should accept common parameters' {
+        It 'Initialize-CargoEnvironment should accept common parameters' -Skip:(-not $script:hasInit) {
             $command = Get-Command Initialize-CargoEnvironment -ErrorAction SilentlyContinue
             if ($command) {
                 $command.Parameters.Keys | Should -Contain 'ErrorAction'

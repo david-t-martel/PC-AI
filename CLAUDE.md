@@ -7,11 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **PC_AI** is a local LLM-powered PC diagnostics and optimization agent designed to:
 - Diagnose hardware issues, device errors, and system problems
 - Analyze event logs, SMART status, and device configurations
-- Propose optimizations for disk, network, WSL2, virtualization, and system performance
+- Propose optimizations for disk, network, and system performance
 - Clean up duplicates, PATH entries, and unnecessary system artifacts
 - Route tool execution via FunctionGemma runtime before final LLM analysis
 
-The agent operates on **Windows 10/11** with WSL2 integration, targeting development workstations with Docker, Hyper-V, and cross-platform tooling.
+The agent operates on **Windows 10/11** with native-first inference via **pcai-inference**. WSL/Docker are optional and not required for the LLM stack.
 
 ## Architecture
 
@@ -60,20 +60,6 @@ The following scripts from the home directory are candidates for consolidation i
 ### Disk Optimization
 - `Optimize-Disks.ps1` - Smart TRIM/defrag for SSD/HDD with scheduled task support
 
-### WSL2/Hyper-V
-- `wsl2-comprehensive-optimizer.ps1` - Full WSL2 optimization (Defender exclusions, VMQ, network)
-- `wsl2-config-analyzer.ps1` - Detailed analysis of .wslconfig, Hyper-V, network, Defender
-- `wsl_diagnostics.ps1` - Quick WSL/Hyper-V service status check
-- `wsl2-network-stability.ps1` - Network interface and port configuration
-- `quick_status.ps1` - Fast virtualization status overview
-
-### Error Analysis
-- `check_virt_errors.ps1` - Hyper-V Compute errors, .NET OOM, vmcompute issues
-- `check_logs.ps1` - 7-day scan of Hyper-V and virtualization logs
-
-### Docker
-- `diagnose-docker-desktop.ps1` - Docker Desktop process/VHDX/config diagnostics
-
 ### Cleanup
 - `clean_machine_path.ps1` - Remove duplicate/stale PATH entries
 - `cleanup-duplicates.ps1` - Duplicate file detection and removal
@@ -115,8 +101,6 @@ The following scripts from the home directory are candidates for consolidation i
 # Disk/USB errors
 Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2,3; StartTime=(Get-Date).AddDays(-3)}
 
-# Hyper-V Compute errors
-Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Hyper-V-Compute-Admin'; Level=2,3}
 ```
 
 ### WMI/CIM Queries
@@ -129,17 +113,6 @@ Get-CimInstance Win32_NetworkAdapter | Where-Object { $_.PhysicalAdapter -eq $tr
 
 # Disk status
 wmic diskdrive get model, status
-```
-
-### WSL2 Integration
-```powershell
-# WSL status
-wsl --status
-wsl -l -v
-
-# Network in WSL
-wsl ip addr show
-wsl ip route show
 ```
 
 ### FunctionGemma Router

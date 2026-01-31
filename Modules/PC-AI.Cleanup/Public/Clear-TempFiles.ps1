@@ -196,6 +196,8 @@ function Clear-TempFiles {
         }
     }
 
+    $disableNative = $env:PCAI_DISABLE_NATIVE -eq '1'
+
     # Clean each location
     foreach ($location in $pathsToClean) {
         Write-Verbose "Cleaning: $($location.Name) - $($location.Path)"
@@ -243,8 +245,8 @@ function Clear-TempFiles {
                 try {
                     $fileSize = $file.Length
 
-                    # Use native high-performance delete if available
-                    if ([PcaiNative.PcaiCore]::IsAvailable) {
+                    # Use native high-performance delete if available (unless disabled)
+                    if (-not $disableNative -and [PcaiNative.PcaiCore]::IsAvailable) {
                         $status = [PcaiNative.PcaiCore]::DeleteFsItem($file.FullName, $false)
                         if ($status -ne 'Success') {
                             throw "Native delete failed with status $status"

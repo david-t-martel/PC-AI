@@ -16,7 +16,7 @@
     - LLM-powered analysis via pcai-inference
 
 .PARAMETER Command
-    Main command: diagnose, optimize, usb, analyze, chat, llm, cleanup, perf, status, version, help
+    Main command: diagnose, optimize, usb, analyze, chat, llm, cleanup, perf, doctor, status, version, help
 
 .PARAMETER Arguments
     Additional arguments for the command
@@ -46,7 +46,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('diagnose', 'optimize', 'usb', 'analyze', 'chat', 'llm', 'cleanup', 'perf', 'status', 'version', 'help')]
+    [ValidateSet('diagnose', 'optimize', 'usb', 'analyze', 'chat', 'llm', 'cleanup', 'perf', 'doctor', 'status', 'version', 'help')]
     [string]$Command,
 
     [Parameter(Position = 1, ValueFromRemainingArguments)]
@@ -357,6 +357,12 @@ function Show-MainHelp {
         $commandSummaries = Get-PCCommandSummary -ProjectRoot $PSScriptRoot
     }
     if ($commandSummaries -and $commandSummaries.Count -gt 0) {
+        if (-not ($commandSummaries.Command -contains 'doctor')) {
+            $commandSummaries += [PSCustomObject]@{
+                Command = 'doctor'
+                Description = 'Run a one-command health check for common runtime failures.'
+            }
+        }
         foreach ($summary in $commandSummaries) {
             if ($summary.Description) {
                 Write-Host "    $($summary.Command) - $($summary.Description)" -ForegroundColor White
@@ -365,7 +371,7 @@ function Show-MainHelp {
             }
         }
     } else {
-        $commands = @('diagnose', 'optimize', 'usb', 'analyze', 'chat', 'llm', 'cleanup', 'perf', 'status', 'version', 'help')
+        $commands = @('diagnose', 'optimize', 'usb', 'analyze', 'chat', 'llm', 'cleanup', 'perf', 'status', 'doctor', 'version', 'help')
         foreach ($cmd in $commands) {
             Write-Host "    $cmd" -ForegroundColor White
         }
@@ -491,7 +497,7 @@ function Show-Help {
         $knownCommands = Get-PCCommandList -ProjectRoot $PSScriptRoot
     }
     if (-not $knownCommands -or $knownCommands.Count -eq 0) {
-        $knownCommands = @('diagnose', 'optimize', 'usb', 'analyze', 'chat', 'llm', 'cleanup', 'perf', 'status', 'version', 'help')
+        $knownCommands = @('diagnose', 'optimize', 'usb', 'analyze', 'chat', 'llm', 'cleanup', 'perf', 'doctor', 'status', 'version', 'help')
     }
     if (-not $Topic) {
         Show-MainHelp
@@ -1659,6 +1665,153 @@ function Invoke-PerfCommand {
 }
 #endregion
 
+#region Doctor Command
+function Invoke-DoctorCommand {
+    param([string[]]$CmdArgs)
+
+    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
+        json = $false
+        legacy = $false
+    }
+
+    $emitJson = $false
+    if ($parsed.Flags.ContainsKey('json') -or ($parsed.Values['json'] -eq $true) -or ($parsed.Values['json'] -eq 'true')) {
+        $emitJson = $true
+    }
+
+    $checkLegacy = $false
+    if ($parsed.Flags.ContainsKey('legacy') -or ($parsed.Values['legacy'] -eq $true) -or ($parsed.Values['legacy'] -eq 'true')) {
+        $checkLegacy = $true
+    }
+
+    if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
+
+    $llmConfig = Load-LLMConfig
+    $pcaiUrl = 'http://127.0.0.1:8080'
+    $functionGemmaUrl = 'http://127.0.0.1:8000'
+
+    if ($llmConfig -and $llmConfig.providers -and $llmConfig.providers.'pcai-inference' -and $llmConfig.providers.'pcai-inference'.baseUrl) {
+        $pcaiUrl = $llmConfig.providers.'pcai-inference'.baseUrl
+    }
+    if ($llmConfig -and $llmConfig.providers -and $llmConfig.providers.functiongemma -and $llmConfig.providers.functiongemma.baseUrl) {
+        $functionGemmaUrl = $llmConfig.providers.functiongemma.baseUrl
+    }
+
+    $nativeDllPaths = @()
+    if ($llmConfig -and $llmConfig.nativeInference -and $llmConfig.nativeInference.dllSearchPaths) {
+        foreach ($path in $llmConfig.nativeInference.dllSearchPaths) {
+            if ([string]::IsNullOrWhiteSpace($path)) { continue }
+            if ([System.IO.Path]::IsPathRooted($path)) {
+                $nativeDllPaths += $path
+            } else {
+                $nativeDllPaths += (Join-Path $PSScriptRoot $path)
+            }
+        }
+    }
+
+    $doctorParams = @{
+        PcaiInferenceUrl = $pcaiUrl
+        FunctionGemmaUrl = $functionGemmaUrl
+    }
+    if ($nativeDllPaths.Count -gt 0) {
+        $doctorParams.NativeDllSearchPaths = $nativeDllPaths
+    }
+    if ($checkLegacy) {
+        $doctorParams.CheckLegacyProviders = $true
+    }
+
+    try {
+        $report = Invoke-PcaiDoctor @doctorParams
+    } catch {
+        Write-Error "Doctor checks failed: $_"
+        return
+    }
+
+    if ($emitJson) {
+        $report | ConvertTo-Json -Depth 6
+        return
+    }
+
+    $health = $report.Health
+
+    Write-Header "PC-AI Doctor"
+    Write-SubHeader "Summary"
+
+    $overallColor = if ($health.OverallStatus -eq 'Healthy') { 'Green' } elseif ($health.OverallStatus -eq 'Degraded') { 'Yellow' } else { 'Yellow' }
+    Write-Bullet "Overall: $($health.OverallStatus)" -Color $overallColor
+
+    $pcaiColor = if ($health.PcaiInference.Status -eq 'OK') { 'Green' } elseif ($health.PcaiInference.Status -eq 'NotRunning') { 'Red' } else { 'Yellow' }
+    Write-Bullet "pcai-inference: $($health.PcaiInference.Status)" -Color $pcaiColor
+
+    $routerColor = if ($health.FunctionGemma.Status -eq 'OK') { 'Green' } elseif ($health.FunctionGemma.Status -eq 'NotRunning') { 'Red' } else { 'Yellow' }
+    Write-Bullet "FunctionGemma: $($health.FunctionGemma.Status)" -Color $routerColor
+
+    $nativeColor = if ($health.NativeFFI.DllExists) { 'Green' } else { 'Yellow' }
+    Write-Bullet "Native DLL: $($health.NativeFFI.Status)" -Color $nativeColor
+
+    $gpuColor = if ($health.Gpu.Status -eq 'OK') { 'Green' } elseif ($health.Gpu.Status -eq 'NotFound') { 'Yellow' } else { 'Yellow' }
+    Write-Bullet "GPU: $($health.Gpu.Status)" -Color $gpuColor
+
+    Write-SubHeader "pcai-inference"
+    Write-Bullet "URL: $pcaiUrl"
+    $respondColor = if ($health.PcaiInference.Responding) { 'Green' } else { 'Red' }
+    Write-Bullet "Responding: $($health.PcaiInference.Responding)" -Color $respondColor
+    if ($health.PcaiInference.Backend) {
+        Write-Bullet "Backend: $($health.PcaiInference.Backend)"
+    }
+    $modelLoadedColor = if ($health.PcaiInference.ModelLoaded) { 'Green' } else { 'Yellow' }
+    Write-Bullet "Model Loaded: $($health.PcaiInference.ModelLoaded)" -Color $modelLoadedColor
+
+    Write-SubHeader "FunctionGemma Router"
+    Write-Bullet "URL: $functionGemmaUrl"
+    $fgRespondColor = if ($health.FunctionGemma.Responding) { 'Green' } else { 'Red' }
+    Write-Bullet "Responding: $($health.FunctionGemma.Responding)" -Color $fgRespondColor
+
+    Write-SubHeader "Native Inference DLL"
+    Write-Bullet "Available: $($health.NativeFFI.DllExists)" -Color $nativeColor
+    if ($health.NativeFFI.Path) {
+        Write-Bullet "Path: $($health.NativeFFI.Path)"
+    }
+
+    Write-SubHeader "GPU"
+    if ($health.Gpu.Devices -and $health.Gpu.Devices.Count -gt 0) {
+        foreach ($gpu in $health.Gpu.Devices) {
+            $driver = if ($gpu.DriverVersion) { " (Driver $($gpu.DriverVersion))" } else { "" }
+            Write-Bullet "$($gpu.Name)$driver"
+        }
+    } else {
+        Write-Bullet "No GPU devices detected"
+    }
+
+    $nvidiaSmiColor = if ($health.Gpu.NvidiaSmi) { 'Green' } else { 'Yellow' }
+    Write-Bullet "NVIDIA SMI: $($health.Gpu.NvidiaSmi)" -Color $nvidiaSmiColor
+
+    if ($health.Docker.Status -ne 'Unknown') {
+        $dockerColor = if ($health.Docker.Status -eq 'OK') { 'Green' } elseif ($health.Docker.Status -in @('NotRunning', 'NotInstalled')) { 'Yellow' } else { 'Yellow' }
+        Write-Bullet "Docker: $($health.Docker.Status)" -Color $dockerColor
+        if ($health.Docker.Running) {
+            $runtimeColor = if ($health.Gpu.NvidiaRuntime) { 'Green' } else { 'Yellow' }
+            Write-Bullet "Docker NVIDIA Runtime: $($health.Gpu.NvidiaRuntime)" -Color $runtimeColor
+        }
+    }
+
+    Write-SubHeader "Environment"
+    if ($health.WSL.Status -ne 'Unknown') {
+        $wslColor = if ($health.WSL.Status -eq 'OK') { 'Green' } elseif ($health.WSL.Status -eq 'Stopped') { 'Yellow' } else { 'Red' }
+        Write-Bullet "WSL: $($health.WSL.Status)" -Color $wslColor
+    }
+
+    if ($report.Recommendations -and $report.Recommendations.Count -gt 0) {
+        Write-SubHeader "Suggested Fixes"
+        foreach ($rec in $report.Recommendations) {
+            Write-Bullet $rec -Color Yellow
+        }
+    } else {
+        Write-Success "No issues detected."
+    }
+}
+#endregion
+
 #region Status Command
 function Invoke-StatusCommand {
     Write-Header "PC-AI System Status"
@@ -1730,6 +1883,159 @@ function Invoke-StatusCommand {
 }
 #endregion
 
+#region Doctor Command
+function Invoke-DoctorCommand {
+    param([string[]]$CmdArgs)
+
+    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{}
+    $asJson = $false
+    if ($parsed.Flags.ContainsKey('json')) { $asJson = $parsed.Flags['json'] }
+    $full = $false
+    if ($parsed.Flags.ContainsKey('full')) { $full = $parsed.Flags['full'] }
+
+    $results = [ordered]@{
+        Timestamp = Get-Date
+        Admin = Test-Administrator
+        Modules = @{}
+        Services = $null
+        LLM = $null
+        Native = $null
+        Recommendations = @()
+    }
+
+    $moduleList = @(
+        'PC-AI.LLM',
+        'PC-AI.Virtualization',
+        'PcaiInference',
+        'PC-AI.Acceleration'
+    )
+
+    foreach ($moduleName in $moduleList) {
+        $modulePath = Join-Path $script:ModulesPath "$moduleName\$moduleName.psd1"
+        $results.Modules[$moduleName] = (Test-Path $modulePath)
+    }
+
+    $doctorUsed = $false
+    if (Ensure-Module 'PC-AI.Virtualization') {
+        try {
+            if (Get-Command Invoke-PcaiDoctor -ErrorAction SilentlyContinue) {
+                $doctor = Invoke-PcaiDoctor
+                $results.Services = $doctor.Health
+                if ($doctor.Recommendations) {
+                    $results.Recommendations += @($doctor.Recommendations)
+                }
+                $doctorUsed = $true
+            } else {
+                $results.Services = Get-PcaiServiceHealth
+            }
+        } catch {
+            $results.Recommendations += "Failed to read PC-AI service health: $($_.Exception.Message)"
+        }
+    } else {
+        $results.Recommendations += "PC-AI.Virtualization module missing."
+    }
+
+    if (Ensure-Module 'PC-AI.LLM') {
+        try {
+            $results.LLM = Get-LLMStatus -TestConnection -IncludeVLLM
+        } catch {
+            $results.Recommendations += "Failed to read LLM status: $($_.Exception.Message)"
+        }
+    } else {
+        $results.Recommendations += "PC-AI.LLM module missing."
+    }
+
+    if (Ensure-Module 'PcaiInference') {
+        try {
+            $results.Native = Get-PcaiInferenceStatus
+        } catch {
+            $results.Recommendations += "Failed to read native inference status: $($_.Exception.Message)"
+        }
+    }
+
+    if (-not $results.Admin) {
+        $results.Recommendations += 'Run PowerShell as Administrator for full repair actions.'
+    }
+
+    if ($results.LLM -and -not $results.LLM.PcaiInference.ApiConnected) {
+        $results.Recommendations += "pcai-inference is not reachable at $($results.LLM.PcaiInference.ApiUrl). Start it with Invoke-PcaiServiceHost or run the server in Deploy\\pcai-inference."
+    }
+
+    if ($results.LLM -and $results.LLM.Router.ApiUrl -and -not $results.LLM.Router.ApiConnected) {
+        $results.Recommendations += "FunctionGemma router is not reachable at $($results.LLM.Router.ApiUrl). Start rust-functiongemma-runtime."
+    }
+
+    if ($results.Native) {
+        if (-not $results.Native.DllExists) {
+            $results.Recommendations += "pcai_inference.dll is missing. Build it: cd Deploy\\pcai-inference; .\\build.ps1"
+        } elseif (-not $results.Native.BackendInitialized) {
+            $results.Recommendations += "Native inference backend is not initialized. Use Initialize-PcaiInference and Import-PcaiModel."
+        } elseif (-not $results.Native.ModelLoaded) {
+            $results.Recommendations += "Native backend is initialized but no model is loaded."
+        }
+    }
+
+    if (-not $doctorUsed -and $results.Services -and $results.Services.Gpu) {
+        if ($results.Services.Gpu.Status -eq 'NotFound') {
+            $results.Recommendations += 'No GPU detected (CPU-only is OK for small models). Install GPU drivers if needed.'
+        }
+        if ($results.Services.Gpu.NvidiaSmi -eq $false) {
+            $results.Recommendations += 'nvidia-smi not found; NVIDIA diagnostics may be unavailable.'
+        }
+    }
+
+    if ($asJson) {
+        $results | ConvertTo-Json -Depth 8
+        return
+    }
+
+    Write-Header "PC-AI Doctor"
+    Write-SubHeader "Environment"
+    Write-Bullet "Admin: $($results.Admin)" -Color $(if ($results.Admin) { 'Green' } else { 'Yellow' })
+
+    Write-SubHeader "Modules"
+    foreach ($module in $results.Modules.Keys) {
+        $ok = $results.Modules[$module]
+        Write-Bullet "$module`: $ok" -Color $(if ($ok) { 'Green' } else { 'Red' })
+    }
+
+    if ($results.Services) {
+        Write-SubHeader "Services"
+        Write-Bullet "pcai-inference: $($results.Services.PcaiInference.Status)"
+        Write-Bullet "FunctionGemma: $($results.Services.FunctionGemma.Status)"
+        if ($results.Services.Gpu) {
+            Write-Bullet "GPU: $($results.Services.Gpu.Status)"
+        }
+    }
+
+    if ($results.LLM) {
+        Write-SubHeader "LLM"
+        Write-Bullet "pcai-inference: $($results.LLM.PcaiInference.ApiConnected) ($($results.LLM.PcaiInference.ApiUrl))"
+        Write-Bullet "Router: $($results.LLM.Router.ApiConnected) ($($results.LLM.Router.ApiUrl))"
+    }
+
+    if ($results.Native) {
+        Write-SubHeader "Native Inference"
+        Write-Bullet "DLL Exists: $($results.Native.DllExists)"
+        Write-Bullet "Backend Initialized: $($results.Native.BackendInitialized)"
+        Write-Bullet "Model Loaded: $($results.Native.ModelLoaded)"
+    }
+
+    if ($results.Recommendations.Count -gt 0) {
+        Write-SubHeader "Recommendations"
+        $results.Recommendations | ForEach-Object { Write-Bullet $_ -Color Yellow }
+    } else {
+        Write-SubHeader "Recommendations"
+        Write-Bullet "No obvious runtime issues detected." -Color Green
+    }
+
+    if ($full -and $results.Services) {
+        Write-SubHeader "Full Service Health (JSON)"
+        $results.Services | ConvertTo-Json -Depth 6
+    }
+}
+#endregion
+
 #region Version Command
 function Invoke-VersionCommand {
     Write-Host ""
@@ -1793,7 +2099,9 @@ function Main {
             'llm' { Invoke-LLMCommand -CmdArgs $Arguments }
             'cleanup' { Invoke-CleanupCommand -CmdArgs $Arguments }
             'perf' { Invoke-PerfCommand -CmdArgs $Arguments }
+            'doctor' { Invoke-DoctorCommand -CmdArgs $Arguments }
             'status' { Invoke-StatusCommand }
+            'doctor' { Invoke-DoctorCommand -CmdArgs $Arguments }
             'version' { Invoke-VersionCommand }
             'help' {
                 $topic = if ($Arguments) { $Arguments[0] } else { $null }

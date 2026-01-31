@@ -7,6 +7,9 @@
 #>
 
 BeforeAll {
+    $script:OriginalDisableNative = $env:PCAI_DISABLE_NATIVE
+    $env:PCAI_DISABLE_NATIVE = '1'
+
     # Import module under test
     $ModulePath = Join-Path $PSScriptRoot '..\..\Modules\PC-AI.Cleanup\PC-AI.Cleanup.psd1'
     Import-Module $ModulePath -Force -ErrorAction Stop
@@ -381,6 +384,11 @@ Describe "Clear-TempFiles" -Tag 'Unit', 'Cleanup', 'Slow' {
 }
 
 AfterAll {
+    if ($null -eq $script:OriginalDisableNative) {
+        Remove-Item Env:PCAI_DISABLE_NATIVE -ErrorAction SilentlyContinue
+    } else {
+        $env:PCAI_DISABLE_NATIVE = $script:OriginalDisableNative
+    }
     Remove-Module PC-AI.Cleanup -Force -ErrorAction SilentlyContinue
     Remove-Module MockData -Force -ErrorAction SilentlyContinue
 }

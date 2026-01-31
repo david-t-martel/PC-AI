@@ -6,6 +6,22 @@
     Provides granular cmdlets for querying system hardware health via CIM/WMI.
 #>
 
+$script:ModuleRoot = $PSScriptRoot
+
+$privatePath = Join-Path $PSScriptRoot 'Private'
+if (Test-Path $privatePath) {
+    Get-ChildItem -Path $privatePath -Filter '*.ps1' | ForEach-Object {
+        . $_.FullName
+    }
+}
+
+$publicPath = Join-Path $PSScriptRoot 'Public'
+if (Test-Path $publicPath) {
+    Get-ChildItem -Path $publicPath -Filter '*.ps1' | ForEach-Object {
+        . $_.FullName
+    }
+}
+
 function Get-PcDeviceError {
     <#
     .SYNOPSIS
@@ -108,4 +124,16 @@ function Get-PcSystemEvent {
     }
 }
 
-Export-ModuleMember -Function Get-PcDeviceError, Get-PcDiskStatus, Get-PcUsbStatus, Get-PcNetworkStatus, Get-PcSystemEvents
+Export-ModuleMember -Function @(
+    'Get-PcDeviceError',
+    'Get-PcDiskStatus',
+    'Get-PcUsbStatus',
+    'Get-PcNetworkStatus',
+    'Get-PcSystemEvent',
+    'Get-DeviceErrors',
+    'Get-DiskHealth',
+    'Get-UsbStatus',
+    'Get-NetworkAdapters',
+    'Get-SystemEvents',
+    'New-DiagnosticReport'
+)

@@ -30,15 +30,14 @@ Local-first diagnostics agent guidance for PC_AI (PowerShell + Rust/C# + local L
 - HVSocket aliases: `Config/hvsock-proxy.conf` (optional)
 - Router entry points: `Invoke-FunctionGemmaReAct`, `Invoke-LLMChatRouted`
 
-## WSL / Docker / LLM stack debugging
-Use these when diagnosing LLM stack failures or virtualization issues:
-- WSL status: `wsl --status`, `wsl -l -v`
-- WSL health: `Get-WSLEnvironmentHealth`, `Invoke-WSLNetworkToolkit -Mode diagnose`
-- Docker health: `docker version`, `docker info`, `Get-DockerStatus`
-- GPU in containers: `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`
+## LLM runtime debugging (native-first)
+Use these when diagnosing LLM stack failures or routing issues:
+- `Invoke-PcaiDoctor` (summary + recommendations)
+- `Get-PcaiServiceHealth` (HTTP + FFI health checks)
+- `Get-PcaiNativeStatus` / `Get-PcaiCapabilities` (native DLL availability)
 - LLM endpoints:
-  - pcai-inference: `GET http://127.0.0.1:8080/v1/models`
-  - FunctionGemma router: `GET http://127.0.0.1:8000/v1/models`
+  - pcai-inference: `GET http://127.0.0.1:8080/health` or `/v1/models`
+  - FunctionGemma router: `GET http://127.0.0.1:8000/health` or `/v1/models`
 
 ## Tooling update workflow
 1. Add/update tool in `Config/pcai-tools.json` (with `pcai_mapping`).
@@ -52,11 +51,10 @@ Use these when diagnosing LLM stack failures or virtualization issues:
 - Use C ABI (`extern "C"`) + C# P/Invoke wrapper for PowerShell.
 
 ## Known gaps / TODOs
-- Enforce JSON-only diagnose output in UI/TUI rendering paths.
-- Implement internal WSL network toolkit parity (currently wraps external scripts when present).
-- Confirm router base URL vs HVSocket routing (if used).
-- Replace external script references (e.g., `C:\\Scripts\\...`) with module cmdlets or add them to repo.
-- Add GPU checks to unified status output.
+- Define a versioned C ABI contract for Rust DLL exports (error codes, ownership).
+- Standardize JSON schemas for native outputs (schema folder + version pinning).
+- Provide progress + streaming updates for long native operations.
+- Finalize eval split + QLoRA quantization for rust-functiongemma-train.
 
 ## Documentation automation
 - Full pipeline: `Tools/Invoke-DocPipeline.ps1 -Mode Full`

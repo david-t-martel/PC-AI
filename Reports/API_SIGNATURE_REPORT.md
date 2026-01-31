@@ -1,11 +1,11 @@
 # API_SIGNATURE_REPORT
 
-Generated: 2026-01-30 21:06:26
+Generated: 2026-01-31 00:58:19
 
-PowerShell functions: 112
-Missing help blocks: 60
+PowerShell functions: 118
+Missing help blocks: 64
 C# DllImports: 42
-Missing Rust exports: 7
+Missing Rust exports: 6
 
 ## Missing help parameters
 - Compare-ToolPerformance: missing Detailed
@@ -19,6 +19,7 @@ Missing Rust exports: 7
 - Find-WithFd: missing Path, Pattern, Extension, Type, MaxDepth, Hidden, Exclude, FullPath, FdPath
 - Find-WithGetChildItem: missing Path, Pattern, Extension, Type, MaxDepth, Hidden, Exclude, FullPath
 - Get-DiskUsageFast: missing ThrottleLimit
+- Get-DiskUsageWithNative: missing Path, Top
 - Convert-SizeToBytes: missing Size
 - Get-DiskUsageWithDust: missing Path, Depth, DustPath
 - Get-DiskUsageParallel: missing Path, Depth, ThrottleLimit
@@ -27,6 +28,7 @@ Missing Rust exports: 7
 - Select-TopResults: missing InputObject, Top
 - Get-FileHashParallel: missing MinimumSize, MaximumSize
 - Get-ProcessesFast: missing RawOutput
+- Get-ProcessesWithNative: missing Top, SortBy
 - Get-ProcessesWithProcs: missing Name, SortBy, Top, Tree, Watch, RawOutput, ProcsPath
 - Get-ProcessesParallel: missing Name, SortBy, Top, Tree, Watch, RawOutput
 - Get-AcceleratedFunction: missing Tool
@@ -35,9 +37,11 @@ Missing Rust exports: 7
 - Measure-WithHyperfine: missing Command, Iterations, Warmup, Name, Shell, HyperfinePath
 - Measure-WithNative: missing Command, Iterations, Warmup, Name
 - Search-ContentFast: missing CaseSensitive, MaxResults, FilesOnly, ThrottleLimit
+- Search-WithPcaiNativeContent: missing Path, Pattern, LiteralPattern, FilePattern, Context, CaseSensitive, WholeWord, Invert, MaxResults, FilesOnly, ThrottleLimit, SearchPattern
 - Search-WithRipgrepAdvanced: missing Path, Pattern, LiteralPattern, FilePattern, Context, CaseSensitive, WholeWord, Invert, MaxResults, FilesOnly, ThrottleLimit, SearchPattern, RgPath
 - Search-WithParallelSelectString: missing Path, Pattern, LiteralPattern, FilePattern, Context, CaseSensitive, WholeWord, Invert, MaxResults, FilesOnly, ThrottleLimit, SearchPattern
 - Search-LogsFast: missing CountOnly
+- Search-WithPcaiNativeLogs: missing Path, Pattern, Include, Context, CaseSensitive, MaxCount, CountOnly
 - Search-WithRipgrep: missing Path, Pattern, Include, Context, CaseSensitive, MaxCount, CountOnly, RgPath
 - Search-WithSelectString: missing Path, Pattern, Include, Context, CaseSensitive, MaxCount, CountOnly
 - Clear-TempFiles: missing Target, OlderThanDays, IncludePrefetch, IncludeWindowsUpdate, Force
@@ -49,7 +53,7 @@ Missing Rust exports: 7
 - Get-SystemInfoTool: missing Category, Detail
 - Invoke-DocSearch: missing Query, Source
 - Invoke-FunctionGemmaChat: missing Messages, Tools, BaseUrl, Model, TimeoutSeconds
-- Invoke-FunctionGemmaReAct: missing Prompt, BaseUrl, Model, ToolsPath, ExecuteTools, ReturnFinal, MaxToolCalls, ResultLimit, TimeoutSeconds, ShowProgress, ShowMetrics, ProgressIntervalSeconds
+- Invoke-FunctionGemmaReAct: missing Prompt, BaseUrl, Model, ToolsPath, ExecuteTools, ReturnFinal, MaxToolCalls, ResultLimit, TimeoutSeconds, ShowProgress, ShowMetrics, ProgressIntervalSeconds, SkipHealthCheck
 - Invoke-LLMChat: missing Message, Model, System, Temperature, MaxTokens, TimeoutSeconds, Interactive, ToJson, History, Provider, UseRouter, RouterMode, Stream, ShowProgress, ShowMetrics, ProgressIntervalSeconds, ResultLimit
 - Invoke-LLMChatRouted: missing EnforceJson
 - Invoke-LLMChatTui: missing Arguments
@@ -87,7 +91,7 @@ Missing Rust exports: 7
 - Start-RustInferenceServer: missing Port, ModelPath, GpuLayers, ServerArgs, NoWait
 - Start-CSharpServiceHost: missing HostPath, ServerArgs, NoWait
 - Invoke-WSLDockerHealthCheck: missing ScriptPath, AutoRecover, Verbose, Quick
-- Invoke-WSLNetworkToolkit: missing Optimize, ApplyConfig, TestNetworkingMode, NetworkingMode, FixDns, RestartWsl, ResetAdapters, ResetWinsock, RestartHns, RestartWslService, DisableVmqOnWsl, Force
+- Invoke-WSLNetworkToolkit: missing Mode, Optimize, ApplyConfig, TestNetworkingMode, NetworkingMode, FixDns, RestartWsl, ResetAdapters, ResetWinsock, RestartHns, RestartWslService, DisableVmqOnWsl, Force
 - Register-HVSockServices: missing ConfigPath, Force
 - Set-PCaiServiceState: missing Name, Action
 - Start-HVSockProxy: missing ConfigPath, StatePath, Force, RegisterServices
@@ -98,11 +102,13 @@ Missing Rust exports: 7
 
 ## Missing Rust exports for C# DllImports
 - pcai_delete_fs_item
-- pcai_fs_version
 - pcai_get_disk_usage
 - pcai_get_disk_usage_json
 - pcai_get_top_processes_json
 - pcai_replace_in_file
 - pcai_replace_in_files
+
+## Missing C# methods referenced by PowerShell
+- CpuCount
 
 

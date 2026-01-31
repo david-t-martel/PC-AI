@@ -1,7 +1,17 @@
 {
   "schema_version": "2.0",
-  "latest": "ctx-pcai-20260130-cuda",
+  "latest": "ctx-pcai-20260131-ffi",
   "contexts": [
+    {
+      "id": "ctx-pcai-20260131-ffi",
+      "file": "pcai-context-2026-01-31.md",
+      "created": "2026-01-31T12:00:00Z",
+      "project": "PC_AI",
+      "agents_involved": ["Claude", "Explore"],
+      "summary": "Native inference FFI integration - 22MB mistralrs DLL, C# bindings, PowerShell module fixes, command routing tools",
+      "supersedes": ["ctx-pcai-20260130-cuda"],
+      "commit": "pending"
+    },
     {
       "id": "ctx-pcai-20260130-cuda",
       "file": "pcai-inference-cuda-build-2026-01-30.md",
@@ -10,7 +20,8 @@
       "agents_involved": ["Claude"],
       "summary": "CUDA-enabled llamacpp backend build - CMake/MSVC toolchain fixes, API compatibility (token_to_str), CUDA 12.9 integration",
       "supersedes": ["ctx-pcai-20260130-s3"],
-      "commit": "pending"
+      "commit": "pending",
+      "status": "superseded"
     },
     {
       "id": "ctx-pcai-20260130-s3",
@@ -95,6 +106,31 @@
     }
   ],
   "completed_goals": [
+    {
+      "goal": "Integrate native FFI inference with command routing pipeline",
+      "completed": "2026-01-31",
+      "context": "ctx-pcai-20260131-ffi",
+      "commit": "pending",
+      "outputs": ["pcai_inference.dll (22MB)", "PcaiInference.psm1", "PcaiInterop.cs"]
+    },
+    {
+      "goal": "Add native inference tools to FunctionGemma routing",
+      "completed": "2026-01-31",
+      "context": "ctx-pcai-20260131-ffi",
+      "commit": "pending"
+    },
+    {
+      "goal": "Fix PowerShell module $PSScriptRoot null issue",
+      "completed": "2026-01-31",
+      "context": "ctx-pcai-20260131-ffi",
+      "commit": "pending"
+    },
+    {
+      "goal": "Add NativeLibrary DLL resolver to C# bindings",
+      "completed": "2026-01-31",
+      "context": "ctx-pcai-20260131-ffi",
+      "commit": "pending"
+    },
     {
       "goal": "Build pcai-inference with CUDA-enabled llama.cpp backend",
       "completed": "2026-01-30",
@@ -207,13 +243,13 @@
       "blocker": "bindgen_cuda panic in mistral.rs on Windows",
       "severity": "medium",
       "status": "workaround available",
-      "notes": "Use llamacpp backend for CUDA, mistralrs is CPU-only on Windows"
+      "notes": "Using mistralrs CPU-only build (22MB), llamacpp+CUDA available separately"
     },
     {
-      "blocker": "llamacpp MSVC toolchain not yet tested",
+      "blocker": "llamacpp MSVC headers missing in default build",
       "severity": "medium",
-      "status": "resolved",
-      "notes": "Build verified with CUDA 12.9, CMake/Ninja/MSVC toolchain working"
+      "status": "workaround available",
+      "notes": "Use --no-default-features to avoid pulling llama-cpp-sys-2; CUDA build requires separate toolchain"
     },
     {
       "blocker": "sccache + ring crate incompatibility",
@@ -227,17 +263,18 @@
       "status": "clean",
       "warnings": 0,
       "tests": 5,
-      "features": ["server", "llamacpp", "ffi", "mistralrs-backend", "cuda"],
+      "features": ["ffi", "mistralrs-backend"],
       "backends": {
-        "llamacpp": "working (CUDA + CPU)",
-        "mistralrs": "working (CPU-only)"
+        "llamacpp": "available (requires CUDA+MSVC toolchain)",
+        "mistralrs": "working (deployed)"
       },
       "build_outputs": {
-        "pcai_inference.dll": "360KB",
-        "ggml-cuda.dll": "46MB",
-        "llama.dll": "2MB"
+        "pcai_inference.dll": "22MB (mistralrs)",
+        "ggml-cuda.dll": "46MB (optional)",
+        "llama.dll": "2MB (optional)"
       },
-      "last_verified": "2026-01-30T22:30:00Z"
+      "deployed_to": ["bin/", "Native/PcaiInference/runtimes/win-x64/native/"],
+      "last_verified": "2026-01-31T12:00:00Z"
     },
     "rust-functiongemma-train": {
       "status": "clean",

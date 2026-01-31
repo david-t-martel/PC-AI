@@ -5,7 +5,7 @@ A comprehensive PowerShell 7+ framework for Windows PC diagnostics, optimization
 ## Features
 
 - **Hardware Diagnostics**: Device errors, SMART status, USB controllers, network adapters
-- **Virtualization Support**: WSL2 optimization, Hyper-V status, Docker diagnostics
+- **Virtualization Diagnostics (optional)**: Hyper-V/WSL status and remediation tooling
 - **Performance Acceleration**: Rust tool integration (ripgrep, fd, procs) with PS7+ parallelism
 - **LLM Analysis**: Local AI-powered diagnostic interpretation via **pcai-inference** (OpenAI-compatible HTTP + native FFI)
 - **Tool-Calling Router**: **FunctionGemma** runtime selects and executes PC-AI tools before analysis
@@ -16,7 +16,7 @@ A comprehensive PowerShell 7+ framework for Windows PC diagnostics, optimization
 - **Windows 10/11** with PowerShell 7.0+
 - **Optional**: pcai-inference HTTP server or pcai-inference DLL for LLM features
 - **Optional**: FunctionGemma runtime (rust-functiongemma-runtime) for tool routing
-- **Legacy/Optional**: vLLM-based router (Docker) if needed
+- **No WSL/Docker required** for pcai-inference or FunctionGemma (native-first)
 - **Optional**: Rust CLI tools for acceleration (fd, ripgrep, procs, bat, etc.)
 
 ## Quick Start
@@ -44,7 +44,7 @@ Search-ContentFast -Path "C:\Scripts" -Pattern "function" -FilePattern "*.ps1"
 | Module | Description |
 |--------|-------------|
 | **PC-AI.Hardware** | Device manager, disk health, USB, network diagnostics |
-| **PC-AI.Virtualization** | WSL2, Hyper-V, Docker status and optimization |
+| **PC-AI.Virtualization** | Optional Hyper-V/WSL diagnostics and optimization |
 | **PC-AI.USB** | USB device management and WSL passthrough |
 | **PC-AI.Network** | Network diagnostics, VSock optimization |
 | **PC-AI.Performance** | Disk optimization, resource monitoring |
@@ -88,6 +88,7 @@ pwsh .\test-all.ps1 -Suite All
 # Use native duplicate detection
 Import-Module .\Modules\PC-AI.Acceleration\PC-AI.Acceleration.psd1
 Get-PcaiNativeStatus
+Get-PcaiCapabilities -IncludeGpu
 Invoke-PcaiNativeDuplicates -Path "D:\Downloads" -MinimumSize 1MB
 
 # Smart diagnosis with LLM
@@ -141,11 +142,9 @@ Speedup:            44.6x
 ```powershell
 # Diagnostics
 .\PC-AI.ps1 diagnose hardware
-.\PC-AI.ps1 diagnose wsl
 .\PC-AI.ps1 diagnose all
 
 # Optimization
-.\PC-AI.ps1 optimize wsl
 .\PC-AI.ps1 optimize disk
 
 # USB Management
@@ -156,9 +155,15 @@ Speedup:            44.6x
 .\PC-AI.ps1 analyze
 .\PC-AI.ps1 analyze --model mistral
 
+# Repair
+.\PC-AI.ps1 cleanup path
+
 # Cleanup
 .\PC-AI.ps1 cleanup path --dry-run
 .\PC-AI.ps1 cleanup temp
+
+# Doctor (runtime health checks)
+.\PC-AI.ps1 doctor
 ```
 
 ## LLM Integration
@@ -170,6 +175,9 @@ PC-AI integrates with local LLM providers for intelligent diagnostic analysis an
 # Run pcai-inference HTTP server (OpenAI-compatible)
 cd .\Deploy\pcai-inference
 cargo run --release --features "llamacpp,server"
+
+# Enable CUDA (llama.cpp backend)
+cargo run --release --features "llamacpp,server,cuda"
 
 # Run analysis with default model (pcai-inference)
 Invoke-PCDiagnosis -ReportPath ".\report.txt"
@@ -185,7 +193,7 @@ then pcai-inference produces the final narrative response.
 .\Deploy\rust-functiongemma-runtime\target\debug\rust-functiongemma-runtime.exe
 
 # Route a request through FunctionGemma, then answer with the main LLM
-Invoke-LLMChatRouted -Message "Check WSL networking and summarize issues." -Mode diagnose
+Invoke-LLMChatRouted -Message "Check disk health and summarize issues." -Mode diagnose
 
 # Or use routed chat (non-interactive)
 Invoke-LLMChat -Message "Explain WSL vs Docker." -UseRouter -RouterMode chat

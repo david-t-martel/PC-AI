@@ -126,7 +126,7 @@ function Get-RustExports {
     foreach ($file in $files) {
         $content = Get-Content -Path $file.FullName -Raw -Encoding UTF8
         if ([string]::IsNullOrEmpty($content)) { continue }
-        $matches = [regex]::Matches($content, 'pub\s+extern\s+"C"\s+fn\s+(pcai_[A-Za-z0-9_]+)')
+        $matches = [regex]::Matches($content, 'pub\s+(?:unsafe\s+)?extern\s+"C"\s+fn\s+(pcai_[A-Za-z0-9_]+)')
         foreach ($m in $matches) {
             $exports += $m.Groups[1].Value
         }
@@ -157,7 +157,7 @@ function Get-CSharpPcaiCoreMethods {
     $content = Get-Content -Path $Path -Raw -Encoding UTF8
     if ([string]::IsNullOrEmpty($content)) { return @() }
     $methodMatches = [regex]::Matches($content, 'public\s+static\s+[^\s]+\s+([A-Za-z0-9_]+)\s*\(')
-    $propertyMatches = [regex]::Matches($content, 'public\s+static\s+[^\s]+\s+([A-Za-z0-9_]+)\s*=>')
+    $propertyMatches = [regex]::Matches($content, 'public\s+static\s+[^\s]+\s+([A-Za-z0-9_]+)\s*(?:=>|\{)')
     $names = @()
     foreach ($m in $methodMatches) { $names += $m.Groups[1].Value }
     foreach ($m in $propertyMatches) { $names += $m.Groups[1].Value }
@@ -179,9 +179,16 @@ $extraHelpParams = @($psFunctions | Where-Object { @($_.ExtraHelpParameters).Cou
 
 $csharpRoot = Join-Path $RepoRoot 'Native\PcaiNative'
 $pcaiCorePath = Join-Path $csharpRoot 'PcaiCore.cs'
-$rustRoot = Join-Path $RepoRoot 'Native\pcai_core\pcai_core_lib\src'
+$rustRoots = @(
+    (Join-Path $RepoRoot 'Native\pcai_core\pcai_core_lib\src'),
+    (Join-Path $RepoRoot 'Native\pcai_core\pcai_fs\src')
+)
 $csDllImports = Get-CSharpDllImports -Root $csharpRoot
-$rustExports = Get-RustExports -Root $rustRoot
+$rustExports = @()
+foreach ($root in $rustRoots) {
+    $rustExports += Get-RustExports -Root $root
+}
+$rustExports = @($rustExports | Sort-Object -Unique)
 
 $missingRustExports = @($csDllImports | Where-Object { $rustExports -notcontains $_ })
 

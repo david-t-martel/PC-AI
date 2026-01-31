@@ -1,8 +1,8 @@
 {
-  "Generated": "2026-01-30 21:06:26",
+  "Generated": "2026-01-31 00:58:19",
   "PowerShell": {
-    "FunctionCount": 112,
-    "MissingHelpCount": 60,
+    "FunctionCount": 118,
+    "MissingHelpCount": 64,
     "MissingHelpParameters": [
       {
         "Name": "Compare-ToolPerformance",
@@ -240,6 +240,21 @@
         "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-DiskUsageFast.ps1"
       },
       {
+        "Name": "Get-DiskUsageWithNative",
+        "Parameters": [
+          "Path",
+          "Top"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Top"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-DiskUsageFast.ps1"
+      },
+      {
         "Name": "Convert-SizeToBytes",
         "Parameters": [
           "Size"
@@ -375,6 +390,21 @@
         ],
         "MissingHelpParameters": [
           "RawOutput"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-ProcessesFast.ps1"
+      },
+      {
+        "Name": "Get-ProcessesWithNative",
+        "Parameters": [
+          "Top",
+          "SortBy"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Top",
+          "SortBy"
         ],
         "ExtraHelpParameters": [],
         "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Get-ProcessesFast.ps1"
@@ -546,6 +576,41 @@
         "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-ContentFast.ps1"
       },
       {
+        "Name": "Search-WithPcaiNativeContent",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "LiteralPattern",
+          "FilePattern",
+          "Context",
+          "CaseSensitive",
+          "WholeWord",
+          "Invert",
+          "MaxResults",
+          "FilesOnly",
+          "ThrottleLimit",
+          "SearchPattern"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Pattern",
+          "LiteralPattern",
+          "FilePattern",
+          "Context",
+          "CaseSensitive",
+          "WholeWord",
+          "Invert",
+          "MaxResults",
+          "FilesOnly",
+          "ThrottleLimit",
+          "SearchPattern"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-ContentFast.ps1"
+      },
+      {
         "Name": "Search-WithRipgrepAdvanced",
         "Parameters": [
           "Path",
@@ -638,6 +703,31 @@
           "MaxCount"
         ],
         "MissingHelpParameters": [
+          "CountOnly"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Acceleration\\Public\\Search-LogsFast.ps1"
+      },
+      {
+        "Name": "Search-WithPcaiNativeLogs",
+        "Parameters": [
+          "Path",
+          "Pattern",
+          "Include",
+          "Context",
+          "CaseSensitive",
+          "MaxCount",
+          "CountOnly"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "Path",
+          "Pattern",
+          "Include",
+          "Context",
+          "CaseSensitive",
+          "MaxCount",
           "CountOnly"
         ],
         "ExtraHelpParameters": [],
@@ -878,7 +968,8 @@
           "TimeoutSeconds",
           "ShowProgress",
           "ShowMetrics",
-          "ProgressIntervalSeconds"
+          "ProgressIntervalSeconds",
+          "SkipHealthCheck"
         ],
         "HelpPresent": false,
         "HelpParameters": [],
@@ -894,7 +985,8 @@
           "TimeoutSeconds",
           "ShowProgress",
           "ShowMetrics",
-          "ProgressIntervalSeconds"
+          "ProgressIntervalSeconds",
+          "SkipHealthCheck"
         ],
         "ExtraHelpParameters": [],
         "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\Public\\Invoke-FunctionGemmaReAct.ps1"
@@ -1409,6 +1501,7 @@
           "PcaiInferenceUrl",
           "FunctionGemmaUrl",
           "CheckLegacyProviders",
+          "NativeDllSearchPaths",
           "OllamaBaseUrl",
           "vLLMBaseUrl"
         ],
@@ -1417,7 +1510,8 @@
           "Distribution",
           "PcaiInferenceUrl",
           "FunctionGemmaUrl",
-          "CheckLegacyProviders"
+          "CheckLegacyProviders",
+          "NativeDllSearchPaths"
         ],
         "MissingHelpParameters": [
           "OllamaBaseUrl",
@@ -1650,6 +1744,7 @@
         "Name": "Invoke-WSLNetworkToolkit",
         "Parameters": [
           "ScriptPath",
+          "Mode",
           "Distribution",
           "Check",
           "Diagnose",
@@ -1678,6 +1773,7 @@
           "Full"
         ],
         "MissingHelpParameters": [
+          "Mode",
           "Optimize",
           "ApplyConfig",
           "TestNetworkingMode",
@@ -1801,7 +1897,6 @@
     "DllImportCount": 42,
     "MissingRustExports": [
       "pcai_delete_fs_item",
-      "pcai_fs_version",
       "pcai_get_disk_usage",
       "pcai_get_disk_usage_json",
       "pcai_get_top_processes_json",
@@ -1812,6 +1907,7 @@
   "PowerShellToCSharp": {
     "PcaiCalls": [
       "CheckResourceSafety",
+      "CpuCount",
       "DeleteFsItem",
       "EstimateTokens",
       "ExtractJson",
@@ -1829,6 +1925,8 @@
       "SearchContent",
       "Version"
     ],
-    "MissingCsharpMethods": []
+    "MissingCsharpMethods": [
+      "CpuCount"
+    ]
   }
 }
