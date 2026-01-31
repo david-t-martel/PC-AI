@@ -93,6 +93,9 @@ function Invoke-FunctionGemmaReAct {
     .PARAMETER ProgressIntervalSeconds
         Interval for progress updates in seconds (1-10). Default: 1
 
+    .PARAMETER SkipHealthCheck
+        Skip cached router health check (useful for tests or custom endpoints).
+
     .EXAMPLE
         Invoke-FunctionGemmaReAct -Prompt "What is the status of my USB devices?" -ExecuteTools
         Routes the query to FunctionGemma for tool planning and executes recommended diagnostic tools
@@ -108,10 +111,10 @@ function Invoke-FunctionGemmaReAct {
         [string]$Prompt,
 
         [Parameter()]
-        [string]$BaseUrl = 'http://127.0.0.1:8000',
+        [string]$BaseUrl = $script:ModuleConfig.RouterApiUrl,
 
         [Parameter()]
-        [string]$Model = 'functiongemma-270m-it',
+        [string]$Model = $script:ModuleConfig.RouterModel,
 
         [Parameter()]
         [string]$ToolsPath = (Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))) 'Config\pcai-tools.json'),
@@ -141,7 +144,10 @@ function Invoke-FunctionGemmaReAct {
 
         [Parameter()]
         [ValidateRange(1, 10)]
-        [int]$ProgressIntervalSeconds = 1
+        [int]$ProgressIntervalSeconds = 1,
+
+        [Parameter()]
+        [switch]$SkipHealthCheck
     )
 
     if (-not (Test-Path $ToolsPath)) {
@@ -149,8 +155,15 @@ function Invoke-FunctionGemmaReAct {
     }
 
     $tools = (Get-Content -Path $ToolsPath -Raw -Encoding UTF8 | ConvertFrom-Json).tools
-    $BaseUrl = Resolve-PcaiEndpoint -ApiUrl $BaseUrl -ProviderName 'vllm'
+    $BaseUrl = Resolve-PcaiEndpoint -ApiUrl $BaseUrl -ProviderName 'functiongemma'
     $ModuleRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+
+    if (-not $SkipHealthCheck) {
+        $routerHealthy = Get-CachedProviderHealth -Provider 'functiongemma' -TimeoutSeconds ([math]::Min($TimeoutSeconds, 10)) -ApiUrl $BaseUrl
+        if (-not $routerHealthy) {
+            throw "FunctionGemma router not reachable at $BaseUrl"
+        }
+    }
 
     # Inject Native Context into the prompt
     if (([System.Management.Automation.PSTypeName]'PcaiNative.PcaiCore').Type -and [PcaiNative.PcaiCore]::IsAvailable) {

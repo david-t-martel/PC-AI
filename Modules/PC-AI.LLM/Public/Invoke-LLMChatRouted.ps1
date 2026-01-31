@@ -63,10 +63,10 @@ function Invoke-LLMChatRouted {
         [string]$Provider = 'auto',
 
         [Parameter()]
-        [string]$RouterBaseUrl = $script:ModuleConfig.VLLMApiUrl,
+        [string]$RouterBaseUrl = $script:ModuleConfig.RouterApiUrl,
 
         [Parameter()]
-        [string]$RouterModel = $script:ModuleConfig.VLLMModel,
+        [string]$RouterModel = $script:ModuleConfig.RouterModel,
 
         [Parameter()]
         [string]$ToolsPath = (Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))) 'Config\pcai-tools.json'),
@@ -110,6 +110,8 @@ $systemPrompt
 $Message
 "@
 
+    $resolvedRouterUrl = Resolve-PcaiEndpoint -ApiUrl $RouterBaseUrl -ProviderName 'functiongemma'
+
     # Initialize router state tracking
     $routerAvailable = $false
     $degradedMode = $false
@@ -117,19 +119,30 @@ $Message
 
     # Try to use router unless explicitly bypassed
     if (-not $BypassRouter) {
-        try {
-            $routerResult = Invoke-FunctionGemmaReAct `
-                -Prompt $routerPrompt `
-                -BaseUrl $RouterBaseUrl `
-                -Model $RouterModel `
-                -ToolsPath $ToolsPath `
-                -ExecuteTools:$ExecuteTools `
-                -ReturnFinal:$false `
-                -MaxToolCalls $MaxToolCalls `
-                -TimeoutSeconds $TimeoutSeconds
-            $routerAvailable = $true
-        } catch {
-            Write-Warning "FunctionGemma router unavailable, proceeding without tool routing: $_"
+        $routerHealthy = Get-CachedProviderHealth -Provider 'functiongemma' -TimeoutSeconds ([math]::Min($TimeoutSeconds, 10)) -ApiUrl $resolvedRouterUrl
+        if ($routerHealthy) {
+            try {
+                $routerResult = Invoke-FunctionGemmaReAct `
+                    -Prompt $routerPrompt `
+                    -BaseUrl $resolvedRouterUrl `
+                    -Model $RouterModel `
+                    -ToolsPath $ToolsPath `
+                    -ExecuteTools:$ExecuteTools `
+                    -ReturnFinal:$false `
+                    -MaxToolCalls $MaxToolCalls `
+                    -TimeoutSeconds $TimeoutSeconds `
+                    -SkipHealthCheck
+                $routerAvailable = $true
+            } catch {
+                Write-Warning "FunctionGemma router unavailable, proceeding without tool routing: $_"
+                $degradedMode = $true
+                $routerResult = [PSCustomObject]@{
+                    ToolCalls = @()
+                    ToolResults = @()
+                }
+            }
+        } else {
+            Write-Warning "FunctionGemma router health check failed for $resolvedRouterUrl. Proceeding without tool routing."
             $degradedMode = $true
             $routerResult = [PSCustomObject]@{
                 ToolCalls = @()
@@ -197,7 +210,7 @@ $toolSummary
         Provider = $finalResponse.Provider
         Model = $Model
         RouterModel = $RouterModel
-        RouterBaseUrl = $RouterBaseUrl
+        RouterBaseUrl = $resolvedRouterUrl
         RouterAvailable = $routerAvailable
         DegradedMode = $degradedMode
         Timestamp = Get-Date

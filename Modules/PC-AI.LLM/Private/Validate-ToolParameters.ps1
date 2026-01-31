@@ -151,6 +151,7 @@ function Test-ParameterType {
         [string]$ParameterName,
 
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [System.Collections.ArrayList]$Errors
     )
 
@@ -246,11 +247,12 @@ function Test-EnumValue {
         [string]$ParameterName,
 
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [System.Collections.ArrayList]$Errors
     )
 
     # Case-sensitive comparison
-    if ($AllowedValues -notcontains $Value) {
+    if ($AllowedValues -cnotcontains $Value) {
         $allowedList = $AllowedValues -join ', '
         [void]$Errors.Add("Parameter '$ParameterName' must be one of: $allowedList")
         return $false

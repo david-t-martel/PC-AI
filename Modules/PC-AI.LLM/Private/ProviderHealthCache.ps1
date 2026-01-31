@@ -22,7 +22,7 @@ function Set-ProviderHealthCache {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('pcai-inference', 'ollama', 'vllm', 'lmstudio')]
+        [ValidateSet('pcai-inference', 'ollama', 'vllm', 'lmstudio', 'functiongemma')]
         [string]$Provider,
 
         [Parameter(Mandatory)]
@@ -76,11 +76,14 @@ function Get-CachedProviderHealth {
     [OutputType([bool])]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('pcai-inference', 'ollama', 'vllm', 'lmstudio')]
+        [ValidateSet('pcai-inference', 'ollama', 'vllm', 'lmstudio', 'functiongemma')]
         [string]$Provider,
 
         [Parameter()]
-        [int]$TimeoutSeconds = 5
+        [int]$TimeoutSeconds = 5,
+
+        [Parameter()]
+        [string]$ApiUrl
     )
 
     # Check cache first
@@ -97,19 +100,29 @@ function Get-CachedProviderHealth {
     try {
         switch ($Provider) {
             'pcai-inference' {
-                $isHealthy = Test-PcaiInferenceConnection -TimeoutSeconds $TimeoutSeconds
+                $targetUrl = if ($ApiUrl) { $ApiUrl } else { $script:ModuleConfig.PcaiInferenceApiUrl }
+                $isHealthy = Test-PcaiInferenceConnection -ApiUrl $targetUrl -TimeoutSeconds $TimeoutSeconds
                 $message = if ($isHealthy) { 'Connected' } else { 'Connection failed' }
             }
             'ollama' {
-                $isHealthy = Test-PcaiInferenceConnection -TimeoutSeconds $TimeoutSeconds
+                $targetUrl = if ($ApiUrl) { $ApiUrl } else { $script:ModuleConfig.PcaiInferenceApiUrl }
+                $isHealthy = Test-PcaiInferenceConnection -ApiUrl $targetUrl -TimeoutSeconds $TimeoutSeconds
                 $message = if ($isHealthy) { 'Connected' } else { 'Connection failed' }
             }
             'vllm' {
-                $isHealthy = Test-OpenAIConnection -ApiUrl $script:ModuleConfig.VLLMApiUrl -TimeoutSeconds $TimeoutSeconds
+                $targetUrl = if ($ApiUrl) { $ApiUrl } else { $script:ModuleConfig.VLLMApiUrl }
+                $isHealthy = Test-OpenAIConnection -ApiUrl $targetUrl -TimeoutSeconds $TimeoutSeconds
                 $message = if ($isHealthy) { 'Connected' } else { 'Connection failed' }
             }
             'lmstudio' {
-                $isHealthy = Test-OpenAIConnection -ApiUrl $script:ModuleConfig.LMStudioApiUrl -TimeoutSeconds $TimeoutSeconds
+                $targetUrl = if ($ApiUrl) { $ApiUrl } else { $script:ModuleConfig.LMStudioApiUrl }
+                $isHealthy = Test-OpenAIConnection -ApiUrl $targetUrl -TimeoutSeconds $TimeoutSeconds
+                $message = if ($isHealthy) { 'Connected' } else { 'Connection failed' }
+            }
+            'functiongemma' {
+                $targetUrl = if ($ApiUrl) { $ApiUrl } else { $script:ModuleConfig.RouterApiUrl }
+                if (-not $targetUrl) { $targetUrl = $script:ModuleConfig.VLLMApiUrl }
+                $isHealthy = Test-OpenAIConnection -ApiUrl $targetUrl -TimeoutSeconds $TimeoutSeconds
                 $message = if ($isHealthy) { 'Connected' } else { 'Connection failed' }
             }
         }

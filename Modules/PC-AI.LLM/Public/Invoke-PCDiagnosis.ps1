@@ -98,7 +98,7 @@ function Invoke-PCDiagnosis {
         [switch]$UseRouter,
 
         [Parameter()]
-        [string]$RouterBaseUrl = "http://localhost:11434",
+        [string]$RouterBaseUrl = $script:ModuleConfig.RouterApiUrl,
 
         [Parameter()]
         [string]$RouterModel = "qwen2.5-coder:7b",
@@ -158,18 +158,29 @@ You are analyzing a Windows PC hardware diagnostic report. Follow the reasoning 
         }
 
         $routerSummary = ''
+        $resolvedRouterUrl = Resolve-PcaiEndpoint -ApiUrl $RouterBaseUrl -ProviderName 'functiongemma'
         if ($UseRouter) {
             $routerPrompt = "Analyze this report and call tools if needed: `n`n $diagnosticText"
-            $routerResult = Invoke-FunctionGemmaReAct `
-                -Prompt $routerPrompt `
-                -BaseUrl $RouterBaseUrl `
-                -Model $RouterModel `
-                -ExecuteTools:([bool]$RouterExecuteTools) `
-                -MaxToolCalls $RouterMaxCalls `
-                -TimeoutSeconds $TimeoutSeconds
+            $routerHealthy = Get-CachedProviderHealth -Provider 'functiongemma' -TimeoutSeconds ([math]::Min($TimeoutSeconds, 10)) -ApiUrl $resolvedRouterUrl
+            if ($routerHealthy) {
+                try {
+                    $routerResult = Invoke-FunctionGemmaReAct `
+                        -Prompt $routerPrompt `
+                        -BaseUrl $resolvedRouterUrl `
+                        -Model $RouterModel `
+                        -ExecuteTools:([bool]$RouterExecuteTools) `
+                        -MaxToolCalls $RouterMaxCalls `
+                        -TimeoutSeconds $TimeoutSeconds `
+                        -SkipHealthCheck
 
-            if ($routerResult -and $routerResult.ToolResults) {
-                $routerSummary = ($routerResult.ToolResults | ConvertTo-Json -Depth 6)
+                    if ($routerResult -and $routerResult.ToolResults) {
+                        $routerSummary = ($routerResult.ToolResults | ConvertTo-Json -Depth 6)
+                    }
+                } catch {
+                    Write-Warning "FunctionGemma router unavailable, proceeding without tool routing: $_"
+                }
+            } else {
+                Write-Warning "FunctionGemma router health check failed for $resolvedRouterUrl. Proceeding without tool routing."
             }
         }
 
@@ -218,6 +229,7 @@ You are analyzing a Windows PC hardware diagnostic report. Follow the reasoning 
                 Model = $Model
                 AnalysisDurationSeconds = [math]::Round($duration, 2)
                 Timestamp = $startTime
+                ReportSavedTo = $null
             }
 
             if ($SaveReport) {

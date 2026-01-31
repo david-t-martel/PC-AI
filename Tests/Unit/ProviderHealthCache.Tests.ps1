@@ -16,6 +16,12 @@ Describe 'ProviderHealthCache' {
             $result.IsHealthy | Should -BeTrue
         }
 
+        It 'Should cache FunctionGemma health results' {
+            Set-ProviderHealthCache -Provider 'functiongemma' -IsHealthy $true
+            $result = Get-ProviderHealthCache -Provider 'functiongemma'
+            $result.IsHealthy | Should -BeTrue
+        }
+
         It 'Should return null for uncached providers' {
             $result = Get-ProviderHealthCache -Provider 'unknown'
             $result | Should -BeNull

@@ -18,6 +18,46 @@ function Resolve-PcaiEndpoint {
         [string]$ConfigPath = 'C:\Users\david\PC_AI\Config\hvsock-proxy.conf'
     )
 
+    $resolveHvsockName = {
+        param([string]$LookupName)
+        if (-not $LookupName) { return $null }
+        if (-not (Test-Path $ConfigPath)) { return $null }
+
+        $lines = Get-Content $ConfigPath | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') }
+        foreach ($line in $lines) {
+            $parts = $line.Split(':')
+            if ($parts.Count -lt 4) { continue }
+            $entryName = $parts[0]
+            if ($entryName -ne $LookupName) { continue }
+
+            $tcpHost = $parts[2]
+            $tcpPort = $parts[3]
+            if ($tcpHost -and $tcpPort) {
+                return "http://$tcpHost`:$tcpPort"
+            }
+        }
+
+        return $null
+    }
+
+    if ([string]::IsNullOrWhiteSpace($ApiUrl) -or $ApiUrl -eq 'auto') {
+        $autoResolved = & $resolveHvsockName $ProviderName
+        if ($autoResolved) { return $autoResolved }
+
+        if ($ProviderName) {
+            switch ($ProviderName) {
+                'pcai-inference' { if ($script:ModuleConfig.PcaiInferenceApiUrl) { $ApiUrl = $script:ModuleConfig.PcaiInferenceApiUrl } }
+                'ollama' { if ($script:ModuleConfig.PcaiInferenceApiUrl) { $ApiUrl = $script:ModuleConfig.PcaiInferenceApiUrl } }
+                'functiongemma' {
+                    if ($script:ModuleConfig.RouterApiUrl) { $ApiUrl = $script:ModuleConfig.RouterApiUrl }
+                    elseif ($script:ModuleConfig.VLLMApiUrl) { $ApiUrl = $script:ModuleConfig.VLLMApiUrl }
+                }
+                'vllm' { if ($script:ModuleConfig.VLLMApiUrl) { $ApiUrl = $script:ModuleConfig.VLLMApiUrl } }
+                'lmstudio' { if ($script:ModuleConfig.LMStudioApiUrl) { $ApiUrl = $script:ModuleConfig.LMStudioApiUrl } }
+            }
+        }
+    }
+
     if (-not $ApiUrl) { return $ApiUrl }
 
     $name = $null
@@ -29,23 +69,8 @@ function Resolve-PcaiEndpoint {
         return $ApiUrl
     }
 
-    if (-not (Test-Path $ConfigPath)) {
-        return $ApiUrl
-    }
-
-    $lines = Get-Content $ConfigPath | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') }
-    foreach ($line in $lines) {
-        $parts = $line.Split(':')
-        if ($parts.Count -lt 4) { continue }
-        $entryName = $parts[0]
-        if ($entryName -ne $name) { continue }
-
-        $tcpHost = $parts[2]
-        $tcpPort = $parts[3]
-        if ($tcpHost -and $tcpPort) {
-            return "http://$tcpHost`:$tcpPort"
-        }
-    }
+    $resolved = & $resolveHvsockName $name
+    if ($resolved) { return $resolved }
 
     return $ApiUrl
 }
@@ -1019,7 +1044,7 @@ function Invoke-LLMChatWithFallback {
     foreach ($p in $providers) {
         switch ($p) {
             'pcai-inference' {
-                if (Test-PcaiInferenceConnection) {
+                if (Get-CachedProviderHealth -Provider 'pcai-inference' -TimeoutSeconds ([math]::Min($TimeoutSeconds, 10)) -ApiUrl $script:ModuleConfig.PcaiInferenceApiUrl) {
                     $modelToUse = if ($Model) { $Model } else { $script:ModuleConfig.DefaultModel }
                     $resp = Invoke-OpenAIChat -Messages $Messages -Model $modelToUse -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $script:ModuleConfig.PcaiInferenceApiUrl
                     $resp | Add-Member -MemberType NoteProperty -Name Provider -Value 'pcai-inference' -Force
@@ -1027,7 +1052,7 @@ function Invoke-LLMChatWithFallback {
                 }
             }
             'ollama' {
-                if (Test-PcaiInferenceConnection) {
+                if (Get-CachedProviderHealth -Provider 'ollama' -TimeoutSeconds ([math]::Min($TimeoutSeconds, 10)) -ApiUrl $script:ModuleConfig.PcaiInferenceApiUrl) {
                     $modelToUse = if ($Model) { $Model } else { $script:ModuleConfig.DefaultModel }
                     $resp = Invoke-OpenAIChat -Messages $Messages -Model $modelToUse -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $script:ModuleConfig.PcaiInferenceApiUrl
                     $resp | Add-Member -MemberType NoteProperty -Name Provider -Value 'pcai-inference' -Force
@@ -1035,7 +1060,7 @@ function Invoke-LLMChatWithFallback {
                 }
             }
             'vllm' {
-                if (Test-OpenAIConnection -ApiUrl $script:ModuleConfig.VLLMApiUrl) {
+                if (Get-CachedProviderHealth -Provider 'vllm' -TimeoutSeconds ([math]::Min($TimeoutSeconds, 10)) -ApiUrl $script:ModuleConfig.VLLMApiUrl) {
                     $modelToUse = if ($Model) { $Model } else { $script:ModuleConfig.VLLMModel }
                     if ($ShowProgress) {
                         $resp = Invoke-OpenAIChatWithProgress -Messages $Messages -Model $modelToUse -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $script:ModuleConfig.VLLMApiUrl -ProgressIntervalSeconds $ProgressIntervalSeconds
@@ -1047,7 +1072,7 @@ function Invoke-LLMChatWithFallback {
                 }
             }
             'lmstudio' {
-                if (Test-OpenAIConnection -ApiUrl $script:ModuleConfig.LMStudioApiUrl) {
+                if (Get-CachedProviderHealth -Provider 'lmstudio' -TimeoutSeconds ([math]::Min($TimeoutSeconds, 10)) -ApiUrl $script:ModuleConfig.LMStudioApiUrl) {
                     $modelToUse = if ($Model) { $Model } else { $script:ModuleConfig.DefaultModel }
                     $resp = Invoke-OpenAIChat -Messages $Messages -Model $modelToUse -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $script:ModuleConfig.LMStudioApiUrl
                     $resp | Add-Member -MemberType NoteProperty -Name Provider -Value 'lmstudio' -Force

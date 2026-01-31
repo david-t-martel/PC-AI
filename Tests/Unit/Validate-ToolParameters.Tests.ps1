@@ -479,7 +479,7 @@ Describe "Confirm-ToolParameters" -Tag 'Unit', 'Validation', 'Fast' {
             $params = @{ name = 123 }
             $result = Confirm-ToolParameters -Parameters $params -Schema $schema
 
-            $result.Errors | Should -BeOfType [System.Collections.ArrayList]
+            ($result.Errors -is [System.Collections.ArrayList]) | Should -BeTrue
         }
     }
 }

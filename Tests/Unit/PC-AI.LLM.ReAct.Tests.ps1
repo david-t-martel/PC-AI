@@ -34,7 +34,7 @@ Describe "Invoke-FunctionGemmaReAct" -Tag 'Unit', 'LLM', 'ReAct' {
             return [PSCustomObject]@{ choices = @() }
         } -ModuleName PC-AI.LLM
 
-        $result = Invoke-FunctionGemmaReAct -Prompt "test" -BaseUrl "http://test" -Model "test"
+        $result = Invoke-FunctionGemmaReAct -Prompt "test" -BaseUrl "http://test" -Model "test" -SkipHealthCheck
         $result.FinalAnswer | Should -Match "Error: LLM returned no response or choices."
     }
 
@@ -58,7 +58,7 @@ Describe "Invoke-FunctionGemmaReAct" -Tag 'Unit', 'LLM', 'ReAct' {
         Mock Get-DockerStatus { return @{ Running = $true } } -ModuleName PC-AI.LLM
 
         $maxCalls = 2
-        $result = Invoke-FunctionGemmaReAct -Prompt "test" -BaseUrl "http://test" -Model "test" -MaxToolCalls $maxCalls -ExecuteTools
+        $result = Invoke-FunctionGemmaReAct -Prompt "test" -BaseUrl "http://test" -Model "test" -MaxToolCalls $maxCalls -ExecuteTools -SkipHealthCheck
 
         $result.ToolResults.Count | Should -Be $maxCalls
     }
@@ -86,7 +86,7 @@ Describe "Invoke-FunctionGemmaReAct" -Tag 'Unit', 'LLM', 'ReAct' {
 
         Mock Get-SystemInfoTool { return "CPU Info" } -ModuleName PC-AI.LLM
 
-        $result = Invoke-FunctionGemmaReAct -Prompt "test" -BaseUrl "http://test" -Model "test" -ExecuteTools
+        $result = Invoke-FunctionGemmaReAct -Prompt "test" -BaseUrl "http://test" -Model "test" -ExecuteTools -SkipHealthCheck
 
         $result.ToolResults[0].arguments.Category | Should -Be "CPU"
     }
@@ -114,7 +114,7 @@ Describe "Invoke-FunctionGemmaReAct" -Tag 'Unit', 'LLM', 'ReAct' {
 
         Mock Get-DockerStatus { throw "Docker failed" } -ModuleName PC-AI.LLM
 
-        $result = Invoke-FunctionGemmaReAct -Prompt "test" -BaseUrl "http://test" -Model "test" -ExecuteTools
+        $result = Invoke-FunctionGemmaReAct -Prompt "test" -BaseUrl "http://test" -Model "test" -ExecuteTools -SkipHealthCheck
 
         $result.ToolResults[0].result | Should -Match "Error executing tool"
     }

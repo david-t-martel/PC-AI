@@ -38,6 +38,11 @@ Describe 'Invoke-LLMChatRouted - Graceful Degradation' {
                 )
             }
         }
+
+        Mock -ModuleName PC-AI.LLM Get-CachedProviderHealth {
+            param([string]$Provider, [int]$TimeoutSeconds, [string]$ApiUrl)
+            return $true
+        }
     }
 
     Context 'BypassRouter Parameter' {
