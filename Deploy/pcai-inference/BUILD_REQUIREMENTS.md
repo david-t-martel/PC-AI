@@ -66,6 +66,11 @@ $env:CUDA_PATH = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.6"
 export CUDA_PATH=/usr/local/cuda
 ```
 
+Alternatively, you can auto-detect and configure CUDA for the current session:
+```powershell
+.\Tools\Initialize-CudaEnvironment.ps1
+```
+
 ### Common Build Issues
 
 #### "GNU compiler is not supported for this target"

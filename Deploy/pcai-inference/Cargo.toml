@@ -27,8 +27,8 @@ reqwest = { version = "0.12", features = ["json"] }
 axum = { version = "0.7", optional = true }
 tower-http = { version = "0.6", features = ["trace", "cors"], optional = true }
 
-# Backend: llama.cpp (optional)
-llama-cpp-2 = { version = "0.1", optional = true, features = ["cuda", "sampler"] }
+# Backend: llama.cpp (optional) - CUDA disabled by default for CPU-only builds
+llama-cpp-2 = { version = "0.1", optional = true, features = ["sampler"] }
 encoding_rs = { version = "0.8", optional = true }
 
 # Backend: mistral.rs (optional)
@@ -43,7 +43,8 @@ tempfile = "3.14"
 default = ["llamacpp", "server"]
 llamacpp = ["dep:llama-cpp-2", "dep:encoding_rs"]
 mistralrs-backend = ["dep:mistralrs", "dep:mistralrs-core"]
-cuda = []
+# CUDA feature gates GPU acceleration for llama.cpp backend
+cuda = ["llama-cpp-2/cuda"]
 server = ["dep:axum", "dep:tower-http"]
 ffi = []
 

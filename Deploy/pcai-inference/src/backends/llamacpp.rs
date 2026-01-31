@@ -10,7 +10,7 @@ use llama_cpp_2::context::LlamaContext;
 use llama_cpp_2::llama_backend::LlamaBackend as LlamaCppBackend_;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_2::model::{AddBos, LlamaModel};
+use llama_cpp_2::model::{AddBos, LlamaModel, Special};
 use llama_cpp_2::sampling::LlamaSampler;
 
 use super::{FinishReason, GenerateRequest, GenerateResponse, InferenceBackend};
@@ -109,7 +109,6 @@ impl LlamaCppBackend {
         let top_p = request.top_p.unwrap_or(0.9);
 
         let mut n_cur = batch.n_tokens();
-        let mut decoder = encoding_rs::UTF_8.new_decoder();
         let mut generated_text = String::new();
         let mut tokens_generated = 0;
         let mut finish_reason = FinishReason::Length;
@@ -138,7 +137,7 @@ impl LlamaCppBackend {
 
             // Decode token to text
             let token_str = model
-                .token_to_piece(token, &mut decoder, true, None)
+                .token_to_str(token, Special::Tokenize)
                 .map_err(|e| Error::Backend(format!("Token decode failed: {:?}", e)))?;
 
             // Check stop sequences
@@ -247,7 +246,7 @@ impl InferenceBackend for LlamaCppBackend {
     async fn generate_streaming(
         &self,
         request: GenerateRequest,
-        callback: &mut dyn FnMut(String) + Send,
+        callback: &mut (dyn FnMut(String) + Send),
     ) -> Result<GenerateResponse> {
         self.generate_streaming_internal(request, |token| callback(token)).await
     }

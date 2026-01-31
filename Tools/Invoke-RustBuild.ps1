@@ -73,35 +73,27 @@ if (Test-Path $lldPath) {
 }
 
 # Configure CUDA environment for candle-core/cudarc builds
-$cudaVersions = @('v13.1', 'v13.0', 'v12.6', 'v12.5')
-$cudaBase = $null
-foreach ($ver in $cudaVersions) {
-    $candidatePath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\$ver"
-    if (Test-Path $candidatePath) {
-        $cudaBase = $candidatePath
-        break
+$cudaHelper = Join-Path $PSScriptRoot 'Initialize-CudaEnvironment.ps1'
+if (Test-Path $cudaHelper) {
+    . $cudaHelper
+    $cudaInfo = Initialize-CudaEnvironment -Quiet
+    if ($cudaInfo.Found) {
+        Write-Verbose "CUDA environment configured: $($cudaInfo.CudaPath)"
     }
+} else {
+    Write-Verbose "CUDA helper not found at $cudaHelper"
 }
 
-if ($cudaBase) {
-    # Set CUDA_PATH for cudarc/bindgen_cuda
-    if (-not $env:CUDA_PATH -or $env:CUDA_PATH -ne $cudaBase) {
-        $env:CUDA_PATH = $cudaBase
+# Normalize CMake environment for crates that use cmake/cc build scripts
+$cmakeHelper = Join-Path $PSScriptRoot 'Initialize-CmakeEnvironment.ps1'
+if (Test-Path $cmakeHelper) {
+    . $cmakeHelper
+    $cmakeInfo = Initialize-CmakeEnvironment -Quiet
+    if ($cmakeInfo.Found -and $cmakeInfo.CmakeRoot) {
+        Write-Verbose "CMake environment configured: $($cmakeInfo.CmakeRoot)"
     }
-
-    # Add CUDA bin to PATH for nvcc
-    $cudaBin = "$cudaBase\bin"
-    if ($env:PATH -notlike "*$cudaBin*") {
-        $env:PATH = "$cudaBin;$env:PATH"
-    }
-
-    # Add nvvm/bin to PATH for cicc (CUDA intermediate compiler)
-    $nvvmBin = "$cudaBase\nvvm\bin"
-    if ((Test-Path $nvvmBin) -and ($env:PATH -notlike "*$nvvmBin*")) {
-        $env:PATH = "$nvvmBin;$env:PATH"
-    }
-
-    Write-Verbose "CUDA environment configured: $cudaBase"
+} else {
+    Write-Verbose "CMake helper not found at $cmakeHelper"
 }
 
 # Default: do not use lld unless explicitly requested

@@ -106,6 +106,38 @@ function Add-PipelineStep {
     Write-Host "[$($step.Timestamp)] $Name : $Status" -ForegroundColor $color
 }
 
+# Initialize CMake environment (fix stale CMAKE_ROOT/CMAKE_PREFIX_PATH)
+$script:CmakeInfo = $null
+$cmakeHelper = Join-Path $toolsDir 'Initialize-CmakeEnvironment.ps1'
+if (Test-Path $cmakeHelper) {
+    . $cmakeHelper
+    $script:CmakeInfo = Initialize-CmakeEnvironment -Quiet
+    if ($script:CmakeInfo.Found) {
+        Add-PipelineStep -Name 'CmakeEnv' -Status 'Success' -Output "CMAKE_ROOT=$($script:CmakeInfo.CmakeRoot)"
+    } else {
+        Add-PipelineStep -Name 'CmakeEnv' -Status 'Warning' -Error 'cmake.exe not found; CMake-dependent docs may fail'
+    }
+} else {
+    Add-PipelineStep -Name 'CmakeEnv' -Status 'Warning' -Error "CMake helper not found at $cmakeHelper"
+}
+
+# Initialize CUDA environment (best-effort) for GPU-dependent Rust crates
+$script:CudaInfo = $null
+$cudaHelper = Join-Path $toolsDir 'Initialize-CudaEnvironment.ps1'
+if (Test-Path $cudaHelper) {
+    . $cudaHelper
+    $script:CudaInfo = Initialize-CudaEnvironment -Quiet
+    if ($script:CudaInfo.Found) {
+        Add-PipelineStep -Name 'CudaEnv' -Status 'Success' -Output "CUDA_PATH=$($script:CudaInfo.CudaPath)"
+    } else {
+        Add-PipelineStep -Name 'CudaEnv' -Status 'Warning' -Error 'CUDA not detected; GPU-only steps will be skipped'
+        $env:LLAMA_CUDA = '0'
+    }
+} else {
+    Add-PipelineStep -Name 'CudaEnv' -Status 'Warning' -Error "CUDA helper not found at $cudaHelper"
+    $env:LLAMA_CUDA = '0'
+}
+
 # ============================================================================
 # Step 1: Generate DOC_STATUS report (TODO/FIXME/DEPRECATED markers)
 # ============================================================================
@@ -159,26 +191,48 @@ function Invoke-RustDocGeneration {
 
     Write-Host "`n=== Generating Rust documentation ===" -ForegroundColor Cyan
 
-    $rustWorkspace = Join-Path $repoRoot 'Native\pcai_core'
-    if (-not (Test-Path $rustWorkspace)) {
-        Add-PipelineStep -Name 'RustDocs' -Status 'Warning' -Error 'Rust workspace not found'
-        return
-    }
+    $workspaces = @(
+        (Join-Path $repoRoot 'Native\pcai_core'),
+        (Join-Path $repoRoot 'Deploy\pcai-inference'),
+        (Join-Path $repoRoot 'Deploy\rust-functiongemma-runtime'),
+        (Join-Path $repoRoot 'Deploy\rust-functiongemma-train')
+    )
 
-    try {
-        Push-Location $rustWorkspace
-        $cargoDoc = cargo doc --no-deps --document-private-items 2>&1
-        Pop-Location
+    $cudaRequired = @(
+        (Join-Path $repoRoot 'Deploy\rust-functiongemma-train')
+    )
+    $cudaAvailable = ($script:CudaInfo -and $script:CudaInfo.Found)
 
-        if ($LASTEXITCODE -eq 0) {
-            Add-PipelineStep -Name 'RustDocs' -Status 'Success' -Output 'T:\RustCache\cargo-target\doc'
-        } else {
-            Add-PipelineStep -Name 'RustDocs' -Status 'Warning' -Error ($cargoDoc | Select-Object -Last 5 | Out-String)
+    $found = $false
+    foreach ($rustWorkspace in $workspaces) {
+        if (-not (Test-Path $rustWorkspace)) {
+            continue
+        }
+        $found = $true
+        if (($cudaRequired -contains $rustWorkspace) -and (-not $cudaAvailable)) {
+            Add-PipelineStep -Name 'RustDocs' -Status 'Skipped' -Error "$rustWorkspace requires CUDA"
+            continue
+        }
+
+        try {
+            Push-Location $rustWorkspace
+            $cargoDoc = cargo doc --no-deps --document-private-items 2>&1
+            Pop-Location
+
+            if ($LASTEXITCODE -eq 0) {
+                Add-PipelineStep -Name 'RustDocs' -Status 'Success' -Output "$rustWorkspace -> T:\RustCache\cargo-target\doc"
+            } else {
+                Add-PipelineStep -Name 'RustDocs' -Status 'Warning' -Error ("$($rustWorkspace): " + ($cargoDoc | Select-Object -Last 5 | Out-String))
+            }
+        }
+        catch {
+            Pop-Location -ErrorAction SilentlyContinue
+            Add-PipelineStep -Name 'RustDocs' -Status 'Error' -Error ("$($rustWorkspace): " + $_.Exception.Message)
         }
     }
-    catch {
-        Pop-Location -ErrorAction SilentlyContinue
-        Add-PipelineStep -Name 'RustDocs' -Status 'Error' -Error $_.Exception.Message
+
+    if (-not $found) {
+        Add-PipelineStep -Name 'RustDocs' -Status 'Warning' -Error 'No Rust workspaces found'
     }
 }
 
@@ -256,6 +310,11 @@ function Invoke-TrainingDataGeneration {
     }
 
     try {
+        if (-not $UseNativeRouter -and -not ($script:CudaInfo -and $script:CudaInfo.Found)) {
+            Add-PipelineStep -Name 'TrainingData' -Status 'Warning' -Error 'CUDA not detected; skipping router dataset generation (rust-functiongemma-train requires CUDA)'
+            return
+        }
+
         $routerParams = @{
             MaxCases = $RouterMaxCases
         }
