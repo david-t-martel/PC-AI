@@ -1,0 +1,60 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 20,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "msvc-release",
+            "displayName": "MSVC Release",
+            "description": "Release build with MSVC",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/release",
+            "toolchainFile": "${sourceDir}/cmake/toolchain-msvc.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "LLAMA_CUDA": "OFF"
+            }
+        },
+        {
+            "name": "msvc-cuda",
+            "displayName": "MSVC with CUDA",
+            "description": "Release build with MSVC and CUDA",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/cuda",
+            "toolchainFile": "${sourceDir}/cmake/toolchain-msvc.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "LLAMA_CUDA": "ON",
+                "CMAKE_CUDA_ARCHITECTURES": "75;80;86;89"
+            }
+        },
+        {
+            "name": "msvc-debug",
+            "displayName": "MSVC Debug",
+            "description": "Debug build with MSVC",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/debug",
+            "toolchainFile": "${sourceDir}/cmake/toolchain-msvc.cmake",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "release",
+            "configurePreset": "msvc-release"
+        },
+        {
+            "name": "cuda",
+            "configurePreset": "msvc-cuda"
+        },
+        {
+            "name": "debug",
+            "configurePreset": "msvc-debug"
+        }
+    ]
+}
