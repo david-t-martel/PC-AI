@@ -10,6 +10,7 @@ use axum::{
 use futures::stream;
 use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, sync::Arc};
+use tokio::sync::mpsc;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
@@ -102,12 +103,6 @@ async fn completions(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CompletionRequest>,
 ) -> std::result::Result<Response, AppError> {
-    let backend = state.backend.read().await;
-
-    if !backend.is_loaded() {
-        return Err(AppError::ModelNotLoaded);
-    }
-
     let prompt_tokens = estimate_tokens(&req.prompt);
     let stop = req.stop.clone();
     let generate_req = GenerateRequest {
@@ -119,9 +114,6 @@ async fn completions(
     };
 
     if req.stream.unwrap_or(false) {
-        let response = backend.generate(generate_req).await?;
-        let (text, finish_reason) =
-            apply_stop_sequences(&response.text, &stop, response.finish_reason);
         let created = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -129,42 +121,22 @@ async fn completions(
         let id = format!("cmpl-{}", Uuid::new_v4());
         let model = req.model.unwrap_or_else(|| "pcai-inference".to_string());
 
-        let mut events: Vec<std::result::Result<Event, Infallible>> = Vec::new();
-        for chunk in chunk_text(&text, 64) {
-            let payload = serde_json::json!({
-                "id": id,
-                "object": "text_completion.chunk",
-                "created": created,
-                "model": model,
-                "choices": [
-                    {
-                        "index": 0,
-                        "text": chunk,
-                        "finish_reason": null
-                    }
-                ]
-            });
-            events.push(Ok(Event::default().data(payload.to_string())));
-        }
+        let sse = stream_completions(
+            state.backend.clone(),
+            generate_req,
+            stop,
+            id,
+            model,
+            created,
+        )
+        .await?;
+        return Ok(sse.into_response());
+    }
 
-        let final_payload = serde_json::json!({
-            "id": id,
-            "object": "text_completion.chunk",
-            "created": created,
-            "model": model,
-            "choices": [
-                {
-                    "index": 0,
-                    "text": "",
-                    "finish_reason": finish_reason_to_string(finish_reason)
-                }
-            ]
-        });
-        events.push(Ok(Event::default().data(final_payload.to_string())));
-        events.push(Ok(Event::default().data("[DONE]")));
+    let backend = state.backend.read().await;
 
-        let stream = stream::iter(events);
-        return Ok(Sse::new(stream).into_response());
+    if !backend.is_loaded() {
+        return Err(AppError::ModelNotLoaded);
     }
 
     let response = backend.generate(generate_req).await?;
@@ -200,10 +172,16 @@ async fn chat_completions(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatCompletionRequest>,
 ) -> std::result::Result<Response, AppError> {
-    let backend = state.backend.read().await;
-
-    if !backend.is_loaded() {
-        return Err(AppError::ModelNotLoaded);
+    if should_route_to_functiongemma(&req) {
+        match call_functiongemma(&req).await {
+            Ok(router_response) => return Ok(Json(router_response).into_response()),
+            Err(err) => {
+                if std::env::var("PCAI_ROUTER_STRICT").ok().as_deref() == Some("1") {
+                    return Err(err);
+                }
+                tracing::warn!("Router failed, falling back to local inference: {}", err.0);
+            }
+        }
     }
 
     let prompt = build_chat_prompt(&req.messages)?;
@@ -219,9 +197,6 @@ async fn chat_completions(
     };
 
     if req.stream.unwrap_or(false) {
-        let response = backend.generate(generate_req).await?;
-        let (content, finish_reason) =
-            apply_stop_sequences(&response.text, &stop, response.finish_reason);
         let created = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -229,42 +204,22 @@ async fn chat_completions(
         let id = format!("chatcmpl-{}", Uuid::new_v4());
         let model = req.model.unwrap_or_else(|| "pcai-inference".to_string());
 
-        let mut events: Vec<std::result::Result<Event, Infallible>> = Vec::new();
-        for chunk in chunk_text(&content, 64) {
-            let payload = serde_json::json!({
-                "id": id,
-                "object": "chat.completion.chunk",
-                "created": created,
-                "model": model,
-                "choices": [
-                    {
-                        "index": 0,
-                        "delta": { "content": chunk },
-                        "finish_reason": null
-                    }
-                ]
-            });
-            events.push(Ok(Event::default().data(payload.to_string())));
-        }
+        let sse = stream_chat_completions(
+            state.backend.clone(),
+            generate_req,
+            stop,
+            id,
+            model,
+            created,
+        )
+        .await?;
+        return Ok(sse.into_response());
+    }
 
-        let final_payload = serde_json::json!({
-            "id": id,
-            "object": "chat.completion.chunk",
-            "created": created,
-            "model": model,
-            "choices": [
-                {
-                    "index": 0,
-                    "delta": {},
-                    "finish_reason": finish_reason_to_string(finish_reason)
-                }
-            ]
-        });
-        events.push(Ok(Event::default().data(final_payload.to_string())));
-        events.push(Ok(Event::default().data("[DONE]")));
+    let backend = state.backend.read().await;
 
-        let stream = stream::iter(events);
-        return Ok(Sse::new(stream).into_response());
+    if !backend.is_loaded() {
+        return Err(AppError::ModelNotLoaded);
     }
 
     let response = backend.generate(generate_req).await?;
@@ -329,6 +284,10 @@ struct ChatCompletionRequest {
     stop: Option<Vec<String>>,
     #[serde(default)]
     stream: Option<bool>,
+    #[serde(default)]
+    tools: Option<Vec<serde_json::Value>>,
+    #[serde(default)]
+    tool_choice: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -500,6 +459,313 @@ fn finish_reason_to_string(reason: FinishReason) -> String {
     }
 }
 
+async fn stream_completions(
+    backend: Arc<RwLock<Box<dyn InferenceBackend>>>,
+    request: GenerateRequest,
+    stop: Option<Vec<String>>,
+    id: String,
+    model: String,
+    created: u64,
+) -> std::result::Result<Sse<impl futures::Stream<Item = std::result::Result<Event, Infallible>>>, AppError>
+{
+    let (tx, rx) = mpsc::unbounded_channel::<StreamItem>();
+    let tx_tokens = tx.clone();
+
+    tokio::spawn(async move {
+        let backend_guard = backend.read().await;
+        if !backend_guard.is_loaded() {
+            let _ = tx.send(StreamItem::Error("Model not loaded".to_string()));
+            let _ = tx.send(StreamItem::Done);
+            return;
+        }
+
+        let mut callback = |token: String| {
+            let _ = tx_tokens.send(StreamItem::Token(token));
+        };
+
+        let result = backend_guard.generate_streaming(request, &mut callback).await;
+        match result {
+            Ok(response) => {
+                let (final_text, finish_reason) =
+                    apply_stop_sequences(&response.text, &stop, response.finish_reason);
+                if final_text.is_empty() {
+                    let _ = tx.send(StreamItem::Final(finish_reason));
+                } else {
+                    let _ = tx.send(StreamItem::Final(finish_reason));
+                }
+            }
+            Err(err) => {
+                let _ = tx.send(StreamItem::Error(err.to_string()));
+            }
+        }
+
+        let _ = tx.send(StreamItem::Done);
+    });
+
+    let id = Arc::new(id);
+    let model = Arc::new(model);
+
+    let stream = stream::unfold(rx, move |mut rx| {
+        let id = Arc::clone(&id);
+        let model = Arc::clone(&model);
+        async move {
+        match rx.recv().await {
+            Some(item) => {
+                let data = match item {
+                    StreamItem::Token(token) => serde_json::json!({
+                        "id": id.as_str(),
+                        "object": "text_completion.chunk",
+                        "created": created,
+                        "model": model.as_str(),
+                        "choices": [
+                            {
+                                "index": 0,
+                                "text": token,
+                                "finish_reason": null
+                            }
+                        ]
+                    })
+                    .to_string(),
+                    StreamItem::Final(reason) => serde_json::json!({
+                        "id": id.as_str(),
+                        "object": "text_completion.chunk",
+                        "created": created,
+                        "model": model.as_str(),
+                        "choices": [
+                            {
+                                "index": 0,
+                                "text": "",
+                                "finish_reason": finish_reason_to_string(reason)
+                            }
+                        ]
+                    })
+                    .to_string(),
+                    StreamItem::Error(msg) => serde_json::json!({
+                        "error": {
+                            "message": msg,
+                            "type": "server_error"
+                        }
+                    })
+                    .to_string(),
+                    StreamItem::Done => "[DONE]".to_string(),
+                };
+                Some((Ok(Event::default().data(data)), rx))
+            }
+            None => None,
+        }
+        }
+    });
+
+    Ok(Sse::new(stream))
+}
+
+async fn stream_chat_completions(
+    backend: Arc<RwLock<Box<dyn InferenceBackend>>>,
+    request: GenerateRequest,
+    stop: Option<Vec<String>>,
+    id: String,
+    model: String,
+    created: u64,
+) -> std::result::Result<Sse<impl futures::Stream<Item = std::result::Result<Event, Infallible>>>, AppError>
+{
+    let (tx, rx) = mpsc::unbounded_channel::<StreamItem>();
+    let tx_tokens = tx.clone();
+
+    tokio::spawn(async move {
+        let backend_guard = backend.read().await;
+        if !backend_guard.is_loaded() {
+            let _ = tx.send(StreamItem::Error("Model not loaded".to_string()));
+            let _ = tx.send(StreamItem::Done);
+            return;
+        }
+
+        let mut callback = |token: String| {
+            let _ = tx_tokens.send(StreamItem::Token(token));
+        };
+
+        let result = backend_guard.generate_streaming(request, &mut callback).await;
+        match result {
+            Ok(response) => {
+                let (_final_text, finish_reason) =
+                    apply_stop_sequences(&response.text, &stop, response.finish_reason);
+                let _ = tx.send(StreamItem::Final(finish_reason));
+            }
+            Err(err) => {
+                let _ = tx.send(StreamItem::Error(err.to_string()));
+            }
+        }
+
+        let _ = tx.send(StreamItem::Done);
+    });
+
+    let id = Arc::new(id);
+    let model = Arc::new(model);
+
+    let stream = stream::unfold(rx, move |mut rx| {
+        let id = Arc::clone(&id);
+        let model = Arc::clone(&model);
+        async move {
+        match rx.recv().await {
+            Some(item) => {
+                let data = match item {
+                    StreamItem::Token(token) => serde_json::json!({
+                        "id": id.as_str(),
+                        "object": "chat.completion.chunk",
+                        "created": created,
+                        "model": model.as_str(),
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": { "content": token },
+                                "finish_reason": null
+                            }
+                        ]
+                    })
+                    .to_string(),
+                    StreamItem::Final(reason) => serde_json::json!({
+                        "id": id.as_str(),
+                        "object": "chat.completion.chunk",
+                        "created": created,
+                        "model": model.as_str(),
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {},
+                                "finish_reason": finish_reason_to_string(reason)
+                            }
+                        ]
+                    })
+                    .to_string(),
+                    StreamItem::Error(msg) => serde_json::json!({
+                        "error": {
+                            "message": msg,
+                            "type": "server_error"
+                        }
+                    })
+                    .to_string(),
+                    StreamItem::Done => "[DONE]".to_string(),
+                };
+                Some((Ok(Event::default().data(data)), rx))
+            }
+            None => None,
+        }
+        }
+    });
+
+    Ok(Sse::new(stream))
+}
+
+fn should_route_to_functiongemma(req: &ChatCompletionRequest) -> bool {
+    if std::env::var("PCAI_ROUTER_DISABLE").ok().as_deref() == Some("1") {
+        return false;
+    }
+
+    if std::env::var("PCAI_ROUTER_FORCE").ok().as_deref() == Some("1") {
+        return true;
+    }
+
+    if let Some(tools) = &req.tools {
+        if !tools.is_empty() {
+            return true;
+        }
+    }
+
+    let mut content = String::new();
+    for message in &req.messages {
+        content.push_str(&message.content);
+        content.push('\n');
+    }
+
+    let content = content.to_lowercase();
+    let keywords = [
+        "diagnose",
+        "diagnostic",
+        "report",
+        "usb",
+        "disk",
+        "drive",
+        "wsl",
+        "docker",
+        "network",
+        "latency",
+        "performance",
+        "gpu",
+        "driver",
+        "event log",
+        "error",
+        "smart",
+    ];
+
+    keywords.iter().any(|k| content.contains(k))
+}
+
+async fn call_functiongemma(
+    req: &ChatCompletionRequest,
+) -> std::result::Result<serde_json::Value, AppError> {
+    let base_url = std::env::var("PCAI_ROUTER_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:8000".to_string());
+    let model = std::env::var("PCAI_ROUTER_MODEL")
+        .unwrap_or_else(|_| "functiongemma-270m-it".to_string());
+
+    let tools = match &req.tools {
+        Some(tools) => Some(tools.clone()),
+        None => load_default_tools(),
+    };
+
+    let payload = serde_json::json!({
+        "model": model,
+        "messages": req.messages.iter().map(|m| serde_json::json!({
+            "role": m.role,
+            "content": m.content
+        })).collect::<Vec<_>>(),
+        "tools": tools,
+        "tool_choice": req.tool_choice.clone().unwrap_or(serde_json::Value::String("auto".to_string())),
+        "temperature": req.temperature.unwrap_or(0.2),
+    });
+
+    let client = reqwest::Client::new();
+    let url = format!("{}/v1/chat/completions", base_url.trim_end_matches('/'));
+    let response = client
+        .post(url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| AppError(Error::Backend(format!("Router request failed: {}", e))))?;
+
+    let status = response.status();
+    let value = response
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| AppError(Error::Backend(format!("Router response invalid: {}", e))))?;
+
+    if !status.is_success() {
+        return Err(AppError(Error::Backend(format!(
+            "Router returned {}: {}",
+            status, value
+        ))));
+    }
+
+    Ok(value)
+}
+
+fn load_default_tools() -> Option<Vec<serde_json::Value>> {
+    let path = std::env::var("PCAI_TOOLS_PATH")
+        .ok()
+        .unwrap_or_else(|| "Config/pcai-tools.json".to_string());
+    let content = std::fs::read_to_string(&path).ok()?;
+    let doc: serde_json::Value = serde_json::from_str(&content).ok()?;
+    doc.get("tools")
+        .and_then(|tools| tools.as_array())
+        .map(|arr| arr.clone())
+}
+
+#[derive(Debug)]
+enum StreamItem {
+    Token(String),
+    Final(FinishReason),
+    Error(String),
+    Done,
+}
 fn chunk_text(text: &str, max_chars: usize) -> Vec<String> {
     if text.is_empty() {
         return vec![];

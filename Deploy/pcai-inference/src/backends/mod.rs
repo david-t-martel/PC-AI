@@ -51,6 +51,20 @@ pub trait InferenceBackend: Send + Sync {
     /// Generate text from a prompt
     async fn generate(&self, request: GenerateRequest) -> Result<GenerateResponse>;
 
+    /// Generate text from a prompt with streaming callback.
+    /// Default implementation falls back to non-streaming generation.
+    async fn generate_streaming(
+        &self,
+        request: GenerateRequest,
+        callback: &mut (dyn FnMut(String) + Send),
+    ) -> Result<GenerateResponse> {
+        let response = self.generate(request).await?;
+        if !response.text.is_empty() {
+            callback(response.text.clone());
+        }
+        Ok(response)
+    }
+
     /// Unload the current model
     async fn unload_model(&mut self) -> Result<()>;
 

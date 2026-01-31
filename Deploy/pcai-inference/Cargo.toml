@@ -21,6 +21,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 async-trait = "0.1"
 uuid = { version = "1.11", features = ["v4"] }
 futures = "0.3"
+reqwest = { version = "0.12", features = ["json"] }
 
 # HTTP server (optional)
 axum = { version = "0.7", optional = true }

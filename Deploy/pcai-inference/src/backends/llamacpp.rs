@@ -57,7 +57,7 @@ impl LlamaCppBackend {
     }
 
     /// Generate text with streaming callback
-    pub async fn generate_streaming<F>(
+    pub async fn generate_streaming_internal<F>(
         &self,
         request: GenerateRequest,
         mut callback: F,
@@ -241,7 +241,15 @@ impl InferenceBackend for LlamaCppBackend {
 
     async fn generate(&self, request: GenerateRequest) -> Result<GenerateResponse> {
         // Use streaming version with no-op callback
-        self.generate_streaming(request, |_| {}).await
+        self.generate_streaming_internal(request, |_| {}).await
+    }
+
+    async fn generate_streaming(
+        &self,
+        request: GenerateRequest,
+        callback: &mut dyn FnMut(String) + Send,
+    ) -> Result<GenerateResponse> {
+        self.generate_streaming_internal(request, |token| callback(token)).await
     }
 
     async fn unload_model(&mut self) -> Result<()> {

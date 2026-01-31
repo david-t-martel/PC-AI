@@ -425,62 +425,43 @@ pub extern "C" fn pcai_generate_streaming(
         return -1;
     }
 
-    // Check if backend supports streaming
-    // Currently only llamacpp has generate_streaming
-    #[cfg(feature = "llamacpp")]
-    if backend.backend_name() == "llama.cpp" {
-        use crate::backends::llamacpp::LlamaCppBackend;
+    // Build request
+    let request = GenerateRequest {
+        prompt: prompt_str,
+        max_tokens: if max_tokens > 0 {
+            Some(max_tokens as usize)
+        } else {
+            None
+        },
+        temperature: if temperature > 0.0 {
+            Some(temperature)
+        } else {
+            None
+        },
+        top_p: None,
+        stop: vec![],
+    };
 
-        // Build request
-        let request = GenerateRequest {
-            prompt: prompt_str,
-            max_tokens: if max_tokens > 0 {
-                Some(max_tokens as usize)
-            } else {
-                None
-            },
-            temperature: if temperature > 0.0 {
-                Some(temperature)
-            } else {
-                None
-            },
-            top_p: None,
-            stop: vec![],
+    // Generate with streaming (backend-specific implementation)
+    let result = guard.runtime.block_on(async {
+        let mut bridge = |token: String| {
+            if let Ok(c_token) = CString::new(token) {
+                callback(c_token.as_ptr(), user_data);
+            }
         };
+        backend.generate_streaming(request, &mut bridge).await
+    });
 
-        // Downcast to LlamaCppBackend to access streaming method
-        // SAFETY: We just checked backend_name() == "llama.cpp"
-        let backend_ptr = backend.as_ref() as *const dyn InferenceBackend as *const LlamaCppBackend;
-        let llamacpp_backend = unsafe { &*backend_ptr };
-
-        // Generate with streaming
-        let result = guard.runtime.block_on(async {
-            llamacpp_backend.generate_streaming(request, |token| {
-                // Convert token to C string and call callback
-                if let Ok(c_token) = CString::new(token) {
-                    callback(c_token.as_ptr(), user_data);
-                }
-            }).await
-        });
-
-        match result {
-            Ok(response) => {
-                tracing::debug!("Streaming completed: {} tokens", response.tokens_generated);
-                return 0;
-            }
-            Err(e) => {
-                set_last_error(format!("Streaming generation failed: {}", e));
-                return -1;
-            }
+    match result {
+        Ok(response) => {
+            tracing::debug!("Streaming completed: {} tokens", response.tokens_generated);
+            0
+        }
+        Err(e) => {
+            set_last_error(format!("Streaming generation failed: {}", e));
+            -1
         }
     }
-
-    // Fallback: streaming not supported
-    set_last_error(format!(
-        "Streaming not supported for backend: {}. Use pcai_generate instead.",
-        backend.backend_name()
-    ));
-    -1
 }
 
 /// Free a string returned by pcai_generate

@@ -1,0 +1,28 @@
+{
+    "version": "1.0.0",
+    "backends": {
+        "llamacpp": {
+            "enabled": true,
+            "requires": ["cmake", "msvc", "ninja"],
+            "features": ["llamacpp", "cuda"],
+            "env": {
+                "CMAKE_GENERATOR": "Ninja",
+                "CMAKE_TOOLCHAIN_FILE": "cmake/toolchain-msvc.cmake"
+            }
+        },
+        "mistralrs": {
+            "enabled": true,
+            "requires": [],
+            "features": ["mistralrs-backend"],
+            "env": {}
+        }
+    },
+    "output": {
+        "dll_name": "pcai_inference.dll",
+        "target_dir": "../../bin"
+    },
+    "cuda": {
+        "min_version": "12.0",
+        "architectures": ["75", "80", "86", "89"]
+    }
+}
