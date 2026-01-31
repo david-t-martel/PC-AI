@@ -1,30 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "providers": {
-    "ollama": {
+    "pcai-inference": {
       "enabled": true,
-      "baseUrl": "hvsock://ollama",
-      "defaultModel": "qwen2.5-coder:7b",
-      "fallbackModels": [
-        "mistral:7b",
-        "deepseek-r1:8b"
-      ],
-      "timeout": 120000,
-      "retryAttempts": 3,
-      "retryDelayMs": 1000
-    },
-    "lmstudio": {
-      "enabled": true,
-      "baseUrl": "hvsock://lmstudio",
-      "priority": 2,
+      "baseUrl": "http://127.0.0.1:8080",
+      "defaultModel": "pcai-inference",
       "timeout": 120000
     },
-    "vllm": {
+    "functiongemma": {
       "enabled": true,
-      "baseUrl": "hvsock://vllm",
+      "baseUrl": "http://127.0.0.1:8000",
       "defaultModel": "functiongemma-270m-it",
-      "priority": 1,
       "timeout": 120000
     }
   },
@@ -37,6 +24,7 @@
   },
   "router": {
     "enabled": true,
+    "provider": "functiongemma",
     "baseUrl": "http://127.0.0.1:8000",
     "model": "functiongemma-270m-it",
     "toolsPath": "Config/pcai-tools.json"
@@ -59,8 +47,6 @@
     "markdownFormatting": true
   },
   "fallbackOrder": [
-    "ollama",
-    "vllm",
-    "lmstudio"
+    "pcai-inference"
   ]
 }

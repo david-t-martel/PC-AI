@@ -1,16 +1,17 @@
-﻿{
-  "LMStudioApiUrl": "http://localhost:1234",
-  "VLLMModel": "functiongemma-270m-it",
+{
+  "PcaiInferenceApiUrl": "http://127.0.0.1:8080",
+  "RouterApiUrl": "http://127.0.0.1:8000",
+  "RouterModel": "functiongemma-270m-it",
+  "DefaultModel": "pcai-inference",
+  "DefaultTimeout": 120,
   "ProviderOrder": [
-    "vllm",
-    "ollama",
-    "lmstudio"
+    "pcai-inference"
   ],
   "ProjectConfigPath": "C:\\Users\\david\\PC_AI\\Config\\llm-config.json",
-  "VLLMApiUrl": "hvsock://vllm",
-  "DefaultTimeout": 120,
-  "OllamaPath": "C:\\Users\\david\\AppData\\Local\\Programs\\Ollama\\ollama.exe",
-  "OllamaApiUrl": "http://localhost:11434",
   "ConfigPath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\llm-config.json",
-  "DefaultModel": "qwen2.5-coder:7b"
+  "OllamaApiUrl": "http://127.0.0.1:8080",
+  "VLLMApiUrl": "http://127.0.0.1:8000",
+  "VLLMModel": "functiongemma-270m-it",
+  "LMStudioApiUrl": "",
+  "OllamaPath": ""
 }

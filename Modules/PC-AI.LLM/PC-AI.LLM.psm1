@@ -14,15 +14,26 @@ $PublicPath = Join-Path -Path $ModuleRoot -ChildPath 'Public'
 
 # Module-level variables
 $script:ModuleConfig = @{
-    OllamaPath     = 'C:\Users\david\AppData\Local\Programs\Ollama\ollama.exe'
-    OllamaApiUrl   = 'http://127.0.0.1:11434'
-    LMStudioApiUrl = 'http://localhost:1234'
+    # Primary Rust inference (pcai-inference)
+    PcaiInferenceApiUrl = 'http://127.0.0.1:8080'
+    DefaultModel        = 'pcai-inference'
+    DefaultTimeout      = 120
+
+    # Rust FunctionGemma router
+    RouterApiUrl = 'http://127.0.0.1:8000'
+    RouterModel  = 'functiongemma-270m-it'
+
+    # Provider order (auto fallback)
+    ProviderOrder = @('pcai-inference')
+
+    # Legacy keys retained for compatibility (mapped to Rust backends)
+    OllamaPath     = ''
+    OllamaApiUrl   = 'http://127.0.0.1:8080'
+    LMStudioApiUrl = ''
     VLLMApiUrl     = 'http://127.0.0.1:8000'
     VLLMModel      = 'functiongemma-270m-it'
-    DefaultModel   = 'qwen2.5-coder:7b'
-    DefaultTimeout = 120
-    ProviderOrder  = @('ollama','vllm','lmstudio')
-    ConfigPath     = Join-Path -Path $ModuleRoot -ChildPath 'llm-config.json'
+
+    ConfigPath = Join-Path -Path $ModuleRoot -ChildPath 'llm-config.json'
 }
 
 # Load configuration if exists (module config)
@@ -46,14 +57,44 @@ $projectConfigPath = Join-Path -Path $projectRoot -ChildPath 'Config\llm-config.
 if (Test-Path -Path $projectConfigPath) {
     try {
         $projectConfig = Get-Content -Path $projectConfigPath -Raw | ConvertFrom-Json
+
+        # New Rust backends
+        if ($projectConfig.providers.'pcai-inference'.baseUrl) {
+            $script:ModuleConfig.PcaiInferenceApiUrl = $projectConfig.providers.'pcai-inference'.baseUrl
+            $script:ModuleConfig.OllamaApiUrl = $script:ModuleConfig.PcaiInferenceApiUrl
+        }
+        if ($projectConfig.providers.'pcai-inference'.defaultModel) {
+            $script:ModuleConfig.DefaultModel = $projectConfig.providers.'pcai-inference'.defaultModel
+        }
+        if ($projectConfig.providers.'pcai-inference'.timeout) {
+            $script:ModuleConfig.DefaultTimeout = [math]::Ceiling($projectConfig.providers.'pcai-inference'.timeout / 1000)
+        }
+
+        if ($projectConfig.providers.functiongemma.baseUrl) {
+            $script:ModuleConfig.RouterApiUrl = $projectConfig.providers.functiongemma.baseUrl
+            $script:ModuleConfig.VLLMApiUrl = $script:ModuleConfig.RouterApiUrl
+        }
+        if ($projectConfig.providers.functiongemma.defaultModel) {
+            $script:ModuleConfig.RouterModel = $projectConfig.providers.functiongemma.defaultModel
+            $script:ModuleConfig.VLLMModel = $script:ModuleConfig.RouterModel
+        }
+
+        if ($projectConfig.router.baseUrl) {
+            $script:ModuleConfig.RouterApiUrl = $projectConfig.router.baseUrl
+            $script:ModuleConfig.VLLMApiUrl = $script:ModuleConfig.RouterApiUrl
+        }
+        if ($projectConfig.router.model) {
+            $script:ModuleConfig.RouterModel = $projectConfig.router.model
+            $script:ModuleConfig.VLLMModel = $script:ModuleConfig.RouterModel
+        }
+
+        if ($projectConfig.fallbackOrder) {
+            $script:ModuleConfig.ProviderOrder = @($projectConfig.fallbackOrder)
+        }
+
+        # Legacy provider support (if present)
         if ($projectConfig.providers.ollama.baseUrl) {
             $script:ModuleConfig.OllamaApiUrl = $projectConfig.providers.ollama.baseUrl
-        }
-        if ($projectConfig.providers.ollama.defaultModel) {
-            $script:ModuleConfig.DefaultModel = $projectConfig.providers.ollama.defaultModel
-        }
-        if ($projectConfig.providers.ollama.timeout) {
-            $script:ModuleConfig.DefaultTimeout = [math]::Ceiling($projectConfig.providers.ollama.timeout / 1000)
         }
         if ($projectConfig.providers.lmstudio.baseUrl) {
             $script:ModuleConfig.LMStudioApiUrl = $projectConfig.providers.lmstudio.baseUrl
@@ -64,9 +105,7 @@ if (Test-Path -Path $projectConfigPath) {
         if ($projectConfig.providers.vllm.defaultModel) {
             $script:ModuleConfig.VLLMModel = $projectConfig.providers.vllm.defaultModel
         }
-        if ($projectConfig.fallbackOrder) {
-            $script:ModuleConfig.ProviderOrder = @($projectConfig.fallbackOrder)
-        }
+
         $script:ModuleConfig.ProjectConfigPath = $projectConfigPath
         Write-Verbose "Loaded project configuration from $projectConfigPath"
     } catch {
@@ -81,8 +120,14 @@ if (Test-Path -Path $settingsPath) {
         $settings = Get-Content -Path $settingsPath -Raw | ConvertFrom-Json
         if ($settings.llm) {
             if ($settings.llm.activeModel) { $script:ModuleConfig.DefaultModel = $settings.llm.activeModel }
-            if ($settings.llm.routerUrl) { $script:ModuleConfig.VLLMApiUrl = $settings.llm.routerUrl }
-            if ($settings.llm.routerModel) { $script:ModuleConfig.VLLMModel = $settings.llm.routerModel }
+            if ($settings.llm.routerUrl) {
+                $script:ModuleConfig.RouterApiUrl = $settings.llm.routerUrl
+                $script:ModuleConfig.VLLMApiUrl = $settings.llm.routerUrl
+            }
+            if ($settings.llm.routerModel) {
+                $script:ModuleConfig.RouterModel = $settings.llm.routerModel
+                $script:ModuleConfig.VLLMModel = $settings.llm.routerModel
+            }
             if ($settings.llm.timeoutSeconds) { $script:ModuleConfig.DefaultTimeout = $settings.llm.timeoutSeconds }
             if ($settings.llm.activeProvider) {
                 # Ensure active provider is at the front of the list
