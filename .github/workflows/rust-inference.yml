@@ -1,0 +1,318 @@
+name: Rust Inference Build & Test
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'Deploy/pcai-inference/**'
+      - 'Modules/PcaiInference.psm1'
+      - 'Tests/Unit/PC-AI.Inference.Tests.ps1'
+      - 'Tests/Integration/FFI.Inference.Tests.ps1'
+      - '.github/workflows/rust-inference.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Deploy/pcai-inference/**'
+      - 'Modules/PcaiInference.psm1'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: Cargo Check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Deploy/pcai-inference
+          shared-key: pcai-inference
+
+      - name: Check (no features)
+        working-directory: Deploy/pcai-inference
+        run: cargo check --lib --no-default-features
+
+      - name: Check (with server)
+        working-directory: Deploy/pcai-inference
+        run: cargo check --lib --features server
+
+  test:
+    name: Rust Tests
+    runs-on: windows-latest
+    needs: check
+    strategy:
+      matrix:
+        rust: [stable, '1.75', '1.80']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Deploy/pcai-inference
+          shared-key: pcai-inference-${{ matrix.rust }}
+
+      - name: Run Tests (no default features)
+        working-directory: Deploy/pcai-inference
+        run: cargo test --no-default-features
+
+      - name: Run Tests (with server)
+        working-directory: Deploy/pcai-inference
+        run: cargo test --features server
+
+      - name: Install cargo-llvm-cov
+        if: matrix.rust == 'stable'
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate Coverage Report
+        if: matrix.rust == 'stable'
+        working-directory: Deploy/pcai-inference
+        run: cargo llvm-cov --no-default-features --lcov --output-path coverage.lcov
+
+      - name: Upload Coverage to Codecov
+        if: matrix.rust == 'stable'
+        uses: codecov/codecov-action@v4
+        with:
+          files: Deploy/pcai-inference/coverage.lcov
+          flags: rust-inference
+          fail_ci_if_error: false
+
+  clippy:
+    name: Clippy Lints
+    runs-on: windows-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Deploy/pcai-inference
+          shared-key: pcai-inference
+
+      - name: Run Clippy
+        working-directory: Deploy/pcai-inference
+        run: cargo clippy --no-default-features -- -D warnings
+
+  fmt:
+    name: Format Check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check Format
+        working-directory: Deploy/pcai-inference
+        run: cargo fmt --check
+
+  powershell-tests:
+    name: PowerShell Module Tests
+    runs-on: windows-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: pwsh
+        run: Install-Module Pester -MinimumVersion 5.6.1 -Force -Scope CurrentUser
+
+      - name: Run Unit Tests
+        shell: pwsh
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = "Tests/Unit/PC-AI.Inference.Tests.ps1"
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = "Detailed"
+          Invoke-Pester -Configuration $config
+
+  build-llamacpp:
+    name: Build with MSVC (llamacpp)
+    runs-on: windows-latest
+    needs: [test, clippy]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Ninja
+        run: choco install ninja -y
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Deploy/pcai-inference
+          shared-key: pcai-inference-msvc
+
+      - name: Set MSVC Environment
+        shell: pwsh
+        run: |
+          $clPath = (Get-Command cl.exe).Source
+          echo "CC=$clPath" >> $env:GITHUB_ENV
+          echo "CXX=$clPath" >> $env:GITHUB_ENV
+          echo "CMAKE_GENERATOR=Ninja" >> $env:GITHUB_ENV
+
+      - name: Build llamacpp Backend
+        working-directory: Deploy/pcai-inference
+        run: cargo build --release --features llamacpp,ffi,server
+
+      - name: Run FFI Tests
+        working-directory: Deploy/pcai-inference
+        run: cargo test --release --features llamacpp,ffi
+
+      - name: Copy Artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path bin -Force
+          Copy-Item Deploy/pcai-inference/target/release/pcai_inference.dll -Destination bin/ -ErrorAction SilentlyContinue
+
+      - name: Upload DLL Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcai-inference-dll-${{ github.sha }}
+          path: bin/pcai_inference.dll
+          if-no-files-found: warn
+
+  build-cuda:
+    name: Build with CUDA
+    runs-on: windows-latest
+    needs: [test, clippy]
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.14
+        with:
+          cuda: '12.4.0'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "cublas"]'
+
+      - name: Install Ninja
+        run: choco install ninja -y
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Deploy/pcai-inference
+          shared-key: pcai-inference-cuda
+
+      - name: Set CUDA Environment
+        shell: pwsh
+        run: |
+          $clPath = (Get-Command cl.exe).Source
+          echo "CC=$clPath" >> $env:GITHUB_ENV
+          echo "CXX=$clPath" >> $env:GITHUB_ENV
+          echo "CMAKE_GENERATOR=Ninja" >> $env:GITHUB_ENV
+          echo "CUDA_PATH=$env:CUDA_PATH" >> $env:GITHUB_ENV
+
+      - name: Build CUDA Backend
+        working-directory: Deploy/pcai-inference
+        run: cargo build --release --features llamacpp,ffi,server,cuda
+
+      - name: Run CUDA Tests
+        working-directory: Deploy/pcai-inference
+        run: cargo test --release --features llamacpp,ffi,cuda
+
+      - name: Copy CUDA Artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path bin-cuda -Force
+          Copy-Item Deploy/pcai-inference/target/release/pcai_inference.dll -Destination bin-cuda/ -ErrorAction SilentlyContinue
+
+      - name: Upload CUDA DLL Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcai-inference-dll-cuda-${{ github.sha }}
+          path: bin-cuda/pcai_inference.dll
+          if-no-files-found: warn
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: windows-latest
+    needs: build-llamacpp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download DLL Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pcai-inference-dll-${{ github.sha }}
+          path: bin
+
+      - name: Install Pester
+        shell: pwsh
+        run: Install-Module Pester -MinimumVersion 5.6.1 -Force -Scope CurrentUser
+
+      - name: Run FFI Integration Tests
+        shell: pwsh
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = "Tests/Integration/FFI.Inference.Tests.ps1"
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = "Detailed"
+          $config.Filter.Tag = "FFI"
+          Invoke-Pester -Configuration $config
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: windows-latest
+    needs: build-llamacpp
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download DLL Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pcai-inference-dll-${{ github.sha }}
+          path: bin
+
+      - name: Install Pester
+        shell: pwsh
+        run: Install-Module Pester -MinimumVersion 5.6.1 -Force -Scope CurrentUser
+
+      - name: Run E2E Tests (without model)
+        shell: pwsh
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = "Tests/E2E/Inference.E2E.Tests.ps1"
+          $config.Run.Exit = $false  # Don't fail if tests skip
+          $config.Output.Verbosity = "Detailed"
+          $config.Filter.Tag = "E2E", "Build", "Module"
+          $config.Filter.ExcludeTag = "Inference"  # Skip tests requiring model
+          Invoke-Pester -Configuration $config
