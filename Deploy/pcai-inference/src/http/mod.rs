@@ -3,12 +3,13 @@
 use axum::{
     extract::State,
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::{sse::Event, IntoResponse, Response, Sse},
     routing::{get, post},
     Json, Router,
 };
+use futures::stream;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{convert::Infallible, sync::Arc};
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
@@ -38,6 +39,7 @@ pub async fn run_server(
 
     let mut app = Router::new()
         .route("/health", get(health_check))
+        .route("/v1/models", get(list_models))
         .route("/v1/completions", post(completions))
         .route("/v1/chat/completions", post(chat_completions))
         .with_state(Arc::new(state))
@@ -74,6 +76,27 @@ async fn health_check(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     }))
 }
 
+/// OpenAI-compatible models list endpoint
+async fn list_models(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let backend = state.backend.read().await;
+    let model_id = if backend.is_loaded() {
+        backend.backend_name()
+    } else {
+        "pcai-inference"
+    };
+
+    Json(serde_json::json!({
+        "object": "list",
+        "data": [
+            {
+                "id": model_id,
+                "object": "model",
+                "owned_by": "pcai"
+            }
+        ]
+    }))
+}
+
 /// OpenAI-compatible completions endpoint
 async fn completions(
     State(state): State<Arc<AppState>>,
@@ -95,6 +118,55 @@ async fn completions(
         stop: stop.clone().unwrap_or_default(),
     };
 
+    if req.stream.unwrap_or(false) {
+        let response = backend.generate(generate_req).await?;
+        let (text, finish_reason) =
+            apply_stop_sequences(&response.text, &stop, response.finish_reason);
+        let created = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let id = format!("cmpl-{}", Uuid::new_v4());
+        let model = req.model.unwrap_or_else(|| "pcai-inference".to_string());
+
+        let mut events: Vec<std::result::Result<Event, Infallible>> = Vec::new();
+        for chunk in chunk_text(&text, 64) {
+            let payload = serde_json::json!({
+                "id": id,
+                "object": "text_completion.chunk",
+                "created": created,
+                "model": model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "text": chunk,
+                        "finish_reason": null
+                    }
+                ]
+            });
+            events.push(Ok(Event::default().data(payload.to_string())));
+        }
+
+        let final_payload = serde_json::json!({
+            "id": id,
+            "object": "text_completion.chunk",
+            "created": created,
+            "model": model,
+            "choices": [
+                {
+                    "index": 0,
+                    "text": "",
+                    "finish_reason": finish_reason_to_string(finish_reason)
+                }
+            ]
+        });
+        events.push(Ok(Event::default().data(final_payload.to_string())));
+        events.push(Ok(Event::default().data("[DONE]")));
+
+        let stream = stream::iter(events);
+        return Ok(Sse::new(stream).into_response());
+    }
+
     let response = backend.generate(generate_req).await?;
 
     let (text, finish_reason) =
@@ -107,7 +179,7 @@ async fn completions(
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs(),
-        model: "pcai-inference".to_string(),
+        model: req.model.unwrap_or_else(|| "pcai-inference".to_string()),
         choices: vec![Choice {
             text,
             index: 0,
@@ -128,12 +200,6 @@ async fn chat_completions(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ChatCompletionRequest>,
 ) -> std::result::Result<Response, AppError> {
-    if req.stream.unwrap_or(false) {
-        return Err(AppError(Error::InvalidInput(
-            "Streaming is not supported".to_string(),
-        )));
-    }
-
     let backend = state.backend.read().await;
 
     if !backend.is_loaded() {
@@ -151,6 +217,55 @@ async fn chat_completions(
         top_p: req.top_p,
         stop: stop.clone().unwrap_or_default(),
     };
+
+    if req.stream.unwrap_or(false) {
+        let response = backend.generate(generate_req).await?;
+        let (content, finish_reason) =
+            apply_stop_sequences(&response.text, &stop, response.finish_reason);
+        let created = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let id = format!("chatcmpl-{}", Uuid::new_v4());
+        let model = req.model.unwrap_or_else(|| "pcai-inference".to_string());
+
+        let mut events: Vec<std::result::Result<Event, Infallible>> = Vec::new();
+        for chunk in chunk_text(&content, 64) {
+            let payload = serde_json::json!({
+                "id": id,
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": { "content": chunk },
+                        "finish_reason": null
+                    }
+                ]
+            });
+            events.push(Ok(Event::default().data(payload.to_string())));
+        }
+
+        let final_payload = serde_json::json!({
+            "id": id,
+            "object": "chat.completion.chunk",
+            "created": created,
+            "model": model,
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {},
+                    "finish_reason": finish_reason_to_string(finish_reason)
+                }
+            ]
+        });
+        events.push(Ok(Event::default().data(final_payload.to_string())));
+        events.push(Ok(Event::default().data("[DONE]")));
+
+        let stream = stream::iter(events);
+        return Ok(Sse::new(stream).into_response());
+    }
 
     let response = backend.generate(generate_req).await?;
     let (content, finish_reason) =
@@ -185,6 +300,8 @@ async fn chat_completions(
 // Request/Response types
 #[derive(Debug, Deserialize)]
 struct CompletionRequest {
+    #[serde(default)]
+    model: Option<String>,
     prompt: String,
     #[serde(default)]
     max_tokens: Option<usize>,
@@ -194,6 +311,8 @@ struct CompletionRequest {
     top_p: Option<f32>,
     #[serde(default)]
     stop: Option<Vec<String>>,
+    #[serde(default)]
+    stream: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -379,6 +498,29 @@ fn finish_reason_to_string(reason: FinishReason) -> String {
         FinishReason::Length => "length".to_string(),
         FinishReason::Error => "error".to_string(),
     }
+}
+
+fn chunk_text(text: &str, max_chars: usize) -> Vec<String> {
+    if text.is_empty() {
+        return vec![];
+    }
+
+    let mut chunks = Vec::new();
+    let mut current = String::new();
+
+    for ch in text.chars() {
+        current.push(ch);
+        if current.len() >= max_chars {
+            chunks.push(current);
+            current = String::new();
+        }
+    }
+
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+
+    chunks
 }
 
 #[cfg(test)]
