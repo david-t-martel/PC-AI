@@ -174,7 +174,13 @@ async fn chat_completions(
 ) -> std::result::Result<Response, AppError> {
     if should_route_to_functiongemma(&req) {
         match call_functiongemma(&req).await {
-            Ok(router_response) => return Ok(Json(router_response).into_response()),
+            Ok(router_response) => {
+                if req.stream.unwrap_or(false) {
+                    let sse = stream_functiongemma_response(router_response)?;
+                    return Ok(sse.into_response());
+                }
+                return Ok(Json(router_response).into_response());
+            }
             Err(err) => {
                 if std::env::var("PCAI_ROUTER_STRICT").ok().as_deref() == Some("1") {
                     return Err(err);
@@ -479,20 +485,22 @@ async fn stream_completions(
             return;
         }
 
+        let mut tracker = StopTracker::new(stop.clone(), 64);
         let mut callback = |token: String| {
-            let _ = tx_tokens.send(StreamItem::Token(token));
+            for chunk in tracker.push(&token) {
+                let _ = tx_tokens.send(StreamItem::Token(chunk));
+            }
         };
 
         let result = backend_guard.generate_streaming(request, &mut callback).await;
         match result {
             Ok(response) => {
-                let (final_text, finish_reason) =
-                    apply_stop_sequences(&response.text, &stop, response.finish_reason);
-                if final_text.is_empty() {
-                    let _ = tx.send(StreamItem::Final(finish_reason));
+                let finish_reason = if tracker.stop_hit() {
+                    FinishReason::Stop
                 } else {
-                    let _ = tx.send(StreamItem::Final(finish_reason));
-                }
+                    response.finish_reason
+                };
+                let _ = tx.send(StreamItem::Final(finish_reason));
             }
             Err(err) => {
                 let _ = tx.send(StreamItem::Error(err.to_string()));
@@ -579,15 +587,21 @@ async fn stream_chat_completions(
             return;
         }
 
+        let mut tracker = StopTracker::new(stop.clone(), 64);
         let mut callback = |token: String| {
-            let _ = tx_tokens.send(StreamItem::Token(token));
+            for chunk in tracker.push(&token) {
+                let _ = tx_tokens.send(StreamItem::Token(chunk));
+            }
         };
 
         let result = backend_guard.generate_streaming(request, &mut callback).await;
         match result {
             Ok(response) => {
-                let (_final_text, finish_reason) =
-                    apply_stop_sequences(&response.text, &stop, response.finish_reason);
+                let finish_reason = if tracker.stop_hit() {
+                    FinishReason::Stop
+                } else {
+                    response.finish_reason
+                };
                 let _ = tx.send(StreamItem::Final(finish_reason));
             }
             Err(err) => {
@@ -653,6 +667,153 @@ async fn stream_chat_completions(
     });
 
     Ok(Sse::new(stream))
+}
+
+fn stream_functiongemma_response(
+    response: serde_json::Value,
+) -> std::result::Result<Sse<impl futures::Stream<Item = std::result::Result<Event, Infallible>>>, AppError> {
+    let mut events: Vec<std::result::Result<Event, Infallible>> = Vec::new();
+
+    if response.get("error").is_some() {
+        events.push(Ok(Event::default().data(response.to_string())));
+        events.push(Ok(Event::default().data("[DONE]")));
+        return Ok(Sse::new(stream::iter(events)));
+    }
+
+    let id = response
+        .get("id")
+        .and_then(|v| v.as_str())
+        .unwrap_or_else(|| "chatcmpl-functiongemma");
+    let created = response
+        .get("created")
+        .and_then(|v| v.as_u64())
+        .unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+        });
+    let model = response
+        .get("model")
+        .and_then(|v| v.as_str())
+        .unwrap_or("functiongemma-270m-it");
+
+    let choice = response
+        .get("choices")
+        .and_then(|v| v.as_array())
+        .and_then(|v| v.first())
+        .ok_or_else(|| AppError(Error::Backend("Router response missing choices".to_string())))?;
+
+    let finish_reason = choice
+        .get("finish_reason")
+        .and_then(|v| v.as_str())
+        .unwrap_or_else(|| {
+            if choice
+                .get("message")
+                .and_then(|m| m.get("tool_calls"))
+                .is_some()
+            {
+                "tool_calls"
+            } else {
+                "stop"
+            }
+        });
+
+    let message = choice
+        .get("message")
+        .ok_or_else(|| AppError(Error::Backend("Router response missing message".to_string())))?;
+
+    // initial role delta
+    let role_payload = serde_json::json!({
+        "id": id,
+        "object": "chat.completion.chunk",
+        "created": created,
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "delta": { "role": "assistant" },
+                "finish_reason": null
+            }
+        ]
+    });
+    events.push(Ok(Event::default().data(role_payload.to_string())));
+
+    if let Some(content) = message.get("content").and_then(|v| v.as_str()) {
+        for chunk in chunk_text(content, 64) {
+            let payload = serde_json::json!({
+                "id": id,
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": { "content": chunk },
+                        "finish_reason": null
+                    }
+                ]
+            });
+            events.push(Ok(Event::default().data(payload.to_string())));
+        }
+    }
+
+    if let Some(tool_calls) = message.get("tool_calls").and_then(|v| v.as_array()) {
+        for (index, tool_call) in tool_calls.iter().enumerate() {
+            let id_value = tool_call
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_else(|| "call_0");
+            let func = tool_call.get("function").cloned().unwrap_or_else(|| {
+                serde_json::json!({
+                    "name": "unknown",
+                    "arguments": "{}"
+                })
+            });
+
+            let payload = serde_json::json!({
+                "id": id,
+                "object": "chat.completion.chunk",
+                "created": created,
+                "model": model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": {
+                            "tool_calls": [
+                                {
+                                    "index": index,
+                                    "id": id_value,
+                                    "type": "function",
+                                    "function": func
+                                }
+                            ]
+                        },
+                        "finish_reason": null
+                    }
+                ]
+            });
+            events.push(Ok(Event::default().data(payload.to_string())));
+        }
+    }
+
+    let final_payload = serde_json::json!({
+        "id": id,
+        "object": "chat.completion.chunk",
+        "created": created,
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "delta": {},
+                "finish_reason": finish_reason
+            }
+        ]
+    });
+    events.push(Ok(Event::default().data(final_payload.to_string())));
+    events.push(Ok(Event::default().data("[DONE]")));
+
+    Ok(Sse::new(stream::iter(events)))
 }
 
 fn should_route_to_functiongemma(req: &ChatCompletionRequest) -> bool {
@@ -757,6 +918,77 @@ fn load_default_tools() -> Option<Vec<serde_json::Value>> {
     doc.get("tools")
         .and_then(|tools| tools.as_array())
         .map(|arr| arr.clone())
+}
+
+#[derive(Debug)]
+struct StopTracker {
+    stops: Vec<String>,
+    buffer: String,
+    emitted_len: usize,
+    stopped: bool,
+    chunk_size: usize,
+}
+
+impl StopTracker {
+    fn new(stops: Option<Vec<String>>, chunk_size: usize) -> Self {
+        Self {
+            stops: stops.unwrap_or_default(),
+            buffer: String::new(),
+            emitted_len: 0,
+            stopped: false,
+            chunk_size: chunk_size.max(1),
+        }
+    }
+
+    fn stop_hit(&self) -> bool {
+        self.stopped
+    }
+
+    fn push(&mut self, token: &str) -> Vec<String> {
+        if self.stopped {
+            return vec![];
+        }
+
+        self.buffer.push_str(token);
+
+        if self.stops.is_empty() {
+            let new_text = &self.buffer[self.emitted_len..];
+            self.emitted_len = self.buffer.len();
+            return chunk_text(new_text, self.chunk_size);
+        }
+
+        let mut earliest: Option<usize> = None;
+        for stop in &self.stops {
+            if stop.is_empty() {
+                continue;
+            }
+            if let Some(idx) = self.buffer.find(stop) {
+                earliest = Some(match earliest {
+                    Some(prev) => prev.min(idx),
+                    None => idx,
+                });
+            }
+        }
+
+        match earliest {
+            Some(idx) => {
+                let allowed = &self.buffer[..idx];
+                let new_text = if self.emitted_len < allowed.len() {
+                    &allowed[self.emitted_len..]
+                } else {
+                    ""
+                };
+                self.emitted_len = allowed.len();
+                self.stopped = true;
+                chunk_text(new_text, self.chunk_size)
+            }
+            None => {
+                let new_text = &self.buffer[self.emitted_len..];
+                self.emitted_len = self.buffer.len();
+                chunk_text(new_text, self.chunk_size)
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
