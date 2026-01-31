@@ -73,7 +73,7 @@ public static class Program
             return 0;
         }
 
-        PrintBanner(baseUrl, model, provider, mode);
+        PrintBanner(baseUrl, model, provider, mode, options.Backend);
 
         if (string.Equals(mode, "single", StringComparison.OrdinalIgnoreCase))
         {
@@ -99,10 +99,11 @@ public static class Program
         return 0;
     }
 
-    private static void PrintBanner(string baseUrl, string model, string provider, string mode)
+    private static void PrintBanner(string baseUrl, string model, string provider, string mode, BackendType backend = BackendType.Http)
     {
         Console.WriteLine("PC_AI Chat TUI");
         Console.WriteLine($"Provider: {provider}");
+        Console.WriteLine($"Backend: {backend}");
         Console.WriteLine($"Endpoint: {baseUrl}");
         Console.WriteLine($"Model: {model}");
         Console.WriteLine($"Mode: {mode}");
@@ -598,6 +599,11 @@ public sealed class CliOptions
     public string? ToolsPath { get; init; }
     public string? HvsockConfigPath { get; init; }
 
+    // Native inference options
+    public BackendType Backend { get; init; } = BackendType.Auto;
+    public string? ModelPath { get; init; }
+    public int GpuLayers { get; init; } = -1;
+
     public static CliOptions Parse(string[] args)
     {
         string? baseUrl = null;
@@ -614,6 +620,11 @@ public sealed class CliOptions
         string? prompt = null;
         string? toolsPath = null;
         string? hvsockConfigPath = null;
+
+        // Native inference options
+        var backend = BackendType.Auto;
+        string? modelPath = null;
+        int gpuLayers = -1;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -668,6 +679,32 @@ public sealed class CliOptions
                 case "--hvsock-config":
                     hvsockConfigPath = NextValue(args, ref i);
                     break;
+                case "--backend":
+                case "-b":
+                    var backendStr = NextValue(args, ref i).ToLowerInvariant();
+                    backend = backendStr switch
+                    {
+                        "auto" => BackendType.Auto,
+                        "http" => BackendType.Http,
+                        "llamacpp" => BackendType.LlamaCpp,
+                        "mistralrs" => BackendType.MistralRs,
+                        _ => BackendType.Auto
+                    };
+                    break;
+                case "--model-path":
+                    modelPath = NextValue(args, ref i);
+                    break;
+                case "--gpu-layers":
+                    if (int.TryParse(NextValue(args, ref i), out var parsedLayers))
+                    {
+                        gpuLayers = parsedLayers;
+                    }
+                    break;
+                case "--help":
+                case "-h":
+                    PrintHelp();
+                    Environment.Exit(0);
+                    break;
             }
         }
 
@@ -686,8 +723,40 @@ public sealed class CliOptions
             Mode = mode,
             Prompt = prompt,
             ToolsPath = toolsPath,
-            HvsockConfigPath = hvsockConfigPath
+            HvsockConfigPath = hvsockConfigPath,
+            Backend = backend,
+            ModelPath = modelPath,
+            GpuLayers = gpuLayers
         };
+    }
+
+    private static void PrintHelp()
+    {
+        Console.WriteLine(@"PC-AI Chat TUI
+
+Usage: PcaiChatTui [options]
+
+Options:
+  --base-url, -u <url>      LLM endpoint URL (default: http://localhost:11434)
+  --model, -m <name>        Model name for HTTP providers
+  --provider <name>         Provider: ollama, vllm (default: ollama)
+  --mode <mode>             Mode: chat, diagnose, stream, single, react
+  --config, -c <path>       Config file path
+  --timeout <seconds>       Request timeout
+  --system <prompt>         System prompt text
+  --system-file <path>      System prompt file
+  --tools <path>            Tools JSON path
+  --health                  Check endpoint health
+  --models                  List available models
+  --json                    Output as JSON
+
+Native Inference:
+  --backend, -b <type>      Backend: auto, http, llamacpp, mistralrs
+  --model-path <path>       Path to GGUF/SafeTensors model file
+  --gpu-layers <n>          GPU layers (-1 = all, 0 = CPU only)
+
+  --help, -h                Show this help
+");
     }
 
     private static string NextValue(string[] args, ref int index)
