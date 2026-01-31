@@ -9,6 +9,7 @@ use tokenizers::Tokenizer;
 use rust_functiongemma_train::{Config, Model};
 use rust_functiongemma_train::data_gen::DataGenerator;
 use rust_functiongemma_train::dataset::Dataset;
+use rust_functiongemma_train::early_stopping::EarlyStoppingConfig;
 use rust_functiongemma_train::trainer::{Trainer, TrainerConfig};
 use rust_functiongemma_train::eval::{evaluate_sample, EvaluationMetrics};
 use rust_functiongemma_train::router_dataset::{
@@ -96,6 +97,12 @@ enum Commands {
         warmup_steps: usize,
         #[arg(long, default_value = "cosine")]
         scheduler_type: String,
+        #[arg(long, default_value = "0")]
+        early_stopping_patience: usize,
+        #[arg(long, default_value = "0.001")]
+        early_stopping_min_delta: f64,
+        #[arg(long)]
+        use_4bit: bool,
     },
     /// Evaluate a trained model or adapter
     Eval {
@@ -236,6 +243,9 @@ fn main() -> Result<()> {
             use_lora,
             warmup_steps,
             scheduler_type,
+            early_stopping_patience,
+            early_stopping_min_delta,
+            use_4bit,
         } => {
             let device = Device::new_cuda(0).unwrap_or(Device::Cpu);
             println!("Training on device: {:?}", device);
@@ -271,6 +281,15 @@ fn main() -> Result<()> {
                 Some(Tokenizer::from_file(model_dir.join("tokenizer.json")).map_err(anyhow::Error::msg)?)
             };
 
+            let early_stopping = if early_stopping_patience > 0 {
+                Some(EarlyStoppingConfig {
+                    patience: early_stopping_patience,
+                    min_delta: early_stopping_min_delta,
+                })
+            } else {
+                None
+            };
+
             let t_cfg = TrainerConfig {
                 lr,
                 epochs,
@@ -285,11 +304,24 @@ fn main() -> Result<()> {
                 use_lora,
                 warmup_steps,
                 scheduler_type: scheduler_type.clone(),
+                early_stopping,
+                use_4bit,
             };
             let mut trainer = Trainer::new(model, &config, t_cfg, device, varmap);
 
             trainer.train(&dataset, tokenizer.as_ref())?;
-            trainer.save_adapters(&PathBuf::from(output))?;
+
+            let output_path = PathBuf::from(&output);
+            trainer.save_adapters(&output_path)?;
+
+            let output_dir = if output_path.extension().is_some() {
+                output_path.parent().unwrap_or_else(|| PathBuf::from(".").as_path()).to_path_buf()
+            } else {
+                output_path.clone()
+            };
+
+            trainer.save_peft_adapter(&output_dir)?;
+            write_tokenizer_metadata(&model_dir, &output_dir)?;
         }
         Commands::Eval {
             model_path,
@@ -411,5 +443,29 @@ fn main() -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn write_tokenizer_metadata(model_dir: &PathBuf, output_dir: &PathBuf) -> Result<()> {
+    std::fs::create_dir_all(output_dir)?;
+
+    let tokenizer_src = model_dir.join("tokenizer.json");
+    if tokenizer_src.exists() {
+        let tokenizer_dst = output_dir.join("tokenizer.json");
+        fs::copy(&tokenizer_src, &tokenizer_dst)?;
+    }
+
+    let config_src = model_dir.join("tokenizer_config.json");
+    if config_src.exists() {
+        let config_dst = output_dir.join("tokenizer_config.json");
+        fs::copy(&config_src, &config_dst)?;
+    }
+
+    let meta = serde_json::json!({
+        "tokenizer_source": tokenizer_src.display().to_string(),
+        "config_source": if config_src.exists() { config_src.display().to_string() } else { "" },
+        "output_dir": output_dir.display().to_string()
+    });
+    fs::write(output_dir.join("tokenizer_metadata.json"), serde_json::to_string_pretty(&meta)?)?;
     Ok(())
 }

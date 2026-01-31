@@ -18,11 +18,17 @@ async fn health_and_models() {
         .send().await.unwrap()
         .json().await.unwrap();
     assert_eq!(health["status"], "ok");
+    assert!(health["metadata"]["version"].as_str().is_some());
+    assert!(health["metadata"]["model"].as_str().is_some());
+    assert!(health["metadata"]["tools"].is_object());
 
     let models: serde_json::Value = client.get(format!("{}/v1/models", base))
         .send().await.unwrap()
         .json().await.unwrap();
     assert_eq!(models["object"], "list");
+    assert!(models["data"][0]["metadata"]["version"].as_str().is_some());
+    assert!(models["data"][0]["metadata"]["model"].as_str().is_some());
+    assert!(models["data"][0]["metadata"]["tools"].is_object());
 }
 
 #[tokio::test]

@@ -22,15 +22,15 @@ Deploy/functiongemma-finetune (Python) and to enable a Rust-only router runtime.
   - Scenario file: Deploy/functiongemma-finetune/scenarios.json
   - Tool coverage from pcai-tools.json
 - [x] Ensure chat template rendering uses the tokenizer template with tools.
-- [ ] Add prompt masking so user/developer content does not contribute to loss.
+- [x] Add prompt masking so user/developer content does not contribute to loss.
 - [x] Emit tool test vectors alongside tool-coverage datasets (parity with generate_training_data.py). Implemented via `prepare-router --test-vectors`.
 
 ## P0 - Training parity
-- [ ] LoRA/QLoRA support with target modules (q/k/v/o/gate/up/down). (LoRA done; QLoRA pending)
+- [ ] LoRA/QLoRA support with target modules (q/k/v/o/gate/up/down). (LoRA done; QLoRA stub wired, quantization pending)
 - [x] Warmup + LR scheduling (linear or cosine).
 - [x] Resume from checkpoint.
-- [ ] Eval split and optional early stopping. (early stopping helper exists but not wired)
-- [ ] Save PEFT-style adapter outputs + tokenizer metadata. (PEFT outputs exist; tokenizer metadata pending)
+- [ ] Eval split and optional early stopping. (early stopping wired; eval split pending)
+- [x] Save PEFT-style adapter outputs + tokenizer metadata.
 
 ## P0 - Runtime inference parity
 - [ ] Load base model + LoRA adapters, or merged model.

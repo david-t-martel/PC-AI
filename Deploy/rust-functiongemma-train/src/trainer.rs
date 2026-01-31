@@ -1,11 +1,12 @@
 use anyhow::Result;
-use candle_core::Device;
+use candle_core::{Device, DType};
 use candle_nn::{Optimizer, VarMap};
 use crate::model::{Model, Config};
 use crate::dataset::Dataset;
 use tokenizers::Tokenizer;
 use crate::scheduler::{LRScheduler, SchedulerConfig, SchedulerType};
 use crate::checkpoint::{Checkpoint, CheckpointConfig};
+use crate::early_stopping::{EarlyStopping, EarlyStoppingConfig};
 use std::path::PathBuf;
 
 pub struct TrainerConfig {
@@ -22,6 +23,9 @@ pub struct TrainerConfig {
     pub use_lora: bool,
     pub warmup_steps: usize,
     pub scheduler_type: String,
+    pub early_stopping: Option<EarlyStoppingConfig>,
+    pub use_4bit: bool,
+    pub eval_max_batches: Option<usize>,
 }
 
 impl Default for TrainerConfig {
@@ -40,6 +44,9 @@ impl Default for TrainerConfig {
             use_lora: true,
             warmup_steps: 100,
             scheduler_type: "cosine".to_string(),
+            early_stopping: None,
+            use_4bit: false,
+            eval_max_batches: None,
         }
     }
 }
@@ -90,8 +97,14 @@ impl<'a> Trainer<'a> {
         }
     }
 
-    pub fn train(&mut self, dataset: &Dataset, tokenizer: Option<&Tokenizer>) -> Result<()> {
-        let num_batches = dataset.len() / self.trainer_cfg.batch_size;
+    pub fn train(&mut self, dataset: &Dataset, tokenizer: Option<&Tokenizer>, eval_dataset: Option<&Dataset>) -> Result<()> {
+        if self.trainer_cfg.use_4bit {
+            println!("Warning: QLoRA 4-bit is not implemented yet; proceeding without quantization.");
+        }
+        if dataset.len() == 0 {
+            return Err(anyhow::anyhow!("Empty training dataset"));
+        }
+        let num_batches = (dataset.len() + self.trainer_cfg.batch_size - 1) / self.trainer_cfg.batch_size;
         let total_steps = self.trainer_cfg.epochs * num_batches;
 
         // Update scheduler with correct total_steps
@@ -111,6 +124,8 @@ impl<'a> Trainer<'a> {
 
         let mut optimizer = candle_nn::AdamW::new_lr(self.varmap.all_vars(), self.trainer_cfg.lr)?;
         let mut best_loss = f64::MAX;
+        let mut early_stopper = self.trainer_cfg.early_stopping.clone().map(EarlyStopping::new);
+        let mut last_epoch = 0usize;
 
         for epoch in 0..self.trainer_cfg.epochs {
             println!("Epoch {}/{}", epoch + 1, self.trainer_cfg.epochs);
@@ -128,7 +143,7 @@ impl<'a> Trainer<'a> {
                 }
 
                 let start_idx = i * self.trainer_cfg.batch_size;
-                let (inputs, targets) = dataset.get_batch(
+                let (inputs, targets, loss_mask) = dataset.get_batch(
                     start_idx,
                     self.trainer_cfg.batch_size,
                     tokenizer,
@@ -139,12 +154,7 @@ impl<'a> Trainer<'a> {
                 )?;
 
                 let logits = self.model.forward(&inputs)?;
-                let (b, s, v) = logits.dims3()?;
-                let logits_flat = logits.reshape((b * s, v))?.to_dtype(candle_core::DType::F32)?;
-                let targets_flat = targets.reshape((b * s,))?;
-
-                let loss = candle_nn::loss::cross_entropy(&logits_flat, &targets_flat)?;
-                let loss_val = loss.to_scalar::<f32>()? as f64;
+                let (loss, loss_val) = self.compute_loss(&logits, &targets, &loss_mask)?;
 
                 epoch_loss += loss_val;
                 batch_count += 1;
@@ -174,18 +184,95 @@ impl<'a> Trainer<'a> {
             let avg_epoch_loss = epoch_loss / batch_count as f64;
             println!("Epoch {} completed. Avg Loss: {:.4}", epoch + 1, avg_epoch_loss);
 
+            let mut metric_loss = avg_epoch_loss;
+            if let Some(eval_ds) = eval_dataset {
+                match self.evaluate_loss(eval_ds, tokenizer) {
+                    Ok(eval_loss) => {
+                        metric_loss = eval_loss;
+                        println!("Eval Loss: {:.4}", eval_loss);
+                    }
+                    Err(err) => {
+                        println!("Eval failed: {:?}", err);
+                    }
+                }
+            }
+
             // Update best loss
-            if avg_epoch_loss < best_loss {
-                best_loss = avg_epoch_loss;
+            if metric_loss < best_loss {
+                best_loss = metric_loss;
                 println!("New best loss: {:.4}", best_loss);
+            }
+            last_epoch = epoch;
+
+            if let Some(stopper) = early_stopper.as_mut() {
+                if stopper.should_stop(metric_loss) {
+                    println!(
+                        "Early stopping triggered at epoch {} (best loss {:.4}).",
+                        epoch + 1,
+                        stopper.best_loss()
+                    );
+                    break;
+                }
             }
         }
 
         // Save final checkpoint
-        self.save_checkpoint(self.trainer_cfg.epochs - 1, best_loss)?;
+        self.save_checkpoint(last_epoch, best_loss)?;
         println!("Training completed. Best loss: {:.4}", best_loss);
 
         Ok(())
+    }
+
+    fn compute_loss(&self, logits: &candle_core::Tensor, targets: &candle_core::Tensor, loss_mask: &candle_core::Tensor) -> Result<(candle_core::Tensor, f64)> {
+        let (b, s, v) = logits.dims3()?;
+        let logits_flat = logits.reshape((b * s, v))?.to_dtype(candle_core::DType::F32)?;
+        let targets_flat = targets.reshape((b * s,))?;
+        let mask_flat = loss_mask.reshape((b * s,))?.to_dtype(DType::F32)?;
+        let log_probs = candle_nn::ops::log_softmax(&logits_flat, 1)?;
+        let target_log_probs = log_probs.gather(&targets_flat.unsqueeze(1)?, 1)?.squeeze(1)?;
+        let masked_log_probs = (&target_log_probs * &mask_flat)?;
+        let mask_sum = mask_flat.sum_all()?.to_scalar::<f32>()? as f64;
+        let denom = if mask_sum > 0.0 { mask_sum } else { 1.0 };
+        let loss = masked_log_probs.sum_all()?.affine(-1.0 / denom, 0.0)?;
+        let loss_val = loss.to_scalar::<f32>()? as f64;
+        Ok((loss, loss_val))
+    }
+
+    fn evaluate_loss(&self, dataset: &Dataset, tokenizer: Option<&Tokenizer>) -> Result<f64> {
+        if dataset.len() == 0 {
+            return Err(anyhow::anyhow!("Empty eval dataset"));
+        }
+        let num_batches = (dataset.len() + self.trainer_cfg.batch_size - 1) / self.trainer_cfg.batch_size;
+        let max_batches = self.trainer_cfg.eval_max_batches.unwrap_or(num_batches);
+        let mut total_loss = 0.0;
+        let mut batch_count = 0usize;
+
+        for i in 0..num_batches {
+            if batch_count >= max_batches {
+                break;
+            }
+            let start_idx = i * self.trainer_cfg.batch_size;
+            let (inputs, targets, loss_mask) = dataset.get_batch(
+                start_idx,
+                self.trainer_cfg.batch_size,
+                tokenizer,
+                &self.device,
+                self.trainer_cfg.pack_sequences,
+                self.trainer_cfg.max_seq_len,
+                self.trainer_cfg.eos_token_id,
+            )?;
+
+            let logits = self.model.forward(&inputs)?;
+            let (_, loss_val) = self.compute_loss(&logits, &targets, &loss_mask)?;
+            total_loss += loss_val;
+            batch_count += 1;
+        }
+
+        if batch_count == 0 {
+            return Err(anyhow::anyhow!("Eval produced no batches"));
+        }
+
+        Ok(total_loss / batch_count as f64)
     }
 
     pub fn save_adapters(&self, path: &std::path::Path) -> Result<()> {
@@ -197,8 +284,15 @@ impl<'a> Trainer<'a> {
             }
         }
 
-        candle_core::safetensors::save(&lora_vars, path)?;
-        println!("Adapters saved to {:?}", path);
+        let out_path = if path.extension().is_some() {
+            path.to_path_buf()
+        } else {
+            std::fs::create_dir_all(path)?;
+            path.join("adapter_model.safetensors")
+        };
+
+        candle_core::safetensors::save(&lora_vars, &out_path)?;
+        println!("Adapters saved to {:?}", out_path);
         Ok(())
     }
 

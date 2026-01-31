@@ -24,6 +24,8 @@ fn test_full_training_config_integration() {
         use_lora: true,
         warmup_steps: 100,
         scheduler_type: "cosine".to_string(),
+        early_stopping: None,
+        use_4bit: false,
     };
 
     // Verify LoRA config can be derived
@@ -139,6 +141,8 @@ fn test_lora_config_derivation() {
         use_lora: true,
         warmup_steps: 200,
         scheduler_type: "linear".to_string(),
+        early_stopping: None,
+        use_4bit: false,
     };
 
     // Derive LoRA config from trainer config

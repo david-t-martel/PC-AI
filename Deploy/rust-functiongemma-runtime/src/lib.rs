@@ -7,6 +7,9 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{env, net::SocketAddr, time::{SystemTime, UNIX_EPOCH}};
+use std::fs;
+#[cfg(feature = "model")]
+use std::path::{Path, PathBuf};
 use tracing_subscriber::EnvFilter;
 
 #[cfg(feature = "model")]
@@ -94,12 +97,45 @@ struct ErrorResponse {
 struct ModelInfo {
     id: String,
     object: String,
+    owned_by: String,
+    metadata: RouterMetadata,
 }
 
 #[derive(Debug, Serialize)]
 struct ModelList {
     object: String,
     data: Vec<ModelInfo>,
+}
+
+#[derive(Debug, Serialize)]
+struct ToolsMetadata {
+    path: String,
+    count: usize,
+    loaded: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct LoraMetadata {
+    path: String,
+    r: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct RouterMetadata {
+    version: String,
+    model: String,
+    tools: ToolsMetadata,
+    engine: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    device: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lora: Option<LoraMetadata>,
+}
+
+#[derive(Debug, Serialize)]
+struct HealthResponse {
+    status: String,
+    metadata: RouterMetadata,
 }
 
 #[derive(Debug, Default)]
@@ -123,6 +159,49 @@ struct InferenceResult {
 
 fn default_model() -> String {
     env::var("PCAI_ROUTER_MODEL").unwrap_or_else(|_| "functiongemma-270m-it".to_string())
+}
+
+fn tools_metadata() -> ToolsMetadata {
+    let path = env::var("PCAI_TOOLS_PATH").unwrap_or_else(|_| "Config/pcai-tools.json".to_string());
+    let mut count = 0usize;
+    let mut loaded = false;
+    if let Ok(contents) = fs::read_to_string(&path) {
+        if let Ok(doc) = serde_json::from_str::<Value>(&contents) {
+            if let Some(arr) = doc.get("tools").and_then(|v| v.as_array()) {
+                count = arr.len();
+                loaded = true;
+            }
+        }
+    }
+
+    ToolsMetadata { path, count, loaded }
+}
+
+fn router_metadata() -> RouterMetadata {
+    let model = default_model();
+    let engine = match router_engine() {
+        RouterEngine::Heuristic => "heuristic",
+        RouterEngine::Model => "model",
+    };
+
+    #[cfg(feature = "model")]
+    let device = Some(device_label());
+    #[cfg(not(feature = "model"))]
+    let device = None;
+
+    #[cfg(feature = "model")]
+    let lora = lora_metadata();
+    #[cfg(not(feature = "model"))]
+    let lora = None;
+
+    RouterMetadata {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        model,
+        tools: tools_metadata(),
+        engine: engine.to_string(),
+        device,
+        lora,
+    }
 }
 
 impl ErrorResponse {
@@ -175,14 +254,21 @@ fn router_engine() -> RouterEngine {
 }
 
 async fn health() -> Json<Value> {
-    Json(json!({"status": "ok"}))
+    let metadata = router_metadata();
+    Json(json!(HealthResponse { status: "ok".to_string(), metadata }))
 }
 
 async fn list_models() -> Json<ModelList> {
     let model = default_model();
+    let metadata = router_metadata();
     Json(ModelList {
         object: "list".to_string(),
-        data: vec![ModelInfo { id: model, object: "model".to_string() }],
+        data: vec![ModelInfo {
+            id: model,
+            object: "model".to_string(),
+            owned_by: "pcai".to_string(),
+            metadata,
+        }],
     })
 }
 
@@ -255,6 +341,30 @@ fn resolve_tool_choice(tool_choice: &Value) -> Option<String> {
     }
 }
 
+fn tool_choice_requires_tool(tool_choice: &Value) -> bool {
+    match tool_choice {
+        Value::String(s) => s.eq_ignore_ascii_case("required"),
+        Value::Object(map) => {
+            let is_function = map.get("type")
+                .and_then(|v| v.as_str())
+                .map(|t| t.eq_ignore_ascii_case("function"))
+                .unwrap_or(false);
+            is_function && map.get("function").is_none()
+        }
+        _ => false,
+    }
+}
+
+fn first_tool_name(tools: &Value) -> Option<String> {
+    tools.as_array()
+        .and_then(|arr| arr.iter().filter_map(|tool| {
+            tool.get("function")
+                .and_then(|f| f.get("name"))
+                .and_then(|n| n.as_str())
+                .map(|s| s.to_string())
+        }).next())
+}
+
 fn build_tool_calls(tool_name: &str, args: Value, call_id: &str) -> Value {
     json!([
         {
@@ -317,12 +427,16 @@ fn parse_function_call(output: &str) -> Option<(String, Value)> {
 fn heuristic_route(req: &ChatCompletionRequest, prompt: &RouterPrompt) -> InferenceResult {
     let mut tool_name: Option<String> = None;
     let mut tool_args: Value = json!({});
+    let requires_tool = req.tool_choice.as_ref().map(tool_choice_requires_tool).unwrap_or(false);
 
     if let Some(choice) = req.tool_choice.as_ref().and_then(resolve_tool_choice) {
         tool_name = Some(choice);
         tool_args = extract_args_from_text(&prompt.user_request).unwrap_or_else(|| json!({}));
     } else if let Some(tools) = req.tools.as_ref() {
         tool_name = select_tool_by_name(&prompt.user_request, tools);
+        if tool_name.is_none() && requires_tool {
+            tool_name = first_tool_name(tools);
+        }
         tool_args = extract_args_from_text(&prompt.user_request).unwrap_or_else(|| json!({}));
     }
 
@@ -366,9 +480,147 @@ fn render_prompt(messages: &[Message], tools: &Value) -> anyhow::Result<String> 
 }
 
 #[cfg(feature = "model")]
+#[derive(Debug, Clone)]
+struct LoraInfo {
+    path: PathBuf,
+    r: usize,
+}
+
+#[cfg(feature = "model")]
+fn read_lora_r(config_path: &Path) -> Option<usize> {
+    let contents = fs::read_to_string(config_path).ok()?;
+    let val = serde_json::from_str::<Value>(&contents).ok()?;
+    val.get("r").and_then(|v| v.as_u64()).map(|v| v as usize)
+}
+
+#[cfg(feature = "model")]
+fn infer_lora_r_from_weights(path: &Path) -> Option<usize> {
+    let data = fs::read(path).ok()?;
+    let tensors = safetensors::SafeTensors::deserialize(&data).ok()?;
+    for name in tensors.names() {
+        if name.contains("lora_a") {
+            if let Ok(info) = tensors.tensor(&name) {
+                let shape = info.shape();
+                if let Some(first) = shape.first() {
+                    return Some(*first as usize);
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(feature = "model")]
+fn resolve_lora_from_path(path: PathBuf) -> Option<LoraInfo> {
+    let (weights_path, config_path) = if path.is_dir() {
+        (path.join("adapter_model.safetensors"), path.join("adapter_config.json"))
+    } else {
+        let config_path = path.parent().unwrap_or(Path::new(".")).join("adapter_config.json");
+        (path, config_path)
+    };
+
+    if !weights_path.exists() {
+        return None;
+    }
+
+    let r = read_lora_r(&config_path)
+        .or_else(|| infer_lora_r_from_weights(&weights_path))
+        .unwrap_or(0);
+
+    if r == 0 {
+        return None;
+    }
+
+    Some(LoraInfo { path: weights_path, r })
+}
+
+#[cfg(feature = "model")]
+fn resolve_lora_adapter(model_path: &Path) -> Option<LoraInfo> {
+    if let Ok(path) = env::var("PCAI_ROUTER_LORA_PATH") {
+        if let Some(info) = resolve_lora_from_path(PathBuf::from(path)) {
+            return Some(info);
+        }
+    }
+
+    let candidate = model_path.join("adapter_model.safetensors");
+    if candidate.exists() {
+        return resolve_lora_from_path(candidate);
+    }
+
+    None
+}
+
+#[cfg(feature = "model")]
+fn lora_metadata() -> Option<LoraMetadata> {
+    let from_env = env::var("PCAI_ROUTER_LORA_PATH").ok().map(PathBuf::from);
+    let from_model = env::var("PCAI_ROUTER_MODEL_PATH").ok().map(|p| PathBuf::from(p).join("adapter_model.safetensors"));
+    let candidate = from_env.or(from_model)?;
+    let info = resolve_lora_from_path(candidate)?;
+    Some(LoraMetadata { path: info.path.to_string_lossy().to_string(), r: info.r })
+}
+
+#[cfg(feature = "model")]
+fn normalize_device_label(raw: &str) -> String {
+    let lower = raw.trim().to_lowercase();
+    if lower == "cpu" {
+        return "cpu".to_string();
+    }
+    if lower == "cuda" || lower == "gpu" {
+        return "cuda:0".to_string();
+    }
+    if let Some(rest) = lower.strip_prefix("cuda:") {
+        return format!("cuda:{}", rest.trim());
+    }
+    if let Some(rest) = lower.strip_prefix("gpu:") {
+        return format!("cuda:{}", rest.trim());
+    }
+    lower
+}
+
+#[cfg(feature = "model")]
+fn device_label() -> String {
+    if let Ok(device) = env::var("PCAI_ROUTER_DEVICE") {
+        return normalize_device_label(&device);
+    }
+    if let Ok(gpu) = env::var("PCAI_ROUTER_GPU") {
+        return format!("cuda:{}", gpu.trim());
+    }
+    "auto".to_string()
+}
+
+#[cfg(feature = "model")]
+fn resolve_device() -> Device {
+    if let Ok(device) = env::var("PCAI_ROUTER_DEVICE") {
+        let normalized = normalize_device_label(&device);
+        if normalized == "cpu" {
+            return Device::Cpu;
+        }
+        if let Some(rest) = normalized.strip_prefix("cuda:") {
+            if let Ok(idx) = rest.trim().parse::<usize>() {
+                if let Ok(dev) = Device::new_cuda(idx) {
+                    return dev;
+                }
+            }
+        }
+    }
+
+    if let Ok(gpu) = env::var("PCAI_ROUTER_GPU") {
+        if let Ok(idx) = gpu.trim().parse::<usize>() {
+            if let Ok(dev) = Device::new_cuda(idx) {
+                return dev;
+            }
+        }
+    }
+
+    Device::new_cuda(0).unwrap_or(Device::Cpu)
+}
+
+#[cfg(feature = "model")]
 fn infer_with_model(req: &ChatCompletionRequest) -> anyhow::Result<InferenceResult> {
     let model_id = env::var("PCAI_ROUTER_MODEL_PATH").unwrap_or_else(|_| default_model());
     let model_path = model_support::resolve_model_path(&model_id)?;
+    let lora_info = resolve_lora_adapter(&model_path);
+    let lora_r = lora_info.as_ref().map(|l| l.r).unwrap_or(0);
 
     let prompt = match req.tools.as_ref() {
         Some(tools) => render_prompt(&req.messages, tools)?,
@@ -378,7 +630,7 @@ fn infer_with_model(req: &ChatCompletionRequest) -> anyhow::Result<InferenceResu
     let config_raw = std::fs::read_to_string(model_path.join("config.json"))?;
     let config: Config = serde_json::from_str(&config_raw)?;
 
-    let device = Device::new_cuda(0).unwrap_or(Device::Cpu);
+    let device = resolve_device();
     let model_file = model_path.join("model.safetensors");
     let mut tie_embeddings = true;
     if model_file.exists() {
@@ -388,9 +640,12 @@ fn infer_with_model(req: &ChatCompletionRequest) -> anyhow::Result<InferenceResu
 
     let varmap = VarMap::new();
     let vb = VarBuilder::from_varmap(&varmap, DType::BF16, &device);
-    let model = Model::new(&config, 0, vb, tie_embeddings)?;
+    let model = Model::new(&config, lora_r, vb, tie_embeddings)?;
     if model_file.exists() {
         custom_load(&varmap, &model_file)?;
+    }
+    if let Some(lora) = lora_info {
+        custom_load(&varmap, &lora.path)?;
     }
 
     let tokenizer = Tokenizer::from_file(model_path.join("tokenizer.json")).map_err(anyhow::Error::msg)?;

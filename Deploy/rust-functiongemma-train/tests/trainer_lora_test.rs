@@ -50,6 +50,8 @@ fn test_trainer_config_custom_values() {
         use_lora: false,
         warmup_steps: 200,
         scheduler_type: "linear".to_string(),
+        early_stopping: None,
+        use_4bit: false,
     };
 
     assert_eq!(config.lora_r, 16);
