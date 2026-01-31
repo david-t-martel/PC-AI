@@ -471,6 +471,29 @@ if (-not $SkipRust) {
             Write-BuildWarning "  pcai_fs.dll not found in target directory"
         }
 
+        # Deploy pcai_inference.dll to PcaiInference runtime folder (if available)
+        Write-BuildInfo 'Checking for pcai_inference.dll (native inference backend)...'
+        $pcaiInferenceDllPath = Join-Path $BinDir 'pcai_inference.dll'
+        $pcaiInferenceDir = Join-Path $RootDir 'PcaiInference'
+
+        if (Test-Path $pcaiInferenceDllPath) {
+            $pcaiInferenceNativeDir = Join-Path $pcaiInferenceDir 'runtimes\win-x64\native'
+            if (-not (Test-Path $pcaiInferenceNativeDir)) {
+                New-Item -ItemType Directory -Path $pcaiInferenceNativeDir -Force | Out-Null
+                Write-BuildInfo "  Created PcaiInference runtime directory: $pcaiInferenceNativeDir"
+            }
+            Copy-Item $pcaiInferenceDllPath $pcaiInferenceNativeDir -Force
+            $deployedInferencePath = Join-Path $pcaiInferenceNativeDir 'pcai_inference.dll'
+            if (Test-ArtifactIntegrity -Path $deployedInferencePath -StartTime $BuildStartDateTime -AllowStale) {
+                Write-BuildSuccess "  Deployed pcai_inference.dll to PcaiInference runtime folder"
+            } else {
+                Write-BuildWarning "  pcai_inference.dll deployment verification failed"
+            }
+        } else {
+            Write-BuildWarning "  pcai_inference.dll not found in bin directory"
+            Write-BuildInfo "    Build with: cd Deploy\\pcai-inference && .\\build.ps1 -Backend mistralrs"
+        }
+
         Write-BuildSuccess "Rust build completed in $([math]::Round($sw.Elapsed.TotalSeconds, 2))s"
     } finally {
         Pop-Location
@@ -485,6 +508,29 @@ if (-not $SkipRust) {
 
 if (-not $SkipCSharp) {
     Write-BuildStep 'Phase 4: Build C# Wrapper'
+
+    # Validate pcai_inference.dll availability for PcaiInference project
+    $pcaiInferenceDllPath = Join-Path $BinDir 'pcai_inference.dll'
+    $pcaiInferenceProject = Join-Path $RootDir 'PcaiInference\PcaiInference.csproj'
+
+    if (Test-Path $pcaiInferenceProject) {
+        Write-BuildInfo 'PcaiInference project found - checking native DLL dependency...'
+        if (-not (Test-Path $pcaiInferenceDllPath)) {
+            Write-BuildWarning 'pcai_inference.dll not found - PcaiInference will have limited functionality'
+            Write-BuildInfo '  Build native DLL: cd Deploy\pcai-inference && .\build.ps1 -Backend mistralrs'
+        } else {
+            $dllSize = [math]::Round((Get-Item $pcaiInferenceDllPath).Length / 1MB, 2)
+            Write-BuildSuccess "  pcai_inference.dll found ($dllSize MB)"
+
+            # Deploy to PcaiInference runtime folder
+            $pcaiInferenceNativeDir = Join-Path $RootDir 'PcaiInference\runtimes\win-x64\native'
+            if (-not (Test-Path $pcaiInferenceNativeDir)) {
+                New-Item -ItemType Directory -Path $pcaiInferenceNativeDir -Force | Out-Null
+            }
+            Copy-Item $pcaiInferenceDllPath $pcaiInferenceNativeDir -Force
+            Write-BuildInfo "  Deployed to PcaiInference runtime folder"
+        }
+    }
 
     # Purge stale wrapper from bin
     Write-BuildInfo 'Purging stale C# wrapper from staging...'
