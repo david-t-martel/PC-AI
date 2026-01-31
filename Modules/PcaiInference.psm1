@@ -17,6 +17,12 @@
 using namespace System.Runtime.InteropServices
 
 #region Module Variables
+# Use $PSScriptRoot if available (module import), fallback to $MyInvocation for dot-sourcing
+$script:ModulePath = if ($PSScriptRoot) {
+    $PSScriptRoot
+} else {
+    Split-Path -Parent $MyInvocation.MyCommand.ScriptBlock.File
+}
 $script:DllPath = $null
 $script:BackendInitialized = $false
 $script:ModelLoaded = $false
@@ -40,13 +46,27 @@ function Initialize-PcaiFFI {
         throw "DLL not found: $DllPath`n`nBuild instructions:`n  cd Deploy\pcai-inference`n  cargo build --features ffi,mistralrs-backend --release"
     }
 
+    Write-Verbose "Using DLL path: $DllPath"
+
+    # Use forward slashes for C# compatibility (avoids escaping issues)
+    $normalizedPath = $DllPath -replace '\\', '/'
+
     try {
+        $csharpCode = @"
+using System;
+using System.Runtime.InteropServices;
+
+public class PcaiInferenceFFI {
+    private const string DLL_PATH = "$normalizedPath";
+"@
+        Write-Verbose "C# DLL_PATH: $normalizedPath"
+
         Add-Type @"
 using System;
 using System.Runtime.InteropServices;
 
 public class PcaiInferenceFFI {
-    private const string DLL_PATH = @"$DllPath";
+    private const string DLL_PATH = "$normalizedPath";
 
     [DllImport(DLL_PATH, CallingConvention = CallingConvention.Cdecl)]
     public static extern int pcai_init(
@@ -134,10 +154,15 @@ function Initialize-PcaiInference {
 
     # Resolve DLL path - check bin/ first, then fall back to target/release
     if (-not $DllPath) {
-        $projectRoot = Split-Path $PSScriptRoot -Parent
+        $projectRoot = Split-Path $script:ModulePath -Parent
         $binPath = Join-Path $projectRoot 'bin\pcai_inference.dll'
         $targetPath = Join-Path $projectRoot 'Deploy\pcai-inference\target\release\pcai_inference.dll'
-        $DllPath = if (Test-Path $binPath) { $binPath } else { $targetPath }
+        $cargoTargetPath = if ($env:CARGO_TARGET_DIR) { Join-Path $env:CARGO_TARGET_DIR 'release\pcai_inference.dll' } else { $null }
+
+        # Search order: bin/, cargo target, Deploy/
+        $DllPath = if (Test-Path $binPath) { $binPath }
+                   elseif ($cargoTargetPath -and (Test-Path $cargoTargetPath)) { $cargoTargetPath }
+                   else { $targetPath }
     }
 
     $script:DllPath = $DllPath
