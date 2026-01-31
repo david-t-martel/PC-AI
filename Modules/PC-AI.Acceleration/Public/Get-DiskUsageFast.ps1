@@ -62,6 +62,20 @@ function Get-DiskUsageFast {
 
     $dustPath = Get-RustToolPath -ToolName 'dust'
     $useDust = $null -ne $dustPath -and (Test-Path $dustPath)
+    $nativeType = ([System.Management.Automation.PSTypeName]'PcaiNative.PerformanceModule').Type
+
+    if ($nativeType -and [PcaiNative.PcaiCore]::IsAvailable -and $Top -gt 0) {
+        if ($Depth -gt 1) {
+            Write-Verbose "Native disk usage ignores Depth; returning top entries only."
+        }
+        $nativeResults = Get-DiskUsageWithNative -Path $Path -Top $Top
+        if ($null -ne $nativeResults) {
+            return $nativeResults |
+                Where-Object { $_.SizeBytes -ge $minBytes } |
+                Sort-DiskUsageResults -SortBy $SortBy |
+                Select-TopResults -Top $Top
+        }
+    }
 
     if ($useDust) {
         return Get-DiskUsageWithDust -Path $Path -Depth $Depth -DustPath $dustPath |
@@ -75,6 +89,53 @@ function Get-DiskUsageFast {
             Where-Object { $_.SizeBytes -ge $minBytes } |
             Sort-DiskUsageResults -SortBy $SortBy |
             Select-TopResults -Top $Top
+    }
+}
+
+<#
+.SYNOPSIS
+    Retrieve disk usage using the native PCAI performance module.
+
+.PARAMETER Path
+    Path to analyze.
+
+.PARAMETER Top
+    Number of top directories to return.
+#>
+function Get-DiskUsageWithNative {
+    [CmdletBinding()]
+    param(
+        [string]$Path,
+        [int]$Top
+    )
+
+    try {
+        $json = [PcaiNative.PerformanceModule]::GetDiskUsageJson($Path, [uint32]$Top)
+        if (-not $json) {
+            return $null
+        }
+
+        $result = $json | ConvertFrom-Json
+        if (-not $result.top_entries) {
+            return @()
+        }
+
+        return @(
+            $result.top_entries | ForEach-Object {
+                [PSCustomObject]@{
+                    Path      = $_.path
+                    SizeBytes = [int64]$_.size_bytes
+                    SizeMB    = [Math]::Round([double]$_.size_bytes / 1MB, 2)
+                    SizeGB    = [Math]::Round([double]$_.size_bytes / 1GB, 2)
+                    SizeHuman = $_.size_formatted
+                    FileCount = [int64]$_.file_count
+                    Tool      = 'pcai_native'
+                }
+            }
+        )
+    }
+    catch {
+        return $null
     }
 }
 

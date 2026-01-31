@@ -146,16 +146,55 @@ function Get-PcaiNativeStatus {
     $available = Test-PcaiNativeAvailable
     $dllPath = $script:PcaiNativeDllPath
 
+    $coreAvailable = $false
+    $searchAvailable = $false
+    $systemAvailable = $false
+    $fsAvailable = $false
+    $performanceAvailable = $false
+
+    if ($available) {
+        $coreAvailable = [PcaiNative.PcaiCore]::IsAvailable
+        if (([System.Management.Automation.PSTypeName]'PcaiNative.PcaiSearch').Type) {
+            $searchAvailable = [PcaiNative.PcaiSearch]::IsAvailable
+        }
+        if (([System.Management.Automation.PSTypeName]'PcaiNative.SystemModule').Type) {
+            $systemAvailable = [PcaiNative.SystemModule]::IsAvailable
+        }
+        if (([System.Management.Automation.PSTypeName]'PcaiNative.FsModule').Type) {
+            $fsAvailable = [PcaiNative.FsModule]::IsAvailable
+        }
+        $performanceAvailable = $coreAvailable
+    }
+
+    $dlls = $null
+    if ($dllPath) {
+        $dlls = [PSCustomObject]@{
+            PcaiNative     = (Test-Path (Join-Path $dllPath 'PcaiNative.dll'))
+            CoreLib        = (Test-Path (Join-Path $dllPath 'pcai_core_lib.dll'))
+            Fs             = (Test-Path (Join-Path $dllPath 'pcai_fs.dll'))
+            Performance    = (Test-Path (Join-Path $dllPath 'pcai_performance.dll'))
+            Search         = (Test-Path (Join-Path $dllPath 'pcai_search.dll'))
+            System         = (Test-Path (Join-Path $dllPath 'pcai_system.dll'))
+            Inference      = (Test-Path (Join-Path $dllPath 'pcai_inference.dll'))
+        }
+    }
+
     [PSCustomObject]@{
         Available       = $available
         Version         = $script:PcaiNativeVersion
         DllPath         = $dllPath
-        CoreAvailable   = if ($available) { [PcaiNative.PcaiCore]::IsAvailable } else { $false }
+        CoreAvailable   = $coreAvailable
+        CpuCount        = if ($coreAvailable) { [PcaiNative.PcaiCore]::CpuCount } else { [uint32][Environment]::ProcessorCount }
         Modules         = if ($available) {
             [PSCustomObject]@{
-                Core = $true
+                Core        = $coreAvailable
+                Search      = $searchAvailable
+                System      = $systemAvailable
+                Performance = $performanceAvailable
+                Fs          = $fsAvailable
             }
         } else { $null }
+        Dlls            = $dlls
     }
 }
 

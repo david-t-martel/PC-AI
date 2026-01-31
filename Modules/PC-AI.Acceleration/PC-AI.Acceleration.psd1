@@ -30,6 +30,7 @@
         'Initialize-PcaiNative'
         'Test-PcaiNativeAvailable'
         'Get-PcaiNativeStatus'
+        'Get-PcaiCapabilities'
         'Invoke-PcaiNativeDuplicates'
         'Invoke-PcaiNativeFileSearch'
         'Invoke-PcaiNativeContentSearch'

@@ -4,9 +4,9 @@
     Fast process listing using procs
 
 .DESCRIPTION
-    Lists processes using procs (Rust process viewer) when available,
-    with fallback to Get-Process. Procs provides better formatting
-    and additional information like tree view.
+    Lists processes using native PCAI performance APIs when available,
+    then procs (Rust process viewer) when available, with fallback to
+    Get-Process. Procs provides better formatting and tree view output.
 
 .PARAMETER Name
     Filter by process name
@@ -60,6 +60,17 @@ function Get-ProcessesFast {
 
     $procsPath = Get-RustToolPath -ToolName 'procs'
     $useProcs = $null -ne $procsPath -and (Test-Path $procsPath)
+    $nativeType = ([System.Management.Automation.PSTypeName]'PcaiNative.PerformanceModule').Type
+
+    if ($nativeType -and [PcaiNative.PcaiCore]::IsAvailable -and -not $RawOutput -and -not $Tree -and -not $Watch) {
+        $nativeSupportedSort = $SortBy -in @('cpu', 'mem')
+        if (-not $Name -and $Top -gt 0 -and $nativeSupportedSort) {
+            $nativeResults = Get-ProcessesWithNative -Top $Top -SortBy $SortBy
+            if ($null -ne $nativeResults) {
+                return $nativeResults
+            }
+        }
+    }
 
     if ($useProcs -and $RawOutput) {
         return Get-ProcessesWithProcs @PSBoundParameters -ProcsPath $procsPath
@@ -67,6 +78,58 @@ function Get-ProcessesFast {
     else {
         # For structured output, use .NET parallel processing
         return Get-ProcessesParallel @PSBoundParameters
+    }
+}
+
+<#
+.SYNOPSIS
+    Retrieve top processes using the native PCAI performance module.
+
+.PARAMETER Top
+    Number of processes to return.
+
+.PARAMETER SortBy
+    Sort order (cpu or mem).
+#>
+function Get-ProcessesWithNative {
+    [CmdletBinding()]
+    param(
+        [int]$Top,
+        [string]$SortBy
+    )
+
+    try {
+        $sortKey = if ($SortBy -eq 'cpu') { 'cpu' } else { 'memory' }
+        $json = [PcaiNative.PerformanceModule]::GetTopProcessesJson([uint32]$Top, $sortKey)
+        if (-not $json) {
+            return $null
+        }
+
+        $result = $json | ConvertFrom-Json
+        if (-not $result.processes) {
+            return @()
+        }
+
+        return @(
+            $result.processes | ForEach-Object {
+                [PSCustomObject]@{
+                    PID       = $_.pid
+                    Name      = $_.name
+                    CPU       = [Math]::Round([double]$_.cpu_usage, 2)
+                    MemoryMB  = [Math]::Round([double]$_.memory_bytes / 1MB, 2)
+                    Threads   = $null
+                    Handles   = $null
+                    Owner     = $null
+                    Path      = $_.exe_path
+                    StartTime = $null
+                    Status    = $_.status
+                    Tool      = 'pcai_native'
+                }
+            }
+        )
+    }
+    catch {
+        return $null
     }
 }
 

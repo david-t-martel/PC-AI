@@ -4,8 +4,9 @@
     Fast content search using ripgrep with parallel fallback
 
 .DESCRIPTION
-    Searches file contents using ripgrep (rg) when available.
-    Falls back to parallel Select-String using PS7+ ForEach-Object -Parallel.
+    Searches file contents using native PCAI search when available,
+    then ripgrep (rg), with fallback to parallel Select-String using
+    PS7+ ForEach-Object -Parallel.
 
 .PARAMETER Path
     Path to search
@@ -90,6 +91,14 @@ function Search-ContentFast {
     $rgPath = Get-RustToolPath -ToolName 'rg'
     $useRipgrep = $null -ne $rgPath -and (Test-Path $rgPath)
 
+    $nativeType = ([System.Management.Automation.PSTypeName]'PcaiNative.PcaiCore').Type
+    if ($nativeType -and [PcaiNative.PcaiCore]::IsAvailable -and -not $FilesOnly -and -not $Invert) {
+        $nativeResults = Search-WithPcaiNativeContent @PSBoundParameters -SearchPattern $searchPattern
+        if ($null -ne $nativeResults) {
+            return $nativeResults
+        }
+    }
+
     if ($useRipgrep) {
         return Search-WithRipgrepAdvanced @PSBoundParameters -SearchPattern $searchPattern -RgPath $rgPath
     }
@@ -97,6 +106,124 @@ function Search-ContentFast {
         Write-Verbose "ripgrep not available, using parallel Select-String"
         return Search-WithParallelSelectString @PSBoundParameters -SearchPattern $searchPattern
     }
+}
+
+<#
+.SYNOPSIS
+    Search file contents using the native PCAI core engine.
+
+.PARAMETER Path
+    Path to search.
+
+.PARAMETER Pattern
+    Regex pattern to search for.
+
+.PARAMETER LiteralPattern
+    Literal pattern (not used by native path).
+
+.PARAMETER FilePattern
+    File glob patterns to include.
+
+.PARAMETER Context
+    Number of context lines to include.
+
+.PARAMETER CaseSensitive
+    Enable case-sensitive matching.
+
+.PARAMETER WholeWord
+    Match whole words only.
+
+.PARAMETER Invert
+    Invert matches (not supported in native path).
+
+.PARAMETER MaxResults
+    Maximum matches to return.
+
+.PARAMETER FilesOnly
+    Return files only (not supported in native path).
+
+.PARAMETER ThrottleLimit
+    Throttle limit (not used by native path).
+
+.PARAMETER SearchPattern
+    Prepared regex pattern to use.
+#>
+function Search-WithPcaiNativeContent {
+    [CmdletBinding()]
+    param(
+        [string]$Path,
+        [string]$Pattern,
+        [string]$LiteralPattern,
+        [string[]]$FilePattern,
+        [int]$Context,
+        [switch]$CaseSensitive,
+        [switch]$WholeWord,
+        [switch]$Invert,
+        [int]$MaxResults,
+        [switch]$FilesOnly,
+        [int]$ThrottleLimit,
+        [string]$SearchPattern
+    )
+
+    $nativePattern = $SearchPattern
+    if ($WholeWord -and $nativePattern) {
+        $nativePattern = "\b(?:$nativePattern)\b"
+    }
+    if (-not $CaseSensitive) {
+        $nativePattern = "(?i)$nativePattern"
+    }
+
+    $patterns = if ($FilePattern -and $FilePattern.Count -gt 0) { $FilePattern } else { @($null) }
+    $matches = @()
+
+    foreach ($pattern in $patterns) {
+        try {
+            $remaining = if ($MaxResults -gt 0) { [uint64]($MaxResults - $matches.Count) } else { [uint64]0 }
+            if ($MaxResults -gt 0 -and $remaining -le 0) { break }
+
+            $json = [PcaiNative.PcaiCore]::SearchContent(
+                $Path,
+                $nativePattern,
+                $pattern,
+                $remaining,
+                [uint32]$Context
+            )
+            if (-not $json) {
+                continue
+            }
+
+            $result = $json | ConvertFrom-Json
+
+            foreach ($match in ($result.matches | Where-Object { $_ })) {
+                $matches += [PSCustomObject]@{
+                    Path       = $match.path
+                    LineNumber = $match.line_number
+                    Line       = $match.line
+                    Column     = 0
+                    Tool       = 'pcai_native'
+                    Before     = if ($match.before) { $match.before -join "`n" } else { '' }
+                    After      = if ($match.after) { $match.after -join "`n" } else { '' }
+                }
+
+                if ($MaxResults -gt 0 -and $matches.Count -ge $MaxResults) {
+                    break
+                }
+            }
+        }
+        catch {
+            return $null
+        }
+
+        if ($MaxResults -gt 0 -and $matches.Count -ge $MaxResults) {
+            break
+        }
+    }
+
+    if ($MaxResults -gt 0) {
+        return $matches | Select-Object -First $MaxResults
+    }
+
+    return $matches
 }
 
 function Search-WithRipgrepAdvanced {
@@ -246,7 +373,7 @@ function Search-WithParallelSelectString {
     }
 
     $searchParams = @{
-        Pattern       = $SearchPattern
+        Pattern       = if ($WholeWord -and $SearchPattern) { "\b(?:$SearchPattern)\b" } else { $SearchPattern }
         CaseSensitive = $CaseSensitive.IsPresent
         NotMatch      = $Invert.IsPresent
     }

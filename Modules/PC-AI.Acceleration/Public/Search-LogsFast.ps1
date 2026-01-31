@@ -4,9 +4,9 @@
     Fast log file searching using ripgrep
 
 .DESCRIPTION
-    Searches log files for patterns using ripgrep (rg) when available,
-    with fallback to Select-String. Ripgrep is 10-100x faster than
-    PowerShell's Select-String for large files.
+    Searches log files using the native PCAI log search when available,
+    with fallback to ripgrep (rg) or Select-String. Native and ripgrep
+    are significantly faster than PowerShell's Select-String for large files.
 
 .PARAMETER Path
     Path to search (file or directory)
@@ -66,6 +66,15 @@ function Search-LogsFast {
     $rgPath = Get-RustToolPath -ToolName 'rg'
     $useRipgrep = $null -ne $rgPath -and (Test-Path $rgPath)
 
+    $nativeType = ([System.Management.Automation.PSTypeName]'PcaiNative.SystemModule').Type
+    if ($nativeType -and [PcaiNative.SystemModule]::IsAvailable) {
+        $nativeResults = Search-WithPcaiNativeLogs -Path $Path -Pattern $Pattern -Include $Include `
+            -Context $Context -CaseSensitive:$CaseSensitive -MaxCount $MaxCount -CountOnly:$CountOnly
+        if ($null -ne $nativeResults) {
+            return $nativeResults
+        }
+    }
+
     if ($useRipgrep) {
         return Search-WithRipgrep -Path $Path -Pattern $Pattern -Include $Include `
             -Context $Context -CaseSensitive:$CaseSensitive -MaxCount $MaxCount -CountOnly:$CountOnly -RgPath $rgPath
@@ -75,6 +84,114 @@ function Search-LogsFast {
         return Search-WithSelectString -Path $Path -Pattern $Pattern -Include $Include `
             -Context $Context -CaseSensitive:$CaseSensitive -MaxCount $MaxCount -CountOnly:$CountOnly
     }
+}
+
+<#
+.SYNOPSIS
+    Search log files using the native PCAI system module.
+
+.PARAMETER Path
+    Path to search (file or directory).
+
+.PARAMETER Pattern
+    Regex pattern to search for.
+
+.PARAMETER Include
+    File patterns to include.
+
+.PARAMETER Context
+    Number of context lines to include.
+
+.PARAMETER CaseSensitive
+    Enable case-sensitive matching.
+
+.PARAMETER MaxCount
+    Maximum matches per file.
+
+.PARAMETER CountOnly
+    Return counts only.
+#>
+function Search-WithPcaiNativeLogs {
+    [CmdletBinding()]
+    param(
+        [string]$Path,
+        [string]$Pattern,
+        [string[]]$Include,
+        [int]$Context,
+        [switch]$CaseSensitive,
+        [int]$MaxCount,
+        [switch]$CountOnly
+    )
+
+    $patterns = if ($Include -and $Include.Count -gt 0) { $Include } else { @($null) }
+    $matches = @()
+    $total = 0
+
+    foreach ($pattern in $patterns) {
+        try {
+            $json = [PcaiNative.SystemModule]::SearchLogsJson(
+                $Path,
+                $Pattern,
+                $pattern,
+                $CaseSensitive.IsPresent,
+                [uint32]$Context,
+                [uint32]$MaxCount
+            )
+            if (-not $json) {
+                continue
+            }
+
+            $result = $json | ConvertFrom-Json
+
+            if ($CountOnly) {
+                $total += [int]$result.total_matches
+                continue
+            }
+
+            foreach ($fileResult in ($result.results | Where-Object { $_ })) {
+                foreach ($match in ($fileResult.matches | Where-Object { $_ })) {
+                    $matches += [PSCustomObject]@{
+                        Path          = $match.file_path
+                        LineNumber    = $match.line_number
+                        Line          = $match.line_content
+                        ContextBefore = if ($match.context_before) { $match.context_before -join "`n" } else { '' }
+                        ContextAfter  = if ($match.context_after) { $match.context_after -join "`n" } else { '' }
+                        Tool          = 'pcai_native'
+                    }
+
+                    if ($MaxCount -gt 0 -and $matches.Count -ge $MaxCount) {
+                        break
+                    }
+                }
+
+                if ($MaxCount -gt 0 -and $matches.Count -ge $MaxCount) {
+                    break
+                }
+            }
+        }
+        catch {
+            return $null
+        }
+
+        if ($MaxCount -gt 0 -and $matches.Count -ge $MaxCount) {
+            break
+        }
+    }
+
+    if ($CountOnly) {
+        return [PSCustomObject]@{
+            Path    = $Path
+            Pattern = $Pattern
+            Count   = $total
+            Tool    = 'pcai_native'
+        }
+    }
+
+    if ($MaxCount -gt 0) {
+        return $matches | Select-Object -First $MaxCount
+    }
+
+    return $matches
 }
 
 function Search-WithRipgrep {
