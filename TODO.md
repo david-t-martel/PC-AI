@@ -26,7 +26,8 @@
 - [ ] Expand diagnostic coverage to match DIAGNOSE_LOGIC.md expectations
 
 ## UI/TUI usability
-- [ ] Add a unified status command (WSL/Docker/LLM/GPU/Native DLL status)
+- [x] Add a unified status command (WSL/Docker/LLM/Native DLL status)
+- [ ] Extend unified status command to include GPU checks
 - [ ] Provide progress + streaming updates for long native operations
 - [ ] Implement a one-command "doctor" flow for common failures (WSL/Docker/vLLM/Ollama)
 - [ ] Add a concise summary view for JSON diagnose output (human-readable view)
@@ -36,10 +37,11 @@
 - [ ] Ensure router base URL and hvsock mappings are consistent with actual services
 - [ ] Add automatic detection of local endpoints (WSL vs host)
 - [ ] Add container-aware GPU checks when Docker is present
+  - (legacy) vLLM/Ollama checks are optional since pcai-inference is primary
 
 ## Testing + QA
 - [ ] Add tests for module fallbacks when external scripts are missing
 - [ ] Add tests for native DLL availability and graceful fallbacks
 - [x] Add integration tests for router tool schema coverage and JSON output compliance
 - [x] Add unit tests for routed JSON enforcement and TUI wrapper failures
-- [ ] Add integration tests for router tool execution with mock tool outputs
+- [x] Add integration tests for router tool execution with mock tool outputs

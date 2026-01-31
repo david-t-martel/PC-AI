@@ -1,20 +1,22 @@
 # PC-AI: Local LLM-Powered PC Diagnostics Framework
 
-A comprehensive PowerShell 7+ framework for Windows PC diagnostics, optimization, and system analysis powered by local LLMs via Ollama/LM Studio.
+A comprehensive PowerShell 7+ framework for Windows PC diagnostics, optimization, and system analysis powered by local LLMs via **pcai-inference** (Rust).
 
 ## Features
 
 - **Hardware Diagnostics**: Device errors, SMART status, USB controllers, network adapters
 - **Virtualization Support**: WSL2 optimization, Hyper-V status, Docker diagnostics
 - **Performance Acceleration**: Rust tool integration (ripgrep, fd, procs) with PS7+ parallelism
-- **LLM Analysis**: Local AI-powered diagnostic interpretation via Ollama/vLLM/LM Studio
-- **Tool-Calling Router**: FunctionGemma (vLLM) selects and executes PC-AI tools before analysis
+- **LLM Analysis**: Local AI-powered diagnostic interpretation via **pcai-inference** (OpenAI-compatible HTTP + native FFI)
+- **Tool-Calling Router**: **FunctionGemma** runtime selects and executes PC-AI tools before analysis
 - **Unified CLI**: Single entry point for all diagnostic and optimization tasks
 
 ## Requirements
 
 - **Windows 10/11** with PowerShell 7.0+
-- **Optional**: Ollama, vLLM, or LM Studio for LLM features
+- **Optional**: pcai-inference HTTP server or pcai-inference DLL for LLM features
+- **Optional**: FunctionGemma runtime (rust-functiongemma-runtime) for tool routing
+- **Legacy/Optional**: vLLM-based router (Docker) if needed
 - **Optional**: Rust CLI tools for acceleration (fd, ripgrep, procs, bat, etc.)
 
 ## Quick Start
@@ -47,7 +49,7 @@ Search-ContentFast -Path "C:\Scripts" -Pattern "function" -FilePattern "*.ps1"
 | **PC-AI.Network** | Network diagnostics, VSock optimization |
 | **PC-AI.Performance** | Disk optimization, resource monitoring |
 | **PC-AI.Cleanup** | PATH cleanup, duplicate detection, temp cleanup |
-| **PC-AI.LLM** | Ollama/LM Studio integration for AI analysis |
+| **PC-AI.LLM** | pcai-inference + FunctionGemma integration for AI analysis |
 | **PC-AI.Acceleration** | Rust tools integration with PS7+ parallelism |
 
 ## Native Acceleration (Rust DLL + C# Hybrid)
@@ -63,7 +65,7 @@ C# P/Invoke Wrapper (PcaiNative.dll, .NET 8)
          ↓
 PowerShell 7 Modules (PC-AI.Acceleration)
          ↓
-Ollama LLM Analysis (qwen2.5-coder:7b)
+pcai-inference LLM Analysis (local GGUF)
 ```
 
 ### Native Operations
@@ -163,29 +165,25 @@ Speedup:            44.6x
 
 PC-AI integrates with local LLM providers for intelligent diagnostic analysis and tool routing:
 
-### Ollama (Default)
+### pcai-inference (Default)
 ```powershell
-# Ensure Ollama is running
-ollama serve
+# Run pcai-inference HTTP server (OpenAI-compatible)
+cd .\Deploy\pcai-inference
+cargo run --release --features "llamacpp,server"
 
-# Run analysis with default model (qwen2.5-coder:7b)
+# Run analysis with default model (pcai-inference)
 Invoke-PCDiagnosis -ReportPath ".\report.txt"
 ```
 
-### LM Studio
-```powershell
-# Configure LM Studio endpoint
-Set-LLMConfig -Provider lmstudio -BaseUrl "http://localhost:1234"
-
-# Run analysis
-Invoke-PCDiagnosis -ReportPath ".\report.txt"
-```
-
-### vLLM + FunctionGemma (Tool Router)
+### FunctionGemma (Tool Router)
 FunctionGemma is used as a **tool-calling router** to choose and execute PC-AI tools,
-then the primary LLM produces the final narrative response.
+then pcai-inference produces the final narrative response.
 
 ```powershell
+# Run rust-functiongemma runtime (router)
+.\Tools\Invoke-RustBuild.ps1 -Path Deploy\rust-functiongemma-runtime build
+.\Deploy\rust-functiongemma-runtime\target\debug\rust-functiongemma-runtime.exe
+
 # Route a request through FunctionGemma, then answer with the main LLM
 Invoke-LLMChatRouted -Message "Check WSL networking and summarize issues." -Mode diagnose
 
@@ -195,28 +193,48 @@ Invoke-LLMChat -Message "Explain WSL vs Docker." -UseRouter -RouterMode chat
 
 ### HVSocket / VSock Endpoints
 `Config/llm-config.json` supports HVSocket aliases for local routing. Use the `hvsock://` scheme
-to resolve endpoints through `Config/hvsock-proxy.conf`, e.g. `hvsock://ollama`, `hvsock://vllm`.
+to resolve endpoints through `Config/hvsock-proxy.conf` (if configured).
+Primary aliases:
+- `hvsock://pcai-inference` (8080)
+- `hvsock://functiongemma` (8000)
 
 ### TUI Modes
 `PcaiChatTui.exe` supports single-shot, multi-turn, streaming, and tool-routing modes:
 ```
-PcaiChatTui.exe --provider ollama --mode stream
-PcaiChatTui.exe --provider vllm --mode react --tools C:\Users\david\PC_AI\Config\pcai-tools.json
+PcaiChatTui.exe --provider pcai-inference --mode stream
+PcaiChatTui.exe --provider pcai-inference --mode react --tools C:\Users\david\PC_AI\Config\pcai-tools.json
 ```
 
 ### Recommended Models
 
 | Model | Size | Best For |
 |-------|------|----------|
-| qwen2.5-coder:7b | 4GB | Technical analysis (default) |
-| deepseek-r1:8b | 5GB | Complex reasoning |
-| mistral:7b | 4GB | Fast general analysis |
-| gemma3:12b | 7GB | High-quality responses |
+| GGUF: Llama 3 | Varies | General analysis |
+| GGUF: Mistral | Varies | Fast general analysis |
+| GGUF: Phi | Varies | Lightweight local analysis |
+| GGUF: Gemma | Varies | High-quality responses |
 
 ### Router Inputs
 - `DIAGNOSE.md` + `DIAGNOSE_LOGIC.md` define diagnostic routing behavior
 - `CHAT.md` defines general chat behavior
 - `Config/pcai-tools.json` defines tool schema and mappings
+
+## Documentation Automation
+
+PC-AI includes automated documentation generation tools:
+
+```powershell
+# Full documentation + training pipeline
+.\Tools\Invoke-DocPipeline.ps1 -Mode Full
+
+# Docs-only (PowerShell, Rust, C# summaries)
+.\Tools\Invoke-DocPipeline.ps1 -Mode DocsOnly
+
+# Lightweight auto-docs summary
+.\Tools\generate-auto-docs.ps1 -BuildDocs
+```
+
+Outputs are written to `Reports/` (e.g. `AUTO_DOCS_SUMMARY.md`, `DOC_PIPELINE_REPORT.md`).
 
 ## Testing
 
@@ -250,7 +268,10 @@ PC_AI/
 │   ├── PC-AI.LLM/            # LLM integration
 │   └── PC-AI.Acceleration/   # Rust tools + parallelism
 ├── Deploy/
-│   └── functiongemma-finetune/ # FunctionGemma training + router tools
+│   ├── pcai-inference/        # Rust LLM inference engine (HTTP + FFI)
+│   ├── rust-functiongemma-runtime/ # Rust router runtime (tool_calls)
+│   ├── rust-functiongemma-train/   # Rust router dataset + training
+│   └── functiongemma-finetune/ # Legacy Python training + router tools
 ├── Tests/                    # Pester test suites
 ├── Config/                   # Configuration files
 └── Reports/                  # Generated diagnostic reports
@@ -277,5 +298,5 @@ MIT License - See [LICENSE](LICENSE) for details.
 ## Acknowledgments
 
 - [Rust CLI tools](https://github.com/sharkdp/fd) for performance acceleration
-- [Ollama](https://ollama.ai/) for local LLM inference
+- pcai-inference (Rust) for local LLM inference
 - [Pester](https://pester.dev/) for PowerShell testing

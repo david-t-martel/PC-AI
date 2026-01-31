@@ -2,6 +2,8 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+**Status:** ✅ Complete (pcai-inference crate, HTTP server, FFI exports, dual backends, tests, and build scripts are present)
+
 **Goal:** Build a native Rust LLM inference engine with dual backends (llama_cpp-rs + mistralrs) supporting GPU acceleration, OpenAI-compatible HTTP API, and PowerShell FFI—replacing the current vLLM/Ollama/Docker dependency.
 
 **Architecture:** Feature-flagged dual-backend design with a shared `InferenceBackend` trait. llama_cpp-rs provides broadest GGUF compatibility for Ollama/LM Studio models; mistralrs adds multimodal support when available. HTTP server reuses patterns from existing `rust-functiongemma-runtime`. FFI exports enable direct PowerShell calls for low-latency paths.

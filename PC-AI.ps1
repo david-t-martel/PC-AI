@@ -13,7 +13,7 @@
     - Network diagnostics and VSock optimization
     - Performance monitoring and optimization
     - System cleanup (PATH, temp files, duplicates)
-    - LLM-powered analysis via Ollama
+    - LLM-powered analysis via pcai-inference
 
 .PARAMETER Command
     Main command: diagnose, optimize, usb, analyze, chat, llm, cleanup, perf, status, version, help
@@ -1100,7 +1100,7 @@ function Invoke-AnalyzeCommand {
     $llmStatus = Get-LLMStatus
     if (-not $llmStatus.Available) {
         Write-Error "No LLM provider available"
-        Write-Info "Ensure Ollama is running: ollama serve"
+        Write-Info "Ensure pcai-inference is running (default: http://127.0.0.1:8080)"
         return
     }
 
@@ -1144,7 +1144,7 @@ function Invoke-AnalyzeCommand {
     $model = $parsed.Values['model']
     if (-not $model) {
         $llmConfig = Load-LLMConfig
-        $model = $llmConfig.providers.ollama.defaultModel
+        $model = $llmConfig.providers.'pcai-inference'.defaultModel
     }
 
     Write-Info "Model: $model"
@@ -1222,14 +1222,14 @@ function Invoke-ChatCommand {
     $llmStatus = Get-LLMStatus
     if (-not $llmStatus.Available) {
         Write-Error "No LLM provider available"
-        Write-Info "Ensure Ollama is running: ollama serve"
+        Write-Info "Ensure pcai-inference is running (default: http://127.0.0.1:8080)"
         return
     }
 
     $model = $parsed.Values['model']
     if (-not $model) {
         $llmConfig = Load-LLMConfig
-        $model = $llmConfig.providers.ollama.defaultModel
+        $model = $llmConfig.providers.'pcai-inference'.defaultModel
     }
 
     $includeContext = $parsed.Flags['context']
@@ -1267,7 +1267,7 @@ function Invoke-LLMCommand {
     param([string[]]$CmdArgs)
 
     $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
-        provider = 'ollama'
+        provider = 'pcai-inference'
         model = $null
     }
 
@@ -1282,18 +1282,25 @@ function Invoke-LLMCommand {
             try {
                 $status = Get-LLMStatus
 
-                Write-SubHeader "Ollama"
-                $color = if ($status.Ollama.Available) { 'Green' } else { 'Red' }
-                Write-Bullet "Available: $($status.Ollama.Available)" -Color $color
-                if ($status.Ollama.Available) {
-                    Write-Bullet "URL: $($status.Ollama.Url)"
-                    Write-Bullet "Models Loaded: $($status.Ollama.ModelsLoaded -join ', ')"
+                Write-SubHeader "pcai-inference"
+                $color = if ($status.PcaiInference.ApiConnected) { 'Green' } else { 'Red' }
+                Write-Bullet "Available: $($status.PcaiInference.ApiConnected)" -Color $color
+                if ($status.PcaiInference.ApiConnected) {
+                    Write-Bullet "URL: $($status.PcaiInference.ApiUrl)"
+                    $modelNames = $status.PcaiInference.Models | ForEach-Object { $_.Name } | Where-Object { $_ }
+                    if ($modelNames) {
+                        Write-Bullet "Models: $($modelNames -join ', ')"
+                    }
                 }
 
-                if ($status.LMStudio) {
-                    Write-SubHeader "LM Studio"
-                    $color = if ($status.LMStudio.Available) { 'Green' } else { 'Red' }
-                    Write-Bullet "Available: $($status.LMStudio.Available)" -Color $color
+                if ($status.Router) {
+                    Write-SubHeader "FunctionGemma Router"
+                    $color = if ($status.Router.ApiConnected) { 'Green' } else { 'Red' }
+                    Write-Bullet "Available: $($status.Router.ApiConnected)" -Color $color
+                    if ($status.Router.ApiConnected) {
+                        Write-Bullet "URL: $($status.Router.ApiUrl)"
+                        Write-Bullet "Model: $($status.Router.Model)"
+                    }
                 }
             }
             catch {
@@ -1309,12 +1316,11 @@ function Invoke-LLMCommand {
             try {
                 $status = Get-LLMStatus
 
-                if ($provider -eq 'ollama' -and $status.Ollama.Available) {
-                    Write-SubHeader "Ollama Models"
-                    $status.Ollama.AvailableModels | ForEach-Object {
-                        $loaded = if ($status.Ollama.ModelsLoaded -contains $_.Name) { '[Loaded]' } else { '' }
-                        $color = if ($loaded) { 'Green' } else { 'White' }
-                        Write-Bullet "$($_.Name) ($($_.Size)) $loaded" -Color $color
+                if ($provider -in @('pcai-inference','ollama') -and $status.PcaiInference.ApiConnected) {
+                    Write-SubHeader "pcai-inference Models"
+                    $status.PcaiInference.Models | ForEach-Object {
+                        $color = if ($_.Name -eq $status.PcaiInference.DefaultModel) { 'Green' } else { 'White' }
+                        Write-Bullet "$($_.Name)" -Color $color
                     }
                 }
             }
@@ -1342,9 +1348,8 @@ function Invoke-LLMCommand {
             else {
                 # Show config
                 Write-SubHeader "Current Configuration"
-                Write-Bullet "Default Model: $($llmConfig.providers.ollama.defaultModel)"
-                Write-Bullet "Fallback Models: $($llmConfig.providers.ollama.fallbackModels -join ', ')"
-                Write-Bullet "Timeout: $($llmConfig.providers.ollama.timeout)ms"
+                Write-Bullet "Default Model: $($llmConfig.providers.'pcai-inference'.defaultModel)"
+                Write-Bullet "Timeout: $($llmConfig.providers.'pcai-inference'.timeout)ms"
                 Write-Bullet "Max Context: $($llmConfig.contextManagement.maxContextTokens) tokens"
             }
         }
@@ -1708,11 +1713,11 @@ function Invoke-StatusCommand {
     # LLM status (quick check for HTTP mode)
     Write-SubHeader "LLM Provider (HTTP)"
     try {
-        $ollamaTest = Invoke-RestMethod -Uri 'http://localhost:11434/api/tags' -Method Get -TimeoutSec 2 -ErrorAction SilentlyContinue
-        Write-Bullet "Ollama: Running" -Color Green
+        $pcaiTest = Invoke-RestMethod -Uri 'http://127.0.0.1:8080/v1/models' -Method Get -TimeoutSec 2 -ErrorAction SilentlyContinue
+        Write-Bullet "pcai-inference: Running" -Color Green
     }
     catch {
-        Write-Bullet "Ollama: Not Running" -Color Yellow
+        Write-Bullet "pcai-inference: Not Running" -Color Yellow
     }
 
     # Quick system info

@@ -1,14 +1,15 @@
 # Rust Context Slice - PC_AI
 
-**Updated**: 2026-01-30 (Session 1)
+**Updated**: 2026-01-30 (Session 3)
 **For Agents**: rust-pro, architect-reviewer
 
 ## Current Status Summary
 
-All Rust components compile cleanly with CUDA support enabled.
+All Rust components compile cleanly. New pcai-inference crate provides native dual-backend LLM inference.
 
 | Component | Status | Tests | CUDA |
 |-----------|--------|-------|------|
+| **pcai-inference** | ✅ Building | 5 pass | llamacpp only |
 | rust-functiongemma-train | ✅ Clean | 48 pass | ✅ Enabled |
 | rust-functiongemma-runtime | ✅ Production | - | ✅ Ready |
 | pcai_fs | ✅ Clean | 14 pass | N/A |
@@ -33,6 +34,42 @@ All Rust components compile cleanly with CUDA support enabled.
 - ✅ All 48 tests passing in rust-functiongemma-train
 
 ## Active Rust Projects
+
+### 0. pcai-inference ✅ NATIVE DUAL-BACKEND
+**Path**: `Deploy/pcai-inference/`
+**Status**: Building, needs MSVC build test for llamacpp
+**Build**: `cargo build --release --features server,llamacpp`
+
+**Dual Backend Architecture**:
+- **llama-cpp-2**: GGUF model inference with CUDA GPU acceleration (requires MSVC)
+- **mistral.rs**: Alternative backend (CPU-only on Windows due to bindgen_cuda)
+
+**HTTP Endpoints** (port 8080):
+- `GET /health` → `{"status":"healthy","backend":"llamacpp"}`
+- `GET /v1/models` → OpenAI-compatible model list
+- `POST /v1/chat/completions` → Full OpenAI-compatible with streaming
+
+**FFI Exports** (for PowerShell P/Invoke):
+- `pcai_init(backend)` → Initialize backend
+- `pcai_load_model(path, gpu_layers)` → Load GGUF model
+- `pcai_generate(prompt, max_tokens, temp)` → Generate completion
+- `pcai_shutdown()` → Clean shutdown
+
+**Feature Flags**:
+```toml
+[features]
+default = ["llamacpp", "server"]
+llamacpp = ["dep:llama-cpp-2", "dep:encoding_rs"]
+mistralrs-backend = ["dep:mistralrs", "dep:mistralrs-core"]
+cuda = []
+server = ["dep:axum", "dep:tower-http"]
+ffi = []
+```
+
+**Build System**:
+- CMake toolchain: `cmake/toolchain-msvc.cmake`
+- CMake presets: `CMakePresets.json` (msvc-release, msvc-cuda)
+- PowerShell orchestrator: `build.ps1`
 
 ### 1. rust-functiongemma-runtime ✅ PRODUCTION READY
 **Path**: `Deploy/rust-functiongemma-runtime/`
@@ -136,25 +173,40 @@ cargo build --manifest-path Native/pcai_core/Cargo.toml --release
 ## Recent Commits
 
 ```
-e7f815c chore(context): update project context and planning docs
-63ec504 chore(rust-train): remove unused imports
-3f2e066 fix(rust-train): fix compilation and test issues
-1a778cf test(train): add full training pipeline integration test
-070897a build(native): add pcai_fs to build pipeline
-967847c feat(train): integrate scheduler and checkpoint
-1138e13 feat(train): add PEFT-compatible adapter output
-95f9b5e feat(rust): enhance FunctionGemma runtime with OpenAI API
+ec2b5e1 test(e2e): add inference end-to-end tests
+92fde97 feat(tui): add InferenceBackend enum and inference tests
+93cdbc1 chore(config): align LLM config with pcai-inference backend
+d88aa9a feat(pcai-inference): enhance HTTP server with full OpenAI compatibility
+cf20039 build(cmake): enhance MSVC toolchain with auto-detection
+6e84e0c feat(virtualization): update service health and host for Rust backend
+023bafb feat(tui): add native inference backend selection
+f9b23e8 feat(pcai-inference): add OpenAI-compatible models endpoint
+e9467f7 build(pcai-inference): add CMake toolchain for MSVC
+a4bc48b docs(pc-ai): add comprehensive native inference integration guide
 ```
 
 ## Known Issues
 
-1. **sccache + ring crate**: sccache has path spacing issues with ring crate builds
+1. **bindgen_cuda panic in mistral.rs**: Blocks CUDA support on Windows for mistralrs backend
+   - Workaround: Use CPU-only mode or llamacpp backend for GPU
+   - Doc: `T:\projects\rust-mistral\mistral.rs\CUDA_BUILD_BLOCKING_ISSUE.md`
+
+2. **llamacpp MSVC requirement**: llama-cpp-sys-2 requires MSVC, not MinGW/GNU
+   - Solution: CMake toolchain with vcvars64.bat environment
+   - Status: Toolchain created (`cmake/toolchain-msvc.cmake`), needs testing
+
+3. **sccache + ring crate**: sccache has path spacing issues with ring crate builds
    - Workaround: Build runtime without `model` feature, or disable sccache
-2. **Dependabot Alert**: protobuf CVE (high severity, monitoring)
+
+4. **Dependabot Alert**: protobuf CVE (high severity, monitoring)
 
 ## Next Steps
 
-- [x] Enable CUDA (completed 2026-01-30)
+- [x] Enable CUDA for training (completed 2026-01-30)
+- [x] Implement pcai-inference dual-backend (completed 2026-01-30)
+- [x] Create CMake/MSVC toolchain (completed 2026-01-30)
+- [ ] **Test llamacpp build with MSVC toolchain** (priority)
+- [ ] Run inference tests with real GGUF model
+- [ ] Add streaming support to FFI layer
 - [ ] Fix sccache/ring compatibility for runtime model feature
-- [ ] Add streaming support to runtime (SSE)
 - [ ] Performance benchmarks for CUDA training

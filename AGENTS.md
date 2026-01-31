@@ -13,9 +13,9 @@ Local-first diagnostics agent guidance for PC_AI (PowerShell + Rust/C# + local L
 - PowerShell modules live under `Modules/` (Hardware/Virtualization/USB/Network/Performance/Cleanup/LLM/Acceleration).
 - Native acceleration: `Native/` (Rust DLLs → C# P/Invoke → PowerShell wrapper).
 - Router pipeline (optional):
-  1. FunctionGemma (vLLM) selects tools from `Config/pcai-tools.json`
+  1. FunctionGemma runtime selects tools from `Config/pcai-tools.json`
   2. Tool outputs are gathered
-  3. Primary LLM (Ollama/vLLM/LM Studio) writes the response
+  3. Primary LLM (pcai-inference) writes the response
 
 ## Prompt contracts
 - Diagnose mode: `DIAGNOSE.md` + `DIAGNOSE_LOGIC.md`
@@ -25,10 +25,9 @@ Local-first diagnostics agent guidance for PC_AI (PowerShell + Rust/C# + local L
 
 ## LLM + Router integration
 - Provider config: `Config/llm-config.json`
-  - `ollama` → `hvsock://ollama` → 127.0.0.1:11434
-  - `vllm` → `hvsock://vllm` → 127.0.0.1:8000
-  - `lmstudio` → `hvsock://lmstudio` → 127.0.0.1:1234
-- HVSocket aliases: `Config/hvsock-proxy.conf`
+  - `pcai-inference` → `http://127.0.0.1:8080` (OpenAI-compatible)
+  - `functiongemma` → `http://127.0.0.1:8000` (router runtime)
+- HVSocket aliases: `Config/hvsock-proxy.conf` (optional)
 - Router entry points: `Invoke-FunctionGemmaReAct`, `Invoke-LLMChatRouted`
 
 ## WSL / Docker / LLM stack debugging
@@ -38,9 +37,8 @@ Use these when diagnosing LLM stack failures or virtualization issues:
 - Docker health: `docker version`, `docker info`, `Get-DockerStatus`
 - GPU in containers: `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`
 - LLM endpoints:
-  - Ollama: `GET http://localhost:11434/api/tags`
-  - vLLM (OpenAI compat): `GET http://127.0.0.1:8000/v1/models`
-  - LM Studio: `GET http://127.0.0.1:1234/v1/models`
+  - pcai-inference: `GET http://127.0.0.1:8080/v1/models`
+  - FunctionGemma router: `GET http://127.0.0.1:8000/v1/models`
 
 ## Tooling update workflow
 1. Add/update tool in `Config/pcai-tools.json` (with `pcai_mapping`).
@@ -54,8 +52,13 @@ Use these when diagnosing LLM stack failures or virtualization issues:
 - Use C ABI (`extern "C"`) + C# P/Invoke wrapper for PowerShell.
 
 ## Known gaps / TODOs
-- Align `DIAGNOSE.md` tool calls (SearchDocs/GetSystemInfo/SearchLogs) with `Config/pcai-tools.json`.
-- Reconcile diagnose-mode JSON-only requirement with `llm-config.json` response settings (markdown/reasoning).
-- Confirm router base URL vs HVSocket routing (vLLM reachable via `hvsock://vllm` or update config).
+- Enforce JSON-only diagnose output in UI/TUI rendering paths.
+- Implement internal WSL network toolkit parity (currently wraps external scripts when present).
+- Confirm router base URL vs HVSocket routing (if used).
 - Replace external script references (e.g., `C:\\Scripts\\...`) with module cmdlets or add them to repo.
-- Expand tool coverage for hardware/disk/USB/network to match `DIAGNOSE_LOGIC.md` expectations.
+- Add GPU checks to unified status output.
+
+## Documentation automation
+- Full pipeline: `Tools/Invoke-DocPipeline.ps1 -Mode Full`
+- Docs-only: `Tools/Invoke-DocPipeline.ps1 -Mode DocsOnly`
+- Lightweight summaries: `Tools/generate-auto-docs.ps1 -BuildDocs`

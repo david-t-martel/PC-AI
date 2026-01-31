@@ -1,7 +1,28 @@
 {
   "schema_version": "2.0",
-  "latest": "ctx-pcai-20260130-s2",
+  "latest": "ctx-pcai-20260130-cuda",
   "contexts": [
+    {
+      "id": "ctx-pcai-20260130-cuda",
+      "file": "pcai-inference-cuda-build-2026-01-30.md",
+      "created": "2026-01-30T22:30:00Z",
+      "project": "PC_AI",
+      "agents_involved": ["Claude"],
+      "summary": "CUDA-enabled llamacpp backend build - CMake/MSVC toolchain fixes, API compatibility (token_to_str), CUDA 12.9 integration",
+      "supersedes": ["ctx-pcai-20260130-s3"],
+      "commit": "pending"
+    },
+    {
+      "id": "ctx-pcai-20260130-s3",
+      "file": "pcai-context-2026-01-30.md",
+      "created": "2026-01-30T19:30:00Z",
+      "project": "PC_AI",
+      "agents_involved": ["rust-pro", "powershell-pro", "test-automator"],
+      "summary": "Native Rust inference backend (pcai-inference) with llama-cpp-2/mistral.rs dual-backend, CMake/MSVC toolchain, Virtualization module updates",
+      "supersedes": ["ctx-pcai-20260130-s2"],
+      "commit": "ec2b5e1",
+      "status": "superseded"
+    },
     {
       "id": "ctx-pcai-20260130-s2",
       "file": "pcai-context-20260130-session2.md",
@@ -10,7 +31,8 @@
       "agents_involved": [],
       "summary": "CUDA environment integration for Rust ML training - device detection verified",
       "supersedes": ["ctx-pcai-20260130-s1"],
-      "commit": "pending"
+      "commit": "pending",
+      "status": "superseded"
     },
     {
       "id": "ctx-pcai-20260130-s1",
@@ -73,6 +95,43 @@
     }
   ],
   "completed_goals": [
+    {
+      "goal": "Build pcai-inference with CUDA-enabled llama.cpp backend",
+      "completed": "2026-01-30",
+      "context": "ctx-pcai-20260130-cuda",
+      "commit": "pending",
+      "outputs": ["pcai_inference.dll", "ggml-cuda.dll", "llama.dll"]
+    },
+    {
+      "goal": "Fix llama-cpp-2 API compatibility (token_to_str)",
+      "completed": "2026-01-30",
+      "context": "ctx-pcai-20260130-cuda",
+      "commit": "pending"
+    },
+    {
+      "goal": "Implement pcai-inference Rust dual-backend crate",
+      "completed": "2026-01-30",
+      "context": "ctx-pcai-20260130-s3",
+      "commit": "ec2b5e1"
+    },
+    {
+      "goal": "Create CMake/MSVC toolchain for llama.cpp",
+      "completed": "2026-01-30",
+      "context": "ctx-pcai-20260130-s3",
+      "commit": "e9467f7"
+    },
+    {
+      "goal": "Update Virtualization module for Rust backend",
+      "completed": "2026-01-30",
+      "context": "ctx-pcai-20260130-s3",
+      "commit": "6e84e0c"
+    },
+    {
+      "goal": "Add comprehensive inference tests",
+      "completed": "2026-01-30",
+      "context": "ctx-pcai-20260130-s3",
+      "commit": "ec2b5e1"
+    },
     {
       "goal": "Enable CUDA support for rust-functiongemma-train",
       "completed": "2026-01-30",
@@ -145,6 +204,18 @@
       "notes": "No patch available yet"
     },
     {
+      "blocker": "bindgen_cuda panic in mistral.rs on Windows",
+      "severity": "medium",
+      "status": "workaround available",
+      "notes": "Use llamacpp backend for CUDA, mistralrs is CPU-only on Windows"
+    },
+    {
+      "blocker": "llamacpp MSVC toolchain not yet tested",
+      "severity": "medium",
+      "status": "resolved",
+      "notes": "Build verified with CUDA 12.9, CMake/Ninja/MSVC toolchain working"
+    },
+    {
       "blocker": "sccache + ring crate incompatibility",
       "severity": "low",
       "status": "workaround available",
@@ -152,6 +223,22 @@
     }
   ],
   "rust_status": {
+    "pcai-inference": {
+      "status": "clean",
+      "warnings": 0,
+      "tests": 5,
+      "features": ["server", "llamacpp", "ffi", "mistralrs-backend", "cuda"],
+      "backends": {
+        "llamacpp": "working (CUDA + CPU)",
+        "mistralrs": "working (CPU-only)"
+      },
+      "build_outputs": {
+        "pcai_inference.dll": "360KB",
+        "ggml-cuda.dll": "46MB",
+        "llama.dll": "2MB"
+      },
+      "last_verified": "2026-01-30T22:30:00Z"
+    },
     "rust-functiongemma-train": {
       "status": "clean",
       "warnings": 0,
@@ -180,12 +267,13 @@
     }
   },
   "cuda_status": {
-    "toolkit_version": "v13.1",
+    "toolkit_version": "v12.9",
     "gpus": [
       {"name": "RTX 2000 Ada", "vram": "8GB", "compute": "8.9"},
       {"name": "RTX 5060 Ti", "vram": "16GB", "compute": "12.0"}
     ],
     "device_detected": true,
-    "tensor_ops_verified": true
+    "tensor_ops_verified": true,
+    "llamacpp_cuda_verified": true
   }
 }

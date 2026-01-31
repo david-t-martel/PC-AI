@@ -2,6 +2,8 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+**Status:** Deprecated (pcai-inference + rust-functiongemma runtime are the primary path; vLLM is legacy/optional)
+
 **Goal:** Optimize FunctionGemma fine-tuning and vLLM deployment for multi-GPU inference with production-grade reliability.
 
 **Architecture:** Three-phase approach: (1) Training pipeline with QLoRA/validation, (2) Multi-GPU vLLM Docker deployment using RTX 5060 Ti + RTX 2000 Ada, (3) LLM routing with health caching and graceful degradation. All phases use environment variables for path configuration.

@@ -3,7 +3,7 @@
 ## Overview
 PC_AI is a local-first diagnostics and optimization framework for Windows 10/11 with
 WSL2, Docker, and GPU tooling. It combines PowerShell orchestration, Rust/C# native
-acceleration, and local LLMs (Ollama, vLLM, LM Studio).
+acceleration, and local LLMs via **pcai-inference** (OpenAI-compatible HTTP + native FFI).
 
 Key goals:
 - Deterministic diagnostics with explicit tool execution
@@ -26,12 +26,12 @@ PC-AI.ps1 (CLI)
 ```
 User Request
    │
-   ├─ (Optional) FunctionGemma Router (vLLM)
+   ├─ (Optional) FunctionGemma Router
    │      ├─ Uses pcai-tools.json tool schema
    │      ├─ Selects/executes PowerShell tools
    │      └─ Returns tool outputs
    │
-   └─ Primary LLM (Ollama / vLLM / LM Studio)
+   └─ Primary LLM (pcai-inference)
           ├─ System prompt: DIAGNOSE.md + DIAGNOSE_LOGIC.md (diagnose)
           └─ System prompt: CHAT.md (chat)
 ```
@@ -49,11 +49,11 @@ User Request
 3. Main LLM produces final response.
 
 ## Configuration
-- `Config/llm-config.json`: provider endpoints, defaults, router settings.
+- `Config/llm-config.json`: pcai-inference + router endpoints, defaults, tool schema.
 - `Config/pcai-tools.json`: tool schema for FunctionGemma.
 - `DIAGNOSE.md`, `DIAGNOSE_LOGIC.md`: diagnostic system prompts.
 - `CHAT.md`: general chat system prompt.
-- `Config/hvsock-proxy.conf`: HVSocket aliases (hvsock://ollama, hvsock://vllm).
+- `Config/hvsock-proxy.conf`: optional HVSocket aliases for local routing.
 
 ## Extending Tool Coverage
 1. Add a tool definition in `Config/pcai-tools.json`.
@@ -64,3 +64,8 @@ User Request
 ## Deprecations
 - `Deploy/functiongemma-finetune/tool_router.py` is deprecated in favor of native
   routing via `Invoke-FunctionGemmaReAct` + `PcaiOpenAiClient`.
+
+## Documentation Automation
+- `Tools/Invoke-DocPipeline.ps1`: full documentation + training pipeline (Rust, PowerShell, C#).
+- `Tools/generate-auto-docs.ps1`: lightweight auto-docs summary.
+- Reports written to `Reports/` (e.g. `DOC_PIPELINE_REPORT.md`, `AUTO_DOCS_SUMMARY.md`).

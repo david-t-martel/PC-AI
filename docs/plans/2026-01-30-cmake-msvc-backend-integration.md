@@ -2,6 +2,8 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+**Status:** ✅ Complete (CMake toolchain/presets, build orchestration, backend selection, and tests are in repo)
+
 **Goal:** Set up CMake integration with MSVC for llama.cpp, create unified build scripts, add backend selection to PC-AI.ps1 and TUI, and implement comprehensive testing for LLM inference.
 
 **Architecture:** Three-tier approach: (1) CMake toolchain configuration with MSVC for native C++ compilation, (2) PowerShell build orchestration that coordinates Rust+C++builds, (3) Runtime backend selection via CLI flags routing to llamacpp or mistralrs. Testing covers unit (module functions), integration (FFI boundaries), e2e (full inference pipeline), and functional (real model validation).

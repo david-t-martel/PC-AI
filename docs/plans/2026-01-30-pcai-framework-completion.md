@@ -22,6 +22,15 @@
 
 ---
 
+## Status Update (2026-01-31)
+
+- WS1 (FunctionGemma training) is largely implemented in rust-functiongemma-train/runtime; remaining gaps include prompt masking, QLoRA, and full runtime model parity.
+- WS2 (FFI exports) is implemented in Deploy/pcai-inference with FFI docs and tests.
+- WS3 (Documentation) is partially complete; troubleshooting/perf notes exist but no consolidated baseline.
+- WS4 (CargoTools tests) live outside this repo (OneDrive module) and remain external to PC_AI.
+
+---
+
 ## Workstream 1: FunctionGemma Training Enhancements (P0)
 
 ### Task 1.1: Add LoRA Layer Structures
