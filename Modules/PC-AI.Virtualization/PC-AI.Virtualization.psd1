@@ -26,7 +26,9 @@
         'Start-HVSockProxy',
         'Stop-HVSockProxy',
         'Get-HVSockProxyStatus',
+        'Get-PcaiServiceHealth',
         'Invoke-PcaiServiceHost',
+        'Invoke-PcaiDoctor',
         'Set-PCaiServiceState'
     )
     CmdletsToExport = @()
@@ -38,7 +40,7 @@
             ProjectUri = 'https://github.com/david-t-martel/PC_AI'
         }
         PCAI = @{
-            Commands = @('diagnose', 'optimize')
+            Commands = @('diagnose', 'optimize', 'doctor')
         }
     }
 }

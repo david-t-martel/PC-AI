@@ -29,6 +29,10 @@ function Invoke-WSLNetworkToolkit {
         [string]$ScriptPath = 'C:\Scripts\wsl-network-recovery.ps1',
 
         [Parameter()]
+        [ValidateSet('check','diagnose','repair','full')]
+        [string]$Mode,
+
+        [Parameter()]
         [string]$Distribution,
 
         [Parameter()]
@@ -80,6 +84,20 @@ function Invoke-WSLNetworkToolkit {
         [Parameter()]
         [switch]$Force
     )
+
+    if ($Mode) {
+        $Check = $false
+        $Diagnose = $false
+        $Repair = $false
+        $Full = $false
+
+        switch ($Mode) {
+            'check' { $Check = $true }
+            'diagnose' { $Diagnose = $true }
+            'repair' { $Repair = $true }
+            'full' { $Full = $true }
+        }
+    }
 
     $scriptExists = Test-Path $ScriptPath
 

@@ -48,6 +48,8 @@ Export-ModuleMember -Function @(
     'Start-HVSockProxy',
     'Stop-HVSockProxy',
     'Get-HVSockProxyStatus',
+    'Get-PcaiServiceHealth',
     'Invoke-PcaiServiceHost',
+    'Invoke-PcaiDoctor',
     'Set-PCaiServiceState'
 )

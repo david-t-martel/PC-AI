@@ -20,6 +20,9 @@
 .PARAMETER CheckLegacyProviders
     Also check legacy Ollama/vLLM providers for backward compatibility.
 
+.PARAMETER NativeDllSearchPaths
+    Optional list of pcai_inference.dll search paths to override defaults.
+
 .EXAMPLE
     Get-PcaiServiceHealth
 
@@ -41,6 +44,9 @@ function Get-PcaiServiceHealth {
         [Parameter()]
         [switch]$CheckLegacyProviders,
 
+        [Parameter()]
+        [string[]]$NativeDllSearchPaths,
+
         # Legacy parameters (mapped to new backends)
         [Parameter()]
         [string]$OllamaBaseUrl = "http://localhost:11434",
@@ -58,6 +64,7 @@ function Get-PcaiServiceHealth {
         Docker          = @{ Status = 'Unknown'; Running = $false }
         NativeFFI       = @{ Status = 'Unknown'; DllExists = $false }
         Bridges         = @{ Status = 'Unknown'; Count = 0 }
+        Gpu             = @{ Status = 'Unknown'; Devices = @(); NvidiaSmi = $false; NvidiaRuntime = $false }
     }
 
     # Add legacy fields if checking
@@ -109,11 +116,15 @@ function Get-PcaiServiceHealth {
     }
 
     # 3. Check Native FFI DLL
-    $dllPaths = @(
-        'T:\RustCache\cargo-target\release\pcai_inference.dll',
-        "$PSScriptRoot\..\..\..\Deploy\pcai-inference\target\release\pcai_inference.dll",
-        "$env:USERPROFILE\PC_AI\Deploy\pcai-inference\target\release\pcai_inference.dll"
-    )
+    $dllPaths = if ($NativeDllSearchPaths -and $NativeDllSearchPaths.Count -gt 0) {
+        $NativeDllSearchPaths
+    } else {
+        @(
+            'T:\RustCache\cargo-target\release\pcai_inference.dll',
+            "$PSScriptRoot\..\..\..\Deploy\pcai-inference\target\release\pcai_inference.dll",
+            "$env:USERPROFILE\PC_AI\Deploy\pcai-inference\target\release\pcai_inference.dll"
+        )
+    }
     foreach ($dllPath in $dllPaths) {
         if (Test-Path $dllPath) {
             $results.NativeFFI.DllExists = $true
@@ -155,6 +166,38 @@ function Get-PcaiServiceHealth {
         }
     } catch {
         $results.Docker.Status = 'NotInstalled'
+    }
+
+    # 5b. Check GPU status (host + optional Docker runtime)
+    try {
+        $gpus = Get-CimInstance Win32_VideoController -ErrorAction Stop
+        $results.Gpu.Devices = @(
+            $gpus | ForEach-Object {
+                [PSCustomObject]@{
+                    Name          = $_.Name
+                    DriverVersion = $_.DriverVersion
+                    Status        = $_.Status
+                    PnpDeviceId   = $_.PNPDeviceID
+                }
+            }
+        )
+        $results.Gpu.Status = if ($results.Gpu.Devices.Count -gt 0) { 'OK' } else { 'NotFound' }
+
+        $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+        if ($nvidiaSmi) {
+            $results.Gpu.NvidiaSmi = $true
+        }
+
+        if ($results.Docker.Running) {
+            try {
+                $runtimes = docker info --format '{{json .Runtimes}}' 2>$null | ConvertFrom-Json
+                if ($runtimes -and ($runtimes.PSObject.Properties.Name -contains 'nvidia')) {
+                    $results.Gpu.NvidiaRuntime = $true
+                }
+            } catch { }
+        }
+    } catch {
+        $results.Gpu.Status = 'Unknown'
     }
 
     # 6. Check legacy providers if requested
