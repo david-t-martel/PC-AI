@@ -1,8 +1,8 @@
 {
-  "Generated": "2026-01-30 13:28:18",
+  "Generated": "2026-01-30 21:06:26",
   "PowerShell": {
-    "FunctionCount": 110,
-    "MissingHelpCount": 58,
+    "FunctionCount": 112,
+    "MissingHelpCount": 60,
     "MissingHelpParameters": [
       {
         "Name": "Compare-ToolPerformance",
@@ -1254,6 +1254,7 @@
         "Name": "Set-LLMConfig",
         "Parameters": [
           "DefaultModel",
+          "PcaiInferenceApiUrl",
           "OllamaApiUrl",
           "LMStudioApiUrl",
           "OllamaPath",
@@ -1265,6 +1266,7 @@
         "HelpParameters": [],
         "MissingHelpParameters": [
           "DefaultModel",
+          "PcaiInferenceApiUrl",
           "OllamaApiUrl",
           "LMStudioApiUrl",
           "OllamaPath",
@@ -1404,13 +1406,20 @@
         "Name": "Get-PcaiServiceHealth",
         "Parameters": [
           "Distribution",
+          "PcaiInferenceUrl",
+          "FunctionGemmaUrl",
+          "CheckLegacyProviders",
           "OllamaBaseUrl",
           "vLLMBaseUrl"
         ],
         "HelpPresent": true,
-        "HelpParameters": [],
-        "MissingHelpParameters": [
+        "HelpParameters": [
           "Distribution",
+          "PcaiInferenceUrl",
+          "FunctionGemmaUrl",
+          "CheckLegacyProviders"
+        ],
+        "MissingHelpParameters": [
           "OllamaBaseUrl",
           "vLLMBaseUrl"
         ],
@@ -1557,14 +1566,63 @@
       {
         "Name": "Invoke-PcaiServiceHost",
         "Parameters": [
-          "Args",
+          "Backend",
+          "Port",
+          "ModelPath",
+          "GpuLayers",
+          "ServerArgs",
+          "NoWait",
           "HostPath"
         ],
         "HelpPresent": true,
+        "HelpParameters": [
+          "Backend",
+          "Port",
+          "ModelPath",
+          "GpuLayers",
+          "ServerArgs",
+          "NoWait"
+        ],
+        "MissingHelpParameters": [
+          "HostPath"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Invoke-PcaiServiceHost.ps1"
+      },
+      {
+        "Name": "Start-RustInferenceServer",
+        "Parameters": [
+          "Port",
+          "ModelPath",
+          "GpuLayers",
+          "ServerArgs",
+          "NoWait"
+        ],
+        "HelpPresent": false,
         "HelpParameters": [],
         "MissingHelpParameters": [
-          "Args",
-          "HostPath"
+          "Port",
+          "ModelPath",
+          "GpuLayers",
+          "ServerArgs",
+          "NoWait"
+        ],
+        "ExtraHelpParameters": [],
+        "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Invoke-PcaiServiceHost.ps1"
+      },
+      {
+        "Name": "Start-CSharpServiceHost",
+        "Parameters": [
+          "HostPath",
+          "ServerArgs",
+          "NoWait"
+        ],
+        "HelpPresent": false,
+        "HelpParameters": [],
+        "MissingHelpParameters": [
+          "HostPath",
+          "ServerArgs",
+          "NoWait"
         ],
         "ExtraHelpParameters": [],
         "SourcePath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.Virtualization\\Public\\Invoke-PcaiServiceHost.ps1"

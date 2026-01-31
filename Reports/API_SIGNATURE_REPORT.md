@@ -1,9 +1,9 @@
 # API_SIGNATURE_REPORT
 
-Generated: 2026-01-30 13:28:18
+Generated: 2026-01-30 21:06:26
 
-PowerShell functions: 110
-Missing help blocks: 58
+PowerShell functions: 112
+Missing help blocks: 60
 C# DllImports: 42
 Missing Rust exports: 7
 
@@ -65,7 +65,7 @@ Missing Rust exports: 7
 - Invoke-SmartDiagnosis: missing Path, AnalysisType, Model, SaveReport, OutputPath, SkipLLMAnalysis, OllamaBaseUrl, TimeoutSeconds
 - Build-DiagnosticSummary: missing DiagnosticData
 - Send-OllamaRequest: missing Prompt, Model, System, Temperature, MaxTokens, Stream, TimeoutSeconds, MaxRetries, RetryDelaySeconds
-- Set-LLMConfig: missing DefaultModel, OllamaApiUrl, LMStudioApiUrl, OllamaPath, DefaultTimeout, ShowConfig, Reset
+- Set-LLMConfig: missing DefaultModel, PcaiInferenceApiUrl, OllamaApiUrl, LMStudioApiUrl, OllamaPath, DefaultTimeout, ShowConfig, Reset
 - Set-LLMProviderOrder: missing Order
 - Get-DiskSpace: missing DriveLetter, ThresholdPercent, IncludeRemovable, IncludeNetwork
 - Get-ProcessPerformance: missing Top, SortBy, IncludeSystemProcesses, ExcludeIdle, MinimumCpuPercent, MinimumMemoryMB
@@ -73,7 +73,7 @@ Missing Rust exports: 7
 - Watch-SystemResources: missing RefreshInterval, Duration, IncludeTopProcesses, TopProcessCount, OutputMode, WarningThreshold, CriticalThreshold
 - Get-UsbDeviceList: missing Filter
 - Get-HVSockProxyStatus: missing StatePath
-- Get-PcaiServiceHealth: missing Distribution, OllamaBaseUrl, vLLMBaseUrl
+- Get-PcaiServiceHealth: missing OllamaBaseUrl, vLLMBaseUrl
 - Test-WSLHealth: missing Distribution, AutoRecover
 - Test-DockerHealth: missing Distribution, AutoRecover
 - Test-VSockBridgeHealth: missing Distribution, AutoRecover
@@ -83,7 +83,9 @@ Missing Rust exports: 7
 - Get-WSLVsockBridgeStatus: missing Distribution
 - Install-HVSockProxy: missing Installer, Force
 - Install-WSLVsockBridge: missing Distribution, BridgeScriptPath, ServiceFilePath, ConfigPath, EnableService, StartService
-- Invoke-PcaiServiceHost: missing Args, HostPath
+- Invoke-PcaiServiceHost: missing HostPath
+- Start-RustInferenceServer: missing Port, ModelPath, GpuLayers, ServerArgs, NoWait
+- Start-CSharpServiceHost: missing HostPath, ServerArgs, NoWait
 - Invoke-WSLDockerHealthCheck: missing ScriptPath, AutoRecover, Verbose, Quick
 - Invoke-WSLNetworkToolkit: missing Optimize, ApplyConfig, TestNetworkingMode, NetworkingMode, FixDns, RestartWsl, ResetAdapters, ResetWinsock, RestartHns, RestartWslService, DisableVmqOnWsl, Force
 - Register-HVSockServices: missing ConfigPath, Force
