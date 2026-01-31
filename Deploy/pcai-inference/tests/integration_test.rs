@@ -406,7 +406,8 @@ mod ffi_tests {
     #[test]
     fn test_ffi_init_null_backend() {
         let result = pcai_init(std::ptr::null());
-        assert_eq!(result, -1);
+        // InvalidInput error code = -3
+        assert_eq!(result, PcaiErrorCode::InvalidInput as i32);
 
         let err = pcai_last_error();
         assert!(!err.is_null());
@@ -419,7 +420,8 @@ mod ffi_tests {
     fn test_ffi_init_unknown_backend() {
         let backend = CString::new("unknown_backend").unwrap();
         let result = pcai_init(backend.as_ptr());
-        assert_eq!(result, -1);
+        // InvalidInput error code = -3
+        assert_eq!(result, PcaiErrorCode::InvalidInput as i32);
 
         let err = pcai_last_error();
         assert!(!err.is_null());
@@ -463,7 +465,8 @@ mod ffi_tests {
     #[test]
     fn test_ffi_load_model_null_path() {
         let result = pcai_load_model(std::ptr::null(), 0);
-        assert_eq!(result, -1);
+        // InvalidInput error code = -3
+        assert_eq!(result, PcaiErrorCode::InvalidInput as i32);
 
         let err = pcai_last_error();
         assert!(!err.is_null());
@@ -475,7 +478,8 @@ mod ffi_tests {
 
         let path = CString::new("/nonexistent/model.gguf").unwrap();
         let result = pcai_load_model(path.as_ptr(), 0);
-        assert_eq!(result, -1);
+        // NotInitialized error code = -1
+        assert_eq!(result, PcaiErrorCode::NotInitialized as i32);
 
         let err = pcai_last_error();
         assert!(!err.is_null());

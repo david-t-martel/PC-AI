@@ -22,27 +22,20 @@
 #>
 
 BeforeAll {
-    $script:ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $script:BinDir = Join-Path $ProjectRoot "bin"
-    $script:DeployDir = Join-Path $ProjectRoot "Deploy\pcai-inference"
-    $script:ModulePath = Join-Path $ProjectRoot "Modules\PcaiInference.psm1"
-    $script:DllPath = Join-Path $BinDir "pcai_inference.dll"
+    # Import shared test helpers
+    Import-Module (Join-Path $PSScriptRoot "..\Helpers\TestHelpers.psm1") -Force
 
-    # Helper: Get test model if available
+    # Get standard test paths
+    $paths = Get-TestPaths -StartPath $PSScriptRoot
+    $script:ProjectRoot = $paths.ProjectRoot
+    $script:BinDir = $paths.BinDir
+    $script:DeployDir = $paths.DeployDir
+    $script:ModulePath = $paths.ModulePath
+    $script:DllPath = $paths.DllPath
+
+    # Helper: Get test model (wrapper for compatibility)
     function Get-TestModel {
-        if ($env:PCAI_TEST_MODEL -and (Test-Path $env:PCAI_TEST_MODEL)) {
-            return $env:PCAI_TEST_MODEL
-        }
-
-        # Check LM Studio cache
-        $lmStudioPath = Join-Path $env:LOCALAPPDATA "lm-studio\models"
-        if (Test-Path $lmStudioPath) {
-            $model = Get-ChildItem -Path $lmStudioPath -Filter "*.gguf" -Recurse -File |
-                Select-Object -First 1
-            if ($model) { return $model.FullName }
-        }
-
-        return $null
+        Get-TestModelPath
     }
 
     # Track whether we've initialized the backend

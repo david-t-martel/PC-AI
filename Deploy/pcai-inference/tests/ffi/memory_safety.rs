@@ -11,7 +11,9 @@
 use std::ffi::{CStr, CString};
 use std::ptr;
 
-use pcai_inference::ffi::{pcai_free_string, pcai_init, pcai_last_error, pcai_shutdown};
+use pcai_inference::ffi::{
+    pcai_free_string, pcai_init, pcai_last_error, pcai_shutdown, PcaiErrorCode,
+};
 
 /// Test that pcai_free_string handles null safely
 #[test]
@@ -71,7 +73,7 @@ fn test_init_empty_string() {
     let result = pcai_init(empty.as_ptr());
 
     // Should fail gracefully, not crash
-    assert_eq!(result, -1);
+    assert_eq!(result, PcaiErrorCode::InvalidInput as i32);
 
     let err_ptr = pcai_last_error();
     assert!(!err_ptr.is_null());
@@ -89,7 +91,7 @@ fn test_init_long_string() {
     let result = pcai_init(long.as_ptr());
 
     // Should fail gracefully
-    assert_eq!(result, -1);
+    assert_eq!(result, PcaiErrorCode::InvalidInput as i32);
 
     pcai_shutdown();
 }
@@ -103,7 +105,7 @@ fn test_utf8_error_handling() {
     let unicode = CString::new("backend_日本語").unwrap();
     let result = pcai_init(unicode.as_ptr());
 
-    assert_eq!(result, -1);
+    assert_eq!(result, PcaiErrorCode::InvalidInput as i32);
 
     // Error message should be valid UTF-8
     let err_ptr = pcai_last_error();

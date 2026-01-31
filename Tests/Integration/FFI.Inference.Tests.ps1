@@ -19,44 +19,20 @@
 #>
 
 BeforeAll {
-    # Project paths
-    $script:ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-    $script:BinDir = Join-Path $ProjectRoot "bin"
-    $script:DeployDir = Join-Path $ProjectRoot "Deploy\pcai-inference"
-    $script:DllName = "pcai_inference.dll"
-    $script:DllPath = Join-Path $BinDir $DllName
+    # Import shared test helpers
+    Import-Module (Join-Path $PSScriptRoot "..\Helpers\TestHelpers.psm1") -Force
 
-    # Helper: Check if DLL exists
+    # Get standard test paths
+    $paths = Get-TestPaths -StartPath $PSScriptRoot
+    $script:ProjectRoot = $paths.ProjectRoot
+    $script:BinDir = $paths.BinDir
+    $script:DeployDir = $paths.DeployDir
+    $script:DllName = $paths.DllName
+    $script:DllPath = $paths.DllPath
+
+    # Helper: Check if DLL exists (wrapper for compatibility)
     function Test-InferenceDllExists {
-        Test-Path $script:DllPath
-    }
-
-    # Helper: Get test model path
-    function Get-TestModelPath {
-        # Check environment variable first
-        if ($env:PCAI_TEST_MODEL -and (Test-Path $env:PCAI_TEST_MODEL)) {
-            return $env:PCAI_TEST_MODEL
-        }
-
-        # Check LM Studio cache (Windows)
-        $lmStudioPath = Join-Path $env:LOCALAPPDATA "lm-studio\models"
-        if (Test-Path $lmStudioPath) {
-            $ggufFiles = Get-ChildItem -Path $lmStudioPath -Filter "*.gguf" -Recurse -File | Select-Object -First 1
-            if ($ggufFiles) {
-                return $ggufFiles.FullName
-            }
-        }
-
-        # Check Ollama cache
-        $ollamaPath = Join-Path $env:USERPROFILE ".ollama\models\blobs"
-        if (Test-Path $ollamaPath) {
-            $ggufFiles = Get-ChildItem -Path $ollamaPath -Filter "*.gguf" -Recurse -File | Select-Object -First 1
-            if ($ggufFiles) {
-                return $ggufFiles.FullName
-            }
-        }
-
-        return $null
+        Test-InferenceDllAvailable -ProjectRoot $script:ProjectRoot
     }
 }
 
