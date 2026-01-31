@@ -12,14 +12,14 @@ public sealed class PcaiLlmClient : IDisposable
     private readonly HttpClient _http;
     private readonly string _baseUrl;
 
-    public PcaiLlmClient(string baseUrl = "http://localhost:11434")
+    public PcaiLlmClient(string baseUrl = "http://127.0.0.1:8080")
     {
         _baseUrl = baseUrl.TrimEnd('/');
         _http = new HttpClient();
     }
 
     /// <summary>
-    /// Synchronously sends a chat request to Ollama and returns the parsed response.
+    /// Synchronously sends a completion request to pcai-inference and returns the parsed response.
     /// Optimized for low-latency structural ingestion.
     /// </summary>
     public string? Chat(string model, string prompt, float temperature = 0.3f)
@@ -29,7 +29,7 @@ public sealed class PcaiLlmClient : IDisposable
             model = model,
             prompt = prompt,
             stream = false,
-            options = new { temperature = temperature }
+            temperature = temperature
         };
 
         var json = JsonSerializer.Serialize(request);
@@ -37,7 +37,7 @@ public sealed class PcaiLlmClient : IDisposable
 
         try
         {
-            var response = _http.PostAsync($"{_baseUrl}/api/generate", content).GetAwaiter().GetResult();
+            var response = _http.PostAsync($"{_baseUrl}/v1/completions", content).GetAwaiter().GetResult();
             response.EnsureSuccessStatusCode();
             return response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
         }

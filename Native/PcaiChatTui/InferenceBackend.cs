@@ -2,13 +2,14 @@
 using System.Net.Http.Json;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Threading.Channels;
 
 namespace PcaiChatTui;
 
 public enum BackendType
 {
     Auto,
-    Http,       // Ollama/vLLM/LM Studio via HTTP
+    Http,       // pcai-inference via HTTP (OpenAI-compatible)
     LlamaCpp,   // Native llama.cpp via FFI
     MistralRs   // Native mistral.rs via FFI
 }
@@ -28,7 +29,7 @@ public static class BackendFactory
     {
         return type switch
         {
-            BackendType.Http => new HttpBackend(httpEndpoint ?? "http://localhost:11434"),
+            BackendType.Http => new HttpBackend(httpEndpoint ?? "http://127.0.0.1:8080"),
             BackendType.LlamaCpp => new NativeBackend("llamacpp"),
             BackendType.MistralRs => new NativeBackend("mistralrs"),
             BackendType.Auto => ResolveAuto(httpEndpoint),
@@ -47,7 +48,7 @@ public static class BackendFactory
         if (native.IsAvailable)
             return native;
 
-        return new HttpBackend(httpEndpoint ?? "http://localhost:11434");
+        return new HttpBackend(httpEndpoint ?? "http://127.0.0.1:8080");
     }
 }
 
@@ -67,6 +68,17 @@ public class NativeBackend : IInferenceBackend
 
     [DllImport("pcai_inference.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr pcai_generate([MarshalAs(UnmanagedType.LPUTF8Str)] string prompt, uint maxTokens, float temperature);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void TokenCallback(IntPtr token, IntPtr userData);
+
+    [DllImport("pcai_inference.dll", CallingConvention = CallingConvention.Cdecl)]
+    private static extern int pcai_generate_streaming(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string prompt,
+        uint maxTokens,
+        float temperature,
+        TokenCallback callback,
+        IntPtr userData);
 
     [DllImport("pcai_inference.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern void pcai_free_string(IntPtr str);
@@ -142,12 +154,34 @@ public class NativeBackend : IInferenceBackend
 
     public async IAsyncEnumerable<string> GenerateStreamingAsync(string prompt, int maxTokens = 2048, float temperature = 0.7f)
     {
-        // For now, non-streaming fallback
-        var result = await GenerateAsync(prompt, maxTokens, temperature);
-        foreach (var word in result.Split(' '))
+        var channel = Channel.CreateUnbounded<string>();
+        TokenCallback? callback = null;
+        callback = (tokenPtr, _) =>
         {
-            yield return word + " ";
-            await Task.Delay(10); // Simulate streaming
+            if (tokenPtr == IntPtr.Zero) return;
+            var token = Marshal.PtrToStringUTF8(tokenPtr);
+            if (!string.IsNullOrEmpty(token))
+            {
+                channel.Writer.TryWrite(token);
+            }
+        };
+
+        _ = Task.Run(() =>
+        {
+            var result = pcai_generate_streaming(prompt, (uint)maxTokens, temperature, callback, IntPtr.Zero);
+            if (result != 0)
+            {
+                var errorPtr = pcai_last_error();
+                var error = errorPtr != IntPtr.Zero ? Marshal.PtrToStringUTF8(errorPtr) : "Unknown error";
+                channel.Writer.TryComplete(new InvalidOperationException($"Streaming failed: {error}"));
+                return;
+            }
+            channel.Writer.TryComplete();
+        });
+
+        await foreach (var token in channel.Reader.ReadAllAsync())
+        {
+            yield return token;
         }
     }
 
@@ -162,7 +196,7 @@ public class NativeBackend : IInferenceBackend
     }
 }
 
-// HTTP backend (Ollama/vLLM/LM Studio)
+// HTTP backend (pcai-inference OpenAI-compatible)
 public class HttpBackend : IInferenceBackend
 {
     private readonly HttpClient _client;
@@ -182,7 +216,7 @@ public class HttpBackend : IInferenceBackend
         {
             try
             {
-                var response = _client.GetAsync($"{_endpoint}/api/tags").Result;
+                var response = _client.GetAsync($"{_endpoint}/v1/models").Result;
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -202,33 +236,40 @@ public class HttpBackend : IInferenceBackend
     {
         var request = new
         {
-            model = "default",
+            model = "pcai-inference",
             prompt = prompt,
             stream = false,
-            options = new { temperature, num_predict = maxTokens }
+            temperature = temperature,
+            max_tokens = maxTokens
         };
 
         var content = new StringContent(JsonSerializer.Serialize(request), System.Text.Encoding.UTF8, "application/json");
-        var response = await _client.PostAsync($"{_endpoint}/api/generate", content);
+        var response = await _client.PostAsync($"{_endpoint}/v1/completions", content);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(json);
-        return doc.RootElement.GetProperty("response").GetString() ?? "";
+        var choices = doc.RootElement.GetProperty("choices");
+        if (choices.GetArrayLength() == 0)
+        {
+            return string.Empty;
+        }
+        return choices[0].GetProperty("text").GetString() ?? "";
     }
 
     public async IAsyncEnumerable<string> GenerateStreamingAsync(string prompt, int maxTokens = 2048, float temperature = 0.7f)
     {
         var request = new
         {
-            model = "default",
+            model = "pcai-inference",
             prompt = prompt,
             stream = true,
-            options = new { temperature, num_predict = maxTokens }
+            temperature = temperature,
+            max_tokens = maxTokens
         };
 
         var content = new StringContent(JsonSerializer.Serialize(request), System.Text.Encoding.UTF8, "application/json");
-        var response = await _client.PostAsync($"{_endpoint}/api/generate", content);
+        var response = await _client.PostAsync($"{_endpoint}/v1/completions", content);
         response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync();
@@ -239,10 +280,25 @@ public class HttpBackend : IInferenceBackend
             var line = await reader.ReadLineAsync();
             if (string.IsNullOrEmpty(line)) continue;
 
-            using var doc = JsonDocument.Parse(line);
-            if (doc.RootElement.TryGetProperty("response", out var token))
+            if (!line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
             {
-                yield return token.GetString() ?? "";
+                continue;
+            }
+
+            var payload = line.Substring(5).Trim();
+            if (string.Equals(payload, "[DONE]", StringComparison.OrdinalIgnoreCase))
+            {
+                yield break;
+            }
+
+            using var doc = JsonDocument.Parse(payload);
+            if (doc.RootElement.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+            {
+                var choice = choices[0];
+                if (choice.TryGetProperty("text", out var token))
+                {
+                    yield return token.GetString() ?? "";
+                }
             }
         }
     }

@@ -69,31 +69,17 @@ if (Get-Module -ListAvailable CargoTools) {
 }
 
 # Configure CUDA environment for GPU-accelerated builds
-$cudaVersions = @('v13.1', 'v13.0', 'v12.6', 'v12.5')
-$cudaBase = $null
-foreach ($ver in $cudaVersions) {
-    $candidatePath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\$ver"
-    if (Test-Path $candidatePath) {
-        $cudaBase = $candidatePath
-        break
-    }
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$cudaHelper = Join-Path $repoRoot 'Tools\Initialize-CudaEnvironment.ps1'
+if (Test-Path $cudaHelper) {
+    . $cudaHelper
+    $script:CudaInfo = Initialize-CudaEnvironment -Quiet
 }
 
-if ($cudaBase) {
-    # Set CUDA_PATH for cudarc/bindgen_cuda
-    $env:CUDA_PATH = $cudaBase
-
-    # Add CUDA bin to PATH for nvcc
-    $cudaBin = "$cudaBase\bin"
-    if ($env:PATH -notlike "*$cudaBin*") {
-        $env:PATH = "$cudaBin;$env:PATH"
-    }
-
-    # Add nvvm/bin to PATH for cicc (CUDA intermediate compiler)
-    $nvvmBin = "$cudaBase\nvvm\bin"
-    if ((Test-Path $nvvmBin) -and ($env:PATH -notlike "*$nvvmBin*")) {
-        $env:PATH = "$nvvmBin;$env:PATH"
-    }
+$cmakeHelper = Join-Path $repoRoot 'Tools\Initialize-CmakeEnvironment.ps1'
+if (Test-Path $cmakeHelper) {
+    . $cmakeHelper
+    $script:CmakeInfo = Initialize-CmakeEnvironment -Quiet
 }
 
 # Colors for output

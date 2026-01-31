@@ -8,8 +8,8 @@ namespace PcaiChatTui;
 
 public static class Program
 {
-    private const string DefaultBaseUrl = "http://localhost:11434";
-    private const string DefaultModel = "qwen2.5-coder:7b";
+    private const string DefaultBaseUrl = "http://127.0.0.1:8080";
+    private const string DefaultModel = "pcai-inference";
     private const int DefaultTimeoutSec = 120;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -22,7 +22,7 @@ public static class Program
         var options = CliOptions.Parse(args);
         var config = LlmConfig.Load(options.ConfigPath);
 
-        var provider = options.Provider ?? config.DefaultProvider ?? "ollama";
+        var provider = options.Provider ?? config.DefaultProvider ?? "pcai-inference";
         var providerConfig = config.GetProvider(provider);
 
         var baseUrl = NormalizeBaseUrl(options.BaseUrl ?? providerConfig?.BaseUrl ?? DefaultBaseUrl);
@@ -244,7 +244,7 @@ public static class Program
 
             try
             {
-                if (react && string.Equals(provider, "vllm", StringComparison.OrdinalIgnoreCase))
+                if (react)
                 {
                     // Use the unified ReAct orchestrator
                     // We need to inject native context if in diagnose mode
@@ -266,20 +266,11 @@ public static class Program
                     continue;
                 }
 
-                if (string.Equals(provider, "ollama", StringComparison.OrdinalIgnoreCase))
+                if (stream)
                 {
-                    if (stream)
-                    {
-                        Console.Write("assistant> ");
-                        var content = await StreamOllamaChatAsync(http, baseUrl, model, history);
-                        history.Add(new ChatMessage("assistant", content));
-                    }
-                    else
-                    {
-                        var content = await SendOllamaChatAsync(http, baseUrl, model, history);
-                        history.Add(new ChatMessage("assistant", content));
-                        Console.WriteLine($"assistant> {content}\n");
-                    }
+                    Console.Write("assistant> ");
+                    var content = await StreamOpenAiChatAsync(http, baseUrl, model, history);
+                    history.Add(new ChatMessage("assistant", content));
                 }
                 else
                 {
@@ -310,13 +301,6 @@ public static class Program
         }
         messages.Add(new ChatMessage("user", prompt));
 
-        if (string.Equals(provider, "ollama", StringComparison.OrdinalIgnoreCase))
-        {
-            var content = await SendOllamaChatAsync(http, baseUrl, model, messages);
-            Console.WriteLine(content);
-            return;
-        }
-
         var openAiContent = await SendOpenAiChatAsync(http, baseUrl, model, messages);
         Console.WriteLine(openAiContent);
     }
@@ -331,18 +315,9 @@ public static class Program
 
         try
         {
-            if (string.Equals(provider, "ollama", StringComparison.OrdinalIgnoreCase))
-            {
-                var response = await http.GetFromJsonAsync<OllamaVersion>($"{baseUrl}/api/version", JsonOptions);
-                result.Ok = response != null;
-                result.Version = response?.Version ?? "unknown";
-            }
-            else
-            {
-                var response = await http.GetAsync($"{baseUrl}/v1/models");
-                result.Ok = response.IsSuccessStatusCode;
-                result.Version = response.IsSuccessStatusCode ? "ok" : "unknown";
-            }
+            var response = await http.GetAsync($"{baseUrl}/v1/models");
+            result.Ok = response.IsSuccessStatusCode;
+            result.Version = response.IsSuccessStatusCode ? "ok" : "unknown";
         }
         catch (Exception ex)
         {
@@ -355,17 +330,6 @@ public static class Program
 
     private static async Task<IReadOnlyList<string>> GetModelsAsync(HttpClient http, string baseUrl, string provider)
     {
-        if (string.Equals(provider, "ollama", StringComparison.OrdinalIgnoreCase))
-        {
-            var tags = await http.GetFromJsonAsync<OllamaTags>($"{baseUrl}/api/tags", JsonOptions);
-            if (tags?.Models == null)
-            {
-                return Array.Empty<string>();
-            }
-
-            return tags.Models.Select(m => m.Name).ToArray();
-        }
-
         var openAi = await http.GetFromJsonAsync<OpenAiModels>($"{baseUrl}/v1/models", JsonOptions);
         if (openAi?.Data == null)
         {
@@ -459,6 +423,70 @@ public static class Program
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadFromJsonAsync<OpenAiChatResponse>(JsonOptions);
         return json?.Choices?.FirstOrDefault()?.Message?.Content ?? string.Empty;
+    }
+
+    private static async Task<string> StreamOpenAiChatAsync(HttpClient http, string baseUrl, string model, List<ChatMessage> messages)
+    {
+        var payload = new
+        {
+            model,
+            messages = messages.Select(m => new { role = m.Role, content = m.Content }).ToArray(),
+            temperature = 0.2,
+            stream = true
+        };
+
+        var json = JsonSerializer.Serialize(payload, JsonOptions);
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/chat/completions") { Content = content };
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync();
+        using var reader = new StreamReader(stream);
+        var sb = new StringBuilder();
+
+        while (!reader.EndOfStream)
+        {
+            var line = await reader.ReadLineAsync();
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (!line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var payloadLine = line.Substring(5).Trim();
+            if (string.Equals(payloadLine, "[DONE]", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine();
+                break;
+            }
+
+            try
+            {
+                using var doc = JsonDocument.Parse(payloadLine);
+                var choice = doc.RootElement.GetProperty("choices")[0];
+                if (choice.TryGetProperty("delta", out var delta) &&
+                    delta.TryGetProperty("content", out var contentElement))
+                {
+                    var contentText = contentElement.GetString() ?? string.Empty;
+                    if (!string.IsNullOrEmpty(contentText))
+                    {
+                        Console.Write(contentText);
+                        sb.Append(contentText);
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore malformed chunks
+            }
+        }
+
+        return sb.ToString();
     }
 
     private static async Task<OpenAiChatResponse?> SendOpenAiToolCallAsync(HttpClient http, string baseUrl, string model, List<ChatMessage> messages, List<object> tools)
@@ -737,9 +765,9 @@ public sealed class CliOptions
 Usage: PcaiChatTui [options]
 
 Options:
-  --base-url, -u <url>      LLM endpoint URL (default: http://localhost:11434)
+  --base-url, -u <url>      LLM endpoint URL (default: http://127.0.0.1:8080)
   --model, -m <name>        Model name for HTTP providers
-  --provider <name>         Provider: ollama, vllm (default: ollama)
+  --provider <name>         Provider: pcai-inference, vllm, lmstudio (default: pcai-inference)
   --mode <mode>             Mode: chat, diagnose, stream, single, react
   --config, -c <path>       Config file path
   --timeout <seconds>       Request timeout
