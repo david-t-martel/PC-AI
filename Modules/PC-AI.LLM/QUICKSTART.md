@@ -5,18 +5,15 @@ Get started with PC-AI.LLM in under 5 minutes.
 ## Prerequisites Check
 
 ```powershell
-# Verify Ollama is installed
-Test-Path "C:\Users\david\AppData\Local\Programs\Ollama\ollama.exe"
-# Should return: True
-
-# Check if Ollama is running
-Test-NetConnection localhost -Port 11434 | Select-Object TcpTestSucceeded
+# Check if pcai-inference is running
+Test-NetConnection 127.0.0.1 -Port 8080 | Select-Object TcpTestSucceeded
 # Should return: TcpTestSucceeded = True
 ```
 
-If Ollama is not running, start it:
+If pcai-inference is not running, start it:
 ```powershell
-Start-Process "C:\Users\david\AppData\Local\Programs\Ollama\ollama.exe" -ArgumentList "serve"
+cd C:\Users\david\PC_AI\Deploy\pcai-inference
+cargo run --release --features "llamacpp,server"
 ```
 
 ## Step 1: Import Module
@@ -32,10 +29,9 @@ Import-Module "C:\Users\david\PC_AI\Modules\PC-AI.LLM\PC-AI.LLM.psd1"
 Get-LLMStatus -TestConnection
 
 # Should show:
-# - Ollama Installed: True
-# - API Connected: True
-# - Models Available: 11
-# - Default Model: qwen2.5-coder:7b
+# - pcai-inference API Connected: True
+# - Models Available
+# - Default Model: pcai-inference
 ```
 
 ## Step 3: Try Your First Query
@@ -93,10 +89,10 @@ Get-LLMStatus
 ### Change Default Model
 ```powershell
 # View available models
-Get-LLMStatus | Select-Object -ExpandProperty Ollama | Select-Object -ExpandProperty Models | Format-Table Name, Size
+Get-LLMStatus | Select-Object -ExpandProperty PcaiInference | Select-Object -ExpandProperty Models | Format-Table Name
 
 # Set default model
-Set-LLMConfig -DefaultModel "deepseek-r1:8b"
+Set-LLMConfig -DefaultModel "pcai-inference"
 ```
 
 ### View Configuration
@@ -121,13 +117,11 @@ Get-Help Set-LLMConfig -Examples
 Import-Module "C:\Users\david\PC_AI\Modules\PC-AI.LLM\PC-AI.LLM.psd1" -Force
 ```
 
-### Problem: Ollama connection failed
+### Problem: pcai-inference connection failed
 ```powershell
-# Check if Ollama is running
-Get-Process ollama -ErrorAction SilentlyContinue
-
-# If not running, start it
-Start-Process "C:\Users\david\AppData\Local\Programs\Ollama\ollama.exe" -ArgumentList "serve"
+# Start pcai-inference
+cd C:\Users\david\PC_AI\Deploy\pcai-inference
+cargo run --release --features "llamacpp,server"
 
 # Wait 5 seconds, then test again
 Start-Sleep -Seconds 5
@@ -136,9 +130,6 @@ Get-LLMStatus -TestConnection
 
 ### Problem: Model not found
 ```powershell
-# Pull the model
-ollama pull qwen2.5-coder:7b
-
 # Verify
 Get-LLMStatus
 ```
@@ -157,9 +148,9 @@ Set-LLMConfig -DefaultTimeout 300
 1. **First query is slower** - Model loads into memory (5-15 seconds)
 2. **Subsequent queries are faster** - Model cached (1-5 seconds)
 3. **Choose appropriate model**:
-   - Fast: `mistral:latest`
-   - Technical: `qwen2.5-coder:7b` (recommended)
-   - Reasoning: `deepseek-r1:8b`
+   - Fast: smaller GGUF (Phi/Mistral)
+   - Technical: Llama 3 GGUF
+   - Reasoning: larger GGUF variants
 4. **Lower temperature for consistency** - Use 0.1-0.3 for diagnostic analysis
 5. **Higher temperature for creativity** - Use 0.7-1.0 for general questions
 

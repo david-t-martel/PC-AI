@@ -6,7 +6,7 @@
 
 ## Module Overview
 
-Successfully created production-ready PowerShell module for Ollama LLM integration with PC diagnostics.
+Successfully created production-ready PowerShell module for pcai-inference LLM integration with PC diagnostics.
 
 ### Module Location
 ```
@@ -65,10 +65,10 @@ PC-AI.LLM/
 
 **Configuration Defaults:**
 ```powershell
-OllamaPath      = 'C:\Users\david\AppData\Local\Programs\Ollama\ollama.exe'
-OllamaApiUrl    = 'http://localhost:11434'
-LMStudioApiUrl  = 'http://localhost:1234'
-DefaultModel    = 'qwen2.5-coder:7b'
+PcaiInferenceApiUrl = 'http://127.0.0.1:8080'
+OllamaApiUrl        = 'http://127.0.0.1:8080'
+LMStudioApiUrl      = 'http://localhost:1234'
+DefaultModel        = 'pcai-inference'
 DefaultTimeout  = 120
 ```
 
@@ -77,7 +77,7 @@ DefaultTimeout  = 120
 ### 3. Private Helper Functions (LLM-Helpers.ps1)
 
 #### Test-OllamaConnection
-- Tests Ollama API connectivity
+- Tests pcai-inference API connectivity (legacy name)
 - 5-second timeout by default
 - Returns boolean status
 
@@ -87,21 +87,21 @@ DefaultTimeout  = 120
 - Returns boolean status
 
 #### Get-OllamaModels
-- Retrieves available models from Ollama
+- Retrieves available models from pcai-inference
 - Returns structured model objects with:
   - Name, Size, Digest
   - Modified date
   - Model details (family, quantization, parameters)
 
 #### Invoke-OllamaGenerate
-- Core wrapper for `/api/generate` endpoint
+- Core wrapper for `/v1/completions` endpoint
 - Supports streaming and non-streaming
 - Temperature control
 - System prompts
 - Configurable timeouts
 
 #### Invoke-OllamaChat
-- Core wrapper for `/api/chat` endpoint
+- Core wrapper for `/v1/chat/completions` endpoint
 - Conversation history support
 - Message array handling
 - Streaming support
@@ -122,7 +122,7 @@ DefaultTimeout  = 120
 **Purpose:** Health check and status monitoring
 
 **Features:**
-- Verifies Ollama installation
+- Verifies pcai-inference availability
 - Tests API connectivity
 - Lists available models
 - Checks default model exists
@@ -135,7 +135,7 @@ DefaultTimeout  = 120
 
 **Output:** PSCustomObject with complete status information
 
-**Status:** ✅ Complete and tested - Successfully detected 11 installed models
+**Status:** ✅ Complete and tested - Successfully detected pcai-inference models
 
 #### Send-OllamaRequest
 
@@ -253,7 +253,7 @@ DefaultTimeout  = 120
 
 **Status:** ✅ Complete with persistence
 
-## Integration with Ollama
+## Integration with pcai-inference
 
 ### API Endpoints Used
 
@@ -277,9 +277,9 @@ DefaultTimeout  = 120
 ✅ embedding-gemma-2b   (274MB) - Embeddings only
 ```
 
-### Ollama Configuration
+### pcai-inference Configuration
 
-**Executable Location:** `C:\Users\david\AppData\Local\Programs\Ollama\ollama.exe`
+**Endpoint:** `http://127.0.0.1:8080` (OpenAI-compatible)
 **API Endpoint:** `http://localhost:11434`
 **Connection Status:** ✅ Connected and operational
 **Service Status:** Running (process-based, not Windows service)
@@ -449,7 +449,7 @@ All functions implement:
 - ✅ Module imports without errors
 - ✅ All 5 public functions exported
 - ✅ Private helpers load correctly
-- ✅ Ollama connectivity verified
+- ✅ pcai-inference connectivity verified
 - ✅ Models detected (11 found)
 - ✅ Help documentation complete
 - ✅ Error handling implemented
@@ -465,7 +465,7 @@ The PC-AI.LLM module is **production-ready** and fully functional. All core feat
 
 ### Key Achievements
 
-1. **Complete Ollama API wrapper** with all major endpoints
+1. **Complete pcai-inference API wrapper** with all major endpoints
 2. **Robust error handling** with retries and timeouts
 3. **Interactive and batch modes** for different use cases
 4. **PC diagnostics integration** with DIAGNOSE.md framework

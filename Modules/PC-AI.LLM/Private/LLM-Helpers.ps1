@@ -214,10 +214,10 @@ function Invoke-ToolByName {
     }
 }
 
-function Test-OllamaConnection {
+function Test-PcaiInferenceConnection {
     <#
     .SYNOPSIS
-        Tests connectivity to Ollama API
+        Tests connectivity to pcai-inference OpenAI-compatible API
     .OUTPUTS
         Boolean indicating connection status
     #>
@@ -225,22 +225,42 @@ function Test-OllamaConnection {
     [OutputType([bool])]
     param(
         [Parameter()]
-        [string]$ApiUrl = $script:ModuleConfig.OllamaApiUrl,
+        [string]$ApiUrl = $script:ModuleConfig.PcaiInferenceApiUrl,
 
         [Parameter()]
         [int]$TimeoutSeconds = 5
     )
 
-    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'ollama'
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'pcai-inference'
 
     try {
-        $response = Invoke-RestMethod -Uri "$ApiUrl/api/tags" -Method Get -TimeoutSec $TimeoutSeconds -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri "$ApiUrl/v1/models" -Method Get -TimeoutSec $TimeoutSeconds -ErrorAction Stop
         return $true
     }
     catch {
-        Write-Verbose "Ollama connection test failed: $_"
+        Write-Verbose "pcai-inference connection test failed: $_"
         return $false
     }
+}
+
+function Test-OllamaConnection {
+    <#
+    .SYNOPSIS
+        Tests connectivity to the primary LLM endpoint (pcai-inference)
+    .OUTPUTS
+        Boolean indicating connection status
+    #>
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter()]
+        [string]$ApiUrl = $script:ModuleConfig.PcaiInferenceApiUrl,
+
+        [Parameter()]
+        [int]$TimeoutSeconds = 5
+    )
+
+    return (Test-PcaiInferenceConnection -ApiUrl $ApiUrl -TimeoutSeconds $TimeoutSeconds)
 }
 
 function Test-LMStudioConnection {
@@ -512,7 +532,7 @@ function Invoke-OpenAIChatWithProgress {
 function Get-OllamaModels {
     <#
     .SYNOPSIS
-        Retrieves list of available Ollama models
+        Retrieves list of available models from pcai-inference (OpenAI-compatible)
     .OUTPUTS
         Array of model objects
     #>
@@ -520,31 +540,27 @@ function Get-OllamaModels {
     [OutputType([PSCustomObject[]])]
     param(
         [Parameter()]
-        [string]$ApiUrl = $script:ModuleConfig.OllamaApiUrl
+        [string]$ApiUrl = $script:ModuleConfig.PcaiInferenceApiUrl
     )
 
-    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'ollama'
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'pcai-inference'
 
     try {
-        $response = Invoke-RestMethod -Uri "$ApiUrl/api/tags" -Method Get -ErrorAction Stop
+        $response = Invoke-RestMethod -Uri "$ApiUrl/v1/models" -Method Get -ErrorAction Stop
 
-        if ($response.models) {
-            return $response.models | ForEach-Object {
+        if ($response.data) {
+            return $response.data | ForEach-Object {
                 [PSCustomObject]@{
-                    Name = $_.name
-                    ModifiedAt = $_.modified_at
-                    Size = $_.size
-                    Digest = $_.digest
-                    Details = $_.details
+                    Name = $_.id
+                    OwnedBy = $_.owned_by
+                    Root = $_.root
                 }
             }
         }
-        else {
-            return @()
-        }
+        return @()
     }
     catch {
-        Write-Error "Failed to retrieve Ollama models: $_"
+        Write-Error "Failed to retrieve pcai-inference models: $_"
         return @()
     }
 }
@@ -552,7 +568,7 @@ function Get-OllamaModels {
 function Invoke-OllamaGenerate {
     <#
     .SYNOPSIS
-        Invokes Ollama generate API endpoint
+        Invokes pcai-inference completions endpoint (OpenAI-compatible)
     .OUTPUTS
         API response object
     #>
@@ -582,36 +598,34 @@ function Invoke-OllamaGenerate {
         [int]$TimeoutSeconds = $script:ModuleConfig.DefaultTimeout,
 
         [Parameter()]
-        [string]$ApiUrl = $script:ModuleConfig.OllamaApiUrl
+        [string]$ApiUrl = $script:ModuleConfig.PcaiInferenceApiUrl
     )
 
-    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'ollama'
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'pcai-inference'
 
     $body = @{
         model = $Model
         prompt = $Prompt
         stream = $Stream
-        options = @{
-            temperature = $Temperature
-        }
+        temperature = $Temperature
     }
 
     if ($System) {
-        $body['system'] = $System
+        # pcai-inference completions do not have a system field; prepend to prompt.
+        $body.prompt = "$System`n`n$Prompt"
     }
 
     if ($MaxTokens) {
-        $body.options['num_predict'] = $MaxTokens
+        $body['max_tokens'] = $MaxTokens
     }
 
     $jsonBody = $body | ConvertTo-Json -Depth 10
-    # Force UTF-8 (no BOM) to avoid Ollama JSON parse errors in some hosts
     $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
 
     try {
-        Write-Verbose "Sending request to Ollama: Model=$Model, Stream=$Stream"
+        Write-Verbose "Sending request to pcai-inference completions: Model=$Model, Stream=$Stream"
 
-        $response = Invoke-RestMethod -Uri "$ApiUrl/api/generate" `
+        $response = Invoke-RestMethod -Uri "$ApiUrl/v1/completions" `
             -Method Post `
             -Body $jsonBytes `
             -ContentType 'application/json; charset=utf-8' `
@@ -621,7 +635,7 @@ function Invoke-OllamaGenerate {
         return $response
     }
     catch {
-        Write-Error "Ollama API request failed: $_"
+        Write-Error "pcai-inference completion request failed: $_"
         throw
     }
 }
@@ -629,7 +643,7 @@ function Invoke-OllamaGenerate {
 function Invoke-OllamaChat {
     <#
     .SYNOPSIS
-        Invokes Ollama chat API endpoint
+        Invokes pcai-inference chat completions endpoint (OpenAI-compatible)
     .OUTPUTS
         API response object
     #>
@@ -656,50 +670,20 @@ function Invoke-OllamaChat {
         [int]$TimeoutSeconds = $script:ModuleConfig.DefaultTimeout,
 
         [Parameter()]
-        [string]$ApiUrl = $script:ModuleConfig.OllamaApiUrl
+        [string]$ApiUrl = $script:ModuleConfig.PcaiInferenceApiUrl
     )
 
-    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'ollama'
-
-    $body = @{
-        model = $Model
-        messages = $Messages
-        stream = $Stream
-        options = @{
-            temperature = $Temperature
-        }
+    if ($Stream) {
+        return Invoke-OpenAIChatStream -Messages $Messages -Model $Model -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $ApiUrl
     }
 
-    if ($MaxTokens) {
-        $body.options['num_predict'] = $MaxTokens
-    }
-
-    $jsonBody = $body | ConvertTo-Json -Depth 10
-    # Force UTF-8 (no BOM) to avoid Ollama JSON parse errors in some hosts
-    $jsonBytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
-
-    try {
-        Write-Verbose "Sending chat request to Ollama: Model=$Model, Messages=$($Messages.Count)"
-
-        $response = Invoke-RestMethod -Uri "$ApiUrl/api/chat" `
-            -Method Post `
-            -Body $jsonBytes `
-            -ContentType 'application/json; charset=utf-8' `
-            -TimeoutSec $TimeoutSeconds `
-            -ErrorAction Stop
-
-        return $response
-    }
-    catch {
-        Write-Error "Ollama chat API request failed: $_"
-        throw
-    }
+    return Invoke-OpenAIChat -Messages $Messages -Model $Model -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $ApiUrl
 }
 
 function Invoke-OllamaChatStream {
     <#
     .SYNOPSIS
-        Streams Ollama chat responses and returns the full content.
+        Streams pcai-inference chat responses and returns the full content.
     .OUTPUTS
         String (full assistant message)
     #>
@@ -723,57 +707,10 @@ function Invoke-OllamaChatStream {
         [int]$TimeoutSeconds = $script:ModuleConfig.DefaultTimeout,
 
         [Parameter()]
-        [string]$ApiUrl = $script:ModuleConfig.OllamaApiUrl
+        [string]$ApiUrl = $script:ModuleConfig.PcaiInferenceApiUrl
     )
 
-    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'ollama'
-
-    $body = @{
-        model = $Model
-        messages = $Messages
-        stream = $true
-        options = @{
-            temperature = $Temperature
-        }
-    }
-
-    if ($MaxTokens) {
-        $body.options['num_predict'] = $MaxTokens
-    }
-
-    $jsonBody = $body | ConvertTo-Json -Depth 10
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
-
-    $client = New-Object System.Net.Http.HttpClient
-    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
-    $content = New-Object System.Net.Http.ByteArrayContent($bytes)
-    $content.Headers.ContentType = 'application/json'
-
-    $sb = New-Object System.Text.StringBuilder
-    try {
-        $response = $client.PostAsync("$ApiUrl/api/chat", $content, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
-        $response.EnsureSuccessStatusCode() | Out-Null
-        $stream = $response.Content.ReadAsStreamAsync().Result
-        $reader = New-Object System.IO.StreamReader($stream)
-        while (-not $reader.EndOfStream) {
-            $line = $reader.ReadLine()
-            if ([string]::IsNullOrWhiteSpace($line)) { continue }
-            try {
-                $chunk = $line | ConvertFrom-Json -ErrorAction Stop
-                $text = $chunk.message.content
-                if ($text) {
-                    Write-Host -NoNewline $text
-                    $null = $sb.Append($text)
-                }
-                if ($chunk.done) { break }
-            } catch { }
-        }
-        Write-Host ""
-    } finally {
-        $client.Dispose()
-    }
-
-    return $sb.ToString()
+    return Invoke-OpenAIChatStream -Messages $Messages -Model $Model -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $ApiUrl
 }
 
 function Invoke-OpenAIChat {
@@ -858,6 +795,183 @@ function Invoke-OpenAIChat {
     }
 }
 
+function Invoke-OpenAIChatStream {
+    <#
+    .SYNOPSIS
+        Streams OpenAI-compatible chat completions (SSE) and returns full content.
+    .OUTPUTS
+        String (full assistant message)
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)]
+        [array]$Messages,
+
+        [Parameter(Mandatory)]
+        [string]$Model,
+
+        [Parameter()]
+        [ValidateRange(0.0, 2.0)]
+        [double]$Temperature = 0.7,
+
+        [Parameter()]
+        [int]$MaxTokens,
+
+        [Parameter()]
+        [int]$TimeoutSeconds = $script:ModuleConfig.DefaultTimeout,
+
+        [Parameter(Mandatory)]
+        [string]$ApiUrl
+    )
+
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'pcai-inference'
+
+    $body = @{
+        model = $Model
+        messages = $Messages
+        temperature = $Temperature
+        stream = $true
+    }
+
+    if ($MaxTokens) {
+        $body['max_tokens'] = $MaxTokens
+    }
+
+    $jsonBody = $body | ConvertTo-Json -Depth 10
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
+
+    $client = New-Object System.Net.Http.HttpClient
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
+    $content = New-Object System.Net.Http.ByteArrayContent($bytes)
+    $content.Headers.ContentType = 'application/json'
+
+    $sb = New-Object System.Text.StringBuilder
+    try {
+        $request = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Post, "$ApiUrl/v1/chat/completions")
+        $request.Content = $content
+        $response = $client.SendAsync($request, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+        $response.EnsureSuccessStatusCode() | Out-Null
+        $stream = $response.Content.ReadAsStreamAsync().Result
+        $reader = New-Object System.IO.StreamReader($stream)
+        while (-not $reader.EndOfStream) {
+            $line = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            if (-not $line.StartsWith('data:')) { continue }
+
+            $payload = $line.Substring(5).Trim()
+            if ($payload -eq '[DONE]') { break }
+
+            try {
+                $chunk = $payload | ConvertFrom-Json -ErrorAction Stop
+                $choice = $chunk.choices | Select-Object -First 1
+                $delta = $choice.delta
+                $text = $null
+                if ($delta -and $delta.content) {
+                    $text = $delta.content
+                } elseif ($choice.text) {
+                    $text = $choice.text
+                }
+
+                if ($text) {
+                    Write-Host -NoNewline $text
+                    $null = $sb.Append($text)
+                }
+            } catch { }
+        }
+        Write-Host ""
+    } finally {
+        $client.Dispose()
+    }
+
+    return $sb.ToString()
+}
+
+function Invoke-OpenAICompletionStream {
+    <#
+    .SYNOPSIS
+        Streams OpenAI-compatible completions (SSE) and returns full text.
+    .OUTPUTS
+        String (full completion)
+    #>
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Prompt,
+
+        [Parameter(Mandatory)]
+        [string]$Model,
+
+        [Parameter()]
+        [ValidateRange(0.0, 2.0)]
+        [double]$Temperature = 0.7,
+
+        [Parameter()]
+        [int]$MaxTokens,
+
+        [Parameter()]
+        [int]$TimeoutSeconds = $script:ModuleConfig.DefaultTimeout,
+
+        [Parameter(Mandatory)]
+        [string]$ApiUrl
+    )
+
+    $ApiUrl = Resolve-PcaiEndpoint -ApiUrl $ApiUrl -ProviderName 'pcai-inference'
+
+    $body = @{
+        model = $Model
+        prompt = $Prompt
+        temperature = $Temperature
+        stream = $true
+    }
+
+    if ($MaxTokens) {
+        $body['max_tokens'] = $MaxTokens
+    }
+
+    $jsonBody = $body | ConvertTo-Json -Depth 10
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
+
+    $client = New-Object System.Net.Http.HttpClient
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
+    $content = New-Object System.Net.Http.ByteArrayContent($bytes)
+    $content.Headers.ContentType = 'application/json'
+
+    $sb = New-Object System.Text.StringBuilder
+    try {
+        $request = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Post, "$ApiUrl/v1/completions")
+        $request.Content = $content
+        $response = $client.SendAsync($request, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+        $response.EnsureSuccessStatusCode() | Out-Null
+        $stream = $response.Content.ReadAsStreamAsync().Result
+        $reader = New-Object System.IO.StreamReader($stream)
+        while (-not $reader.EndOfStream) {
+            $line = $reader.ReadLine()
+            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+            if (-not $line.StartsWith('data:')) { continue }
+
+            $payload = $line.Substring(5).Trim()
+            if ($payload -eq '[DONE]') { break }
+
+            try {
+                $chunk = $payload | ConvertFrom-Json -ErrorAction Stop
+                $choice = $chunk.choices | Select-Object -First 1
+                $text = $choice.text
+                if ($text) {
+                    Write-Host -NoNewline $text
+                    $null = $sb.Append($text)
+                }
+            } catch { }
+        }
+        Write-Host ""
+    } finally {
+        $client.Dispose()
+    }
+
+    return $sb.ToString()
+}
+
 function Invoke-LLMChatWithFallback {
     <#
     .SYNOPSIS
@@ -885,7 +999,7 @@ function Invoke-LLMChatWithFallback {
         [int]$TimeoutSeconds = $script:ModuleConfig.DefaultTimeout,
 
         [Parameter()]
-        [ValidateSet('auto','ollama','vllm','lmstudio')]
+        [ValidateSet('auto','pcai-inference','ollama','vllm','lmstudio')]
         [string]$Provider = 'auto',
 
         [Parameter()]
@@ -897,18 +1011,26 @@ function Invoke-LLMChatWithFallback {
     )
 
     $providers = if ($Provider -eq 'auto') {
-        if ($script:ModuleConfig.ProviderOrder) { @($script:ModuleConfig.ProviderOrder) } else { @('ollama','vllm','lmstudio') }
+        if ($script:ModuleConfig.ProviderOrder) { @($script:ModuleConfig.ProviderOrder) } else { @('pcai-inference') }
     } else {
         @($Provider)
     }
 
     foreach ($p in $providers) {
         switch ($p) {
-            'ollama' {
-                if (Test-OllamaConnection) {
+            'pcai-inference' {
+                if (Test-PcaiInferenceConnection) {
                     $modelToUse = if ($Model) { $Model } else { $script:ModuleConfig.DefaultModel }
-                    $resp = Invoke-OllamaChat -Messages $Messages -Model $modelToUse -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds
-                    $resp | Add-Member -MemberType NoteProperty -Name Provider -Value 'ollama' -Force
+                    $resp = Invoke-OpenAIChat -Messages $Messages -Model $modelToUse -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $script:ModuleConfig.PcaiInferenceApiUrl
+                    $resp | Add-Member -MemberType NoteProperty -Name Provider -Value 'pcai-inference' -Force
+                    return $resp
+                }
+            }
+            'ollama' {
+                if (Test-PcaiInferenceConnection) {
+                    $modelToUse = if ($Model) { $Model } else { $script:ModuleConfig.DefaultModel }
+                    $resp = Invoke-OpenAIChat -Messages $Messages -Model $modelToUse -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $script:ModuleConfig.PcaiInferenceApiUrl
+                    $resp | Add-Member -MemberType NoteProperty -Name Provider -Value 'pcai-inference' -Force
                     return $resp
                 }
             }

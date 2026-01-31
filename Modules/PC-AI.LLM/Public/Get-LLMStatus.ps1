@@ -3,11 +3,11 @@
 function Get-LLMStatus {
     <#
     .SYNOPSIS
-        Checks the status of Ollama LLM service and available models
+        Checks the status of pcai-inference LLM service and available models
 
     .DESCRIPTION
-        Verifies Ollama installation, service status, API connectivity, and lists available models.
-        Also checks LM Studio as a fallback option.
+        Verifies pcai-inference API connectivity and lists available models.
+        Optionally checks FunctionGemma router and other OpenAI-compatible providers.
 
     .PARAMETER IncludeLMStudio
         Include LM Studio status check in the output
@@ -20,11 +20,11 @@ function Get-LLMStatus {
 
     .EXAMPLE
         Get-LLMStatus
-        Returns basic Ollama status and model list
+        Returns basic pcai-inference status and model list
 
     .EXAMPLE
         Get-LLMStatus -IncludeLMStudio -TestConnection
-        Returns comprehensive status including LM Studio and connectivity tests
+        Returns comprehensive status including router and connectivity tests
 
     .OUTPUTS
         PSCustomObject with status information
@@ -49,15 +49,18 @@ function Get-LLMStatus {
     process {
         $status = [PSCustomObject]@{
             Timestamp       = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-            Ollama          = [PSCustomObject]@{
-                Installed     = $false
-                Path          = $script:ModuleConfig.OllamaPath
-                ApiUrl        = $script:ModuleConfig.OllamaApiUrl
-                ApiConnected  = $false
-                ServiceStatus = $null
-                Models        = @()
-                DefaultModel  = $script:ModuleConfig.DefaultModel
+            PcaiInference   = [PSCustomObject]@{
+                ApiUrl       = $script:ModuleConfig.PcaiInferenceApiUrl
+                ApiConnected = $false
+                Models       = @()
+                DefaultModel = $script:ModuleConfig.DefaultModel
             }
+            Router          = [PSCustomObject]@{
+                ApiUrl       = $script:ModuleConfig.RouterApiUrl
+                ApiConnected = $false
+                Model        = $script:ModuleConfig.RouterModel
+            }
+            Ollama          = $null
             VLLM            = $null
             LMStudio        = $null
             Recommendations = @()
@@ -65,29 +68,16 @@ function Get-LLMStatus {
             ActiveModel     = $script:ModuleConfig.DefaultModel
         }
 
-        # Test API connectivity first (supports Dockerized Ollama)
-        $status.Ollama.ApiConnected = Test-OllamaConnection
-        Write-Verbose "Ollama API connectivity: $($status.Ollama.ApiConnected)"
-
-        # Check Ollama installation path (optional when Dockerized)
-        if (Test-Path -Path $script:ModuleConfig.OllamaPath) {
-            $status.Ollama.Installed = $true
-            Write-Verbose "Ollama executable found at $($script:ModuleConfig.OllamaPath)"
-
-            # Get Ollama service status (if exists)
-            $serviceStatus = Get-ServiceStatus -ServiceName 'Ollama'
-            $status.Ollama.ServiceStatus = $serviceStatus
-        } elseif ($status.Ollama.ApiConnected) {
-            # Ollama reachable via API (likely Dockerized or remote)
-            $status.Ollama.Installed = $true
-        }
+        # Test pcai-inference connectivity
+        $status.PcaiInference.ApiConnected = Test-PcaiInferenceConnection
+        Write-Verbose "pcai-inference API connectivity: $($status.PcaiInference.ApiConnected)"
 
         # Get available models if API is connected
-        if ($status.Ollama.ApiConnected) {
+        if ($status.PcaiInference.ApiConnected) {
             $models = Get-OllamaModels
-            $status.Ollama.Models = @($models)
+            $status.PcaiInference.Models = @($models)
 
-            Write-Verbose "Found $($models.Count) Ollama models"
+            Write-Verbose "Found $($models.Count) pcai-inference models"
 
             # Check if default model exists
             $defaultModelExists = $models | Where-Object { $_.Name -eq $script:ModuleConfig.DefaultModel }
@@ -95,10 +85,21 @@ function Get-LLMStatus {
                 $status.Recommendations += "Default model '$($script:ModuleConfig.DefaultModel)' not found. Available models: $($models.Name -join ', ')"
             }
         } else {
-            if (-not (Test-Path -Path $script:ModuleConfig.OllamaPath)) {
-                $status.Recommendations += "Ollama executable not found at $($script:ModuleConfig.OllamaPath) and API is not reachable."
-            }
-            $status.Recommendations += 'Ollama API is not accessible. Ensure Ollama is running.'
+            $status.Recommendations += 'pcai-inference API is not accessible. Ensure the server is running.'
+        }
+
+        # Compatibility fields expected by older callers
+        $status.PcaiInference | Add-Member -MemberType NoteProperty -Name Available -Value $status.PcaiInference.ApiConnected -Force
+        $status.PcaiInference | Add-Member -MemberType NoteProperty -Name AvailableModels -Value $status.PcaiInference.Models -Force
+        $status.PcaiInference | Add-Member -MemberType NoteProperty -Name ModelsLoaded -Value ($status.PcaiInference.Models | ForEach-Object { $_.Name }) -Force
+
+        # Alias legacy Ollama status to pcai-inference for compatibility
+        $status.Ollama = $status.PcaiInference
+
+        # Router status (FunctionGemma)
+        if ($status.Router.ApiUrl) {
+            $status.Router.ApiConnected = Test-OpenAIConnection -ApiUrl $status.Router.ApiUrl
+            Write-Verbose "Router API connectivity: $($status.Router.ApiConnected)"
         }
 
         # Check LM Studio if requested
@@ -108,11 +109,11 @@ function Get-LLMStatus {
                 ApiConnected = $false
             }
 
-            if ($TestConnection -or $status.Ollama.ApiConnected -eq $false) {
+            if ($TestConnection -or $status.PcaiInference.ApiConnected -eq $false) {
                 $status.LMStudio.ApiConnected = Test-LMStudioConnection
                 Write-Verbose "LM Studio API connectivity: $($status.LMStudio.ApiConnected)"
 
-                if ($status.LMStudio.ApiConnected -and -not $status.Ollama.ApiConnected) {
+                if ($status.LMStudio.ApiConnected -and -not $status.PcaiInference.ApiConnected) {
                     $status.Recommendations += 'LM Studio is available as a fallback option.'
                 }
             }
@@ -128,11 +129,11 @@ function Get-LLMStatus {
                 Metrics      = $null
             }
 
-            if ($TestConnection -or $status.Ollama.ApiConnected -eq $false) {
+            if ($TestConnection -or $status.PcaiInference.ApiConnected -eq $false) {
                 $status.VLLM.ApiConnected = Test-OpenAIConnection -ApiUrl $script:ModuleConfig.VLLMApiUrl
                 Write-Verbose "vLLM API connectivity: $($status.VLLM.ApiConnected)"
 
-                if ($status.VLLM.ApiConnected -and -not $status.Ollama.ApiConnected) {
+                if ($status.VLLM.ApiConnected -and -not $status.PcaiInference.ApiConnected) {
                     $status.Recommendations += 'vLLM is available as a fallback option.'
                 }
 
@@ -144,8 +145,8 @@ function Get-LLMStatus {
         }
 
         # Overall health check
-        $modelCount = @($status.Ollama.Models).Count
-        if ($status.Ollama.Installed -and $status.Ollama.ApiConnected -and $modelCount -gt 0) {
+        $modelCount = @($status.PcaiInference.Models).Count
+        if ($status.PcaiInference.ApiConnected -and $modelCount -gt 0) {
             Write-Verbose 'LLM system is healthy and ready'
         } else {
             Write-Warning 'LLM system is not fully operational. Check recommendations.'

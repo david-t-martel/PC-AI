@@ -8,7 +8,7 @@ function Invoke-PCDiagnosis {
     .DESCRIPTION
         Main diagnostic analysis function that loads DIAGNOSE.md as system prompt and
         DIAGNOSE_LOGIC.md as reasoning guide, then submits a hardware diagnostic report
-        to Ollama for intelligent analysis and recommendations.
+        to pcai-inference for intelligent analysis and recommendations.
 
     .PARAMETER DiagnosticReportPath
         Path to the hardware diagnostic report text file
@@ -38,7 +38,7 @@ function Invoke-PCDiagnosis {
         Routes the diagnostic report through FunctionGemma for tool call planning before analysis
 
     .PARAMETER RouterBaseUrl
-        Base URL for the FunctionGemma vLLM API. Default: http://localhost:11434
+        Base URL for the FunctionGemma router API. Default: http://127.0.0.1:8000
 
     .PARAMETER RouterModel
         Model name to use for FunctionGemma routing. Default: qwen2.5-coder:7b

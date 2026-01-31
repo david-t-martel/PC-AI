@@ -4,7 +4,7 @@
     Invokes native high-performance search operations for LLM analysis
 
 .DESCRIPTION
-    Provides a unified interface for Ollama/LLM to invoke native Rust-powered
+    Provides a unified interface for pcai-inference/LLM to invoke native Rust-powered
     search operations. Returns LLM-optimized JSON output that can be easily
     parsed and analyzed by language models.
 
@@ -44,7 +44,7 @@
 
 .EXAMPLE
     Invoke-NativeSearch -Operation Files -Pattern "*.ps1" -AsJson | Send-OllamaRequest -Prompt "Analyze these PowerShell scripts"
-    Finds PS1 files and sends to Ollama for analysis
+    Finds PS1 files and sends to pcai-inference for analysis
 
 .OUTPUTS
     PSCustomObject with search results and metadata optimized for LLM consumption

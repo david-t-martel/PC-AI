@@ -6,7 +6,7 @@
     Author = 'PC-AI Project'
     CompanyName = 'PC-AI'
     Copyright = '(c) 2026 PC-AI Project. All rights reserved.'
-    Description = 'PowerShell module for integrating Ollama LLM with PC diagnostics and analysis'
+    Description = 'PowerShell module for integrating pcai-inference LLM with PC diagnostics and analysis'
 
     # Minimum PowerShell version
     PowerShellVersion = '5.1'
@@ -41,11 +41,11 @@
     # Private data
     PrivateData = @{
         PSData = @{
-            Tags = @('Ollama', 'LLM', 'AI', 'Diagnostics', 'PC-AI')
+            Tags = @('pcai-inference', 'LLM', 'AI', 'Diagnostics', 'PC-AI')
             LicenseUri = ''
             ProjectUri = ''
             IconUri = ''
-            ReleaseNotes = 'Initial release with Ollama integration for PC diagnostics'
+            ReleaseNotes = 'Updated to use pcai-inference as the primary local LLM backend'
         }
         PCAI = @{
             Commands = @('analyze', 'chat', 'llm')

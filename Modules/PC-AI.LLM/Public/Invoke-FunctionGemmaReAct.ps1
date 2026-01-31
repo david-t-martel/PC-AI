@@ -50,7 +50,7 @@ function Invoke-FunctionGemmaChat {
 function Invoke-FunctionGemmaReAct {
     <#
     .SYNOPSIS
-        Uses FunctionGemma (via vLLM OpenAI API) to plan tool calls and optionally executes them.
+    Uses FunctionGemma (OpenAI-compatible API) to plan tool calls and optionally executes them.
 
     .DESCRIPTION
         Sends a prompt + tool schema to FunctionGemma and returns tool calls. When -ExecuteTools
@@ -61,7 +61,7 @@ function Invoke-FunctionGemmaReAct {
         The user request or prompt.
 
     .PARAMETER BaseUrl
-        Base URL for the vLLM OpenAI-compatible API.
+        Base URL for the FunctionGemma OpenAI-compatible API.
 
     .PARAMETER Model
         Model name to use.

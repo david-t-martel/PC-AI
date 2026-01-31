@@ -12,14 +12,17 @@ function Set-LLMConfig {
     .PARAMETER DefaultModel
         Default model to use for LLM requests
 
+    .PARAMETER PcaiInferenceApiUrl
+        pcai-inference API endpoint URL
+
     .PARAMETER OllamaApiUrl
-        Ollama API endpoint URL
+        Legacy alias for PcaiInferenceApiUrl (kept for compatibility)
 
     .PARAMETER LMStudioApiUrl
         LM Studio API endpoint URL
 
     .PARAMETER OllamaPath
-        Path to Ollama executable
+        Legacy path to Ollama executable (kept for compatibility)
 
     .PARAMETER DefaultTimeout
         Default timeout in seconds for API requests
@@ -57,6 +60,10 @@ function Set-LLMConfig {
 
         [Parameter(ParameterSetName = 'SetConfig')]
         [ValidatePattern('^https?://')]
+        [string]$PcaiInferenceApiUrl,
+
+        [Parameter(ParameterSetName = 'SetConfig')]
+        [ValidatePattern('^https?://')]
         [string]$OllamaApiUrl,
 
         [Parameter(ParameterSetName = 'SetConfig')]
@@ -86,10 +93,10 @@ function Set-LLMConfig {
 
         # Default configuration
         $defaultConfig = @{
-            OllamaPath = 'C:\Users\david\AppData\Local\Programs\Ollama\ollama.exe'
-            OllamaApiUrl = 'http://localhost:11434'
+            PcaiInferenceApiUrl = 'http://127.0.0.1:8080'
+            OllamaApiUrl = 'http://127.0.0.1:8080'
             LMStudioApiUrl = 'http://localhost:1234'
-            DefaultModel = 'qwen2.5-coder:7b'
+            DefaultModel = 'pcai-inference'
             DefaultTimeout = 120
         }
     }
@@ -131,14 +138,13 @@ function Set-LLMConfig {
             $updated = $false
 
             if ($PSBoundParameters.ContainsKey('DefaultModel')) {
-                # Verify model exists if Ollama is available
-                if (Test-OllamaConnection) {
+                # Verify model exists if pcai-inference is available
+                if (Test-PcaiInferenceConnection) {
                     $availableModels = Get-OllamaModels
                     $modelExists = $availableModels | Where-Object { $_.Name -eq $DefaultModel }
 
-                    if (-not $modelExists) {
-                        Write-Warning "Model '$DefaultModel' not found in Ollama. Available models: $($availableModels.Name -join ', ')"
-                        Write-Host "You may need to pull the model with: ollama pull $DefaultModel" -ForegroundColor Yellow
+                    if (-not $modelExists -and $availableModels.Count -gt 0) {
+                        Write-Warning "Model '$DefaultModel' not found in pcai-inference. Available models: $($availableModels.Name -join ', ')"
                     }
                 }
 
@@ -147,9 +153,17 @@ function Set-LLMConfig {
                 $updated = $true
             }
 
+            if ($PSBoundParameters.ContainsKey('PcaiInferenceApiUrl')) {
+                $script:ModuleConfig.PcaiInferenceApiUrl = $PcaiInferenceApiUrl
+                $script:ModuleConfig.OllamaApiUrl = $PcaiInferenceApiUrl
+                Write-Host "pcai-inference API URL set to: $PcaiInferenceApiUrl" -ForegroundColor Green
+                $updated = $true
+            }
+
             if ($PSBoundParameters.ContainsKey('OllamaApiUrl')) {
                 $script:ModuleConfig.OllamaApiUrl = $OllamaApiUrl
-                Write-Host "Ollama API URL set to: $OllamaApiUrl" -ForegroundColor Green
+                $script:ModuleConfig.PcaiInferenceApiUrl = $OllamaApiUrl
+                Write-Host "pcai-inference API URL set to: $OllamaApiUrl" -ForegroundColor Green
                 $updated = $true
             }
 
@@ -161,7 +175,7 @@ function Set-LLMConfig {
 
             if ($PSBoundParameters.ContainsKey('OllamaPath')) {
                 $script:ModuleConfig.OllamaPath = $OllamaPath
-                Write-Host "Ollama path set to: $OllamaPath" -ForegroundColor Green
+                Write-Host "Legacy Ollama path set to: $OllamaPath" -ForegroundColor Green
                 $updated = $true
             }
 
@@ -187,16 +201,27 @@ function Set-LLMConfig {
                     try {
                         $projectConfig = Get-Content -Path $projectConfigPath -Raw | ConvertFrom-Json
                         if ($PSBoundParameters.ContainsKey('DefaultModel')) {
-                            $projectConfig.providers.ollama.defaultModel = $DefaultModel
+                            if ($projectConfig.providers.'pcai-inference') {
+                                $projectConfig.providers.'pcai-inference'.defaultModel = $DefaultModel
+                            }
+                        }
+                        if ($PSBoundParameters.ContainsKey('PcaiInferenceApiUrl')) {
+                            if ($projectConfig.providers.'pcai-inference') {
+                                $projectConfig.providers.'pcai-inference'.baseUrl = $PcaiInferenceApiUrl
+                            }
                         }
                         if ($PSBoundParameters.ContainsKey('OllamaApiUrl')) {
-                            $projectConfig.providers.ollama.baseUrl = $OllamaApiUrl
+                            if ($projectConfig.providers.'pcai-inference') {
+                                $projectConfig.providers.'pcai-inference'.baseUrl = $OllamaApiUrl
+                            }
                         }
                         if ($PSBoundParameters.ContainsKey('LMStudioApiUrl')) {
                             $projectConfig.providers.lmstudio.baseUrl = $LMStudioApiUrl
                         }
                         if ($PSBoundParameters.ContainsKey('DefaultTimeout')) {
-                            $projectConfig.providers.ollama.timeout = ($DefaultTimeout * 1000)
+                            if ($projectConfig.providers.'pcai-inference') {
+                                $projectConfig.providers.'pcai-inference'.timeout = ($DefaultTimeout * 1000)
+                            }
                         }
 
                         $projectJson = $projectConfig | ConvertTo-Json -Depth 10
@@ -215,8 +240,9 @@ function Set-LLMConfig {
 
         # Return current configuration
         return [PSCustomObject]@{
-            OllamaPath = $script:ModuleConfig.OllamaPath
+            PcaiInferenceApiUrl = $script:ModuleConfig.PcaiInferenceApiUrl
             OllamaApiUrl = $script:ModuleConfig.OllamaApiUrl
+            OllamaPath = $script:ModuleConfig.OllamaPath
             LMStudioApiUrl = $script:ModuleConfig.LMStudioApiUrl
             DefaultModel = $script:ModuleConfig.DefaultModel
             DefaultTimeout = $script:ModuleConfig.DefaultTimeout

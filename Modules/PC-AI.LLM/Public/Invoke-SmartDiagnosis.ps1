@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Smart PC diagnosis combining native high-performance tools with Ollama LLM analysis
+    Smart PC diagnosis combining native high-performance tools with pcai-inference LLM analysis
 #>
 function Invoke-SmartDiagnosis {
     [CmdletBinding()]
@@ -47,7 +47,8 @@ function Invoke-SmartDiagnosis {
         }
 
         if ($OllamaBaseUrl) {
-            $script:ModuleConfig.OllamaBaseUrl = $OllamaBaseUrl
+            $script:ModuleConfig.PcaiInferenceApiUrl = $OllamaBaseUrl
+            $script:ModuleConfig.OllamaApiUrl = $OllamaBaseUrl
         }
     }
 

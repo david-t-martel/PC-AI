@@ -1,31 +1,26 @@
 # PC-AI.LLM PowerShell Module
 
-PowerShell module for integrating **Ollama** local LLM with PC diagnostics and system analysis.
+PowerShell module for integrating **pcai-inference** local LLM with PC diagnostics and system analysis.
 
 ## Overview
 
-PC-AI.LLM provides a complete PowerShell interface to Ollama, enabling intelligent analysis of PC hardware diagnostics, interactive chat sessions, and automated AI-powered troubleshooting.
+PC-AI.LLM provides a complete PowerShell interface to pcai-inference, enabling intelligent analysis of PC hardware diagnostics, interactive chat sessions, and automated AI-powered troubleshooting.
 
 ## Features
 
-- **Full Ollama API Integration** - Native PowerShell wrappers for Ollama generate and chat endpoints
+- **pcai-inference Integration** - OpenAI-compatible HTTP + native FFI support
 - **PC Diagnostics Analysis** - Automated analysis of hardware diagnostic reports using LLM reasoning
 - **Interactive Chat** - Conversational interface with conversation history management
 - **Model Management** - Easy model selection, status checking, and configuration
 - **Error Handling** - Robust retry logic, timeout handling, and connection fallback
-- **LM Studio Support** - Fallback to LM Studio API when Ollama is unavailable
+- **FunctionGemma Router** - Optional tool-calling router for diagnostics
 
 ## Installation
 
 ### Prerequisites
 
-1. **Ollama** installed at `C:\Users\david\AppData\Local\Programs\Ollama\ollama.exe`
-2. **Models pulled** (recommended: `qwen2.5-coder:7b` for technical analysis)
-
-```powershell
-# Pull recommended model
-ollama pull qwen2.5-coder:7b
-```
+1. **pcai-inference** HTTP server or DLL built (see `Deploy\pcai-inference`)
+2. **GGUF model available** for local inference
 
 ### Module Installation
 
@@ -45,8 +40,7 @@ Get-Command -Module PC-AI.LLM
 Get-LLMStatus -TestConnection
 
 # Output shows:
-# - Ollama installation status
-# - API connectivity
+# - pcai-inference API connectivity
 # - Available models
 # - Default model
 ```
@@ -72,7 +66,7 @@ Invoke-PCDiagnosis -DiagnosticReportPath "$env:USERPROFILE\Desktop\Hardware-Diag
 ### 4. Interactive Chat
 
 ```powershell
-Invoke-LLMChat -Interactive -Model "qwen2.5-coder:7b" -System "You are a Windows system administrator expert"
+Invoke-LLMChat -Interactive -Model "pcai-inference" -System "You are a Windows system administrator expert"
 
 # Commands in chat:
 # - Type messages to chat
@@ -85,7 +79,7 @@ Invoke-LLMChat -Interactive -Model "qwen2.5-coder:7b" -System "You are a Windows
 
 ### Get-LLMStatus
 
-Check Ollama installation, API connectivity, and available models.
+Check pcai-inference API connectivity and available models.
 
 ```powershell
 Get-LLMStatus -TestConnection -IncludeLMStudio
@@ -96,23 +90,22 @@ Get-LLMStatus -TestConnection -IncludeLMStudio
 - `-IncludeLMStudio` - Check LM Studio availability
 
 **Output:**
-- Ollama installation status
-- API connection status
+- pcai-inference API status
 - Available models list
-- Service status
+- Router availability (if configured)
 - Recommendations
 
 ### Send-OllamaRequest
 
-Send text generation request to Ollama.
+Send text generation request to pcai-inference.
 
 ```powershell
-Send-OllamaRequest -Prompt "Explain RAID" -Model "qwen2.5-coder:7b" -Temperature 0.7
+Send-OllamaRequest -Prompt "Explain RAID" -Model "pcai-inference" -Temperature 0.7
 ```
 
 **Parameters:**
 - `-Prompt` (required) - Text prompt
-- `-Model` - Model name (default: qwen2.5-coder:7b)
+- `-Model` - Model name (default: pcai-inference)
 - `-System` - System prompt
 - `-Temperature` - Randomness (0.0-2.0, default: 0.7)
 - `-MaxTokens` - Maximum tokens to generate
@@ -169,7 +162,7 @@ Invoke-PCDiagnosis -DiagnosticReportPath "report.txt" -SaveReport -Model "qwen2.
 **Parameters:**
 - `-DiagnosticReportPath` - Path to diagnostic report file
 - `-ReportText` - Direct report text input
-- `-Model` - Model for analysis (default: qwen2.5-coder:7b)
+- `-Model` - Model for analysis (default: pcai-inference)
 - `-Temperature` - Analysis consistency (default: 0.3 for deterministic)
 - `-IncludeRawResponse` - Include raw API response
 - `-SaveReport` - Save analysis to file
@@ -210,9 +203,10 @@ Set-LLMConfig -Reset
 
 **Parameters:**
 - `-DefaultModel` - Set default model
-- `-OllamaApiUrl` - Ollama API endpoint
-- `-LMStudioApiUrl` - LM Studio API endpoint
-- `-OllamaPath` - Path to Ollama executable
+- `-PcaiInferenceApiUrl` - pcai-inference API endpoint
+- `-OllamaApiUrl` - Legacy alias for pcai-inference endpoint
+- `-LMStudioApiUrl` - LM Studio API endpoint (optional fallback)
+- `-OllamaPath` - Legacy path to Ollama executable
 - `-DefaultTimeout` - Default timeout (seconds)
 - `-ShowConfig` - Display current config
 - `-Reset` - Reset to defaults
@@ -221,32 +215,20 @@ Set-LLMConfig -Reset
 
 ## Model Selection Guide
 
-### Recommended Models
+### Recommended GGUF Models
 
 | Model | Size | Use Case | Speed | Quality |
 |-------|------|----------|-------|---------|
-| **qwen2.5-coder:7b** | 4.7GB | Technical analysis, diagnostics | Fast | High |
-| **deepseek-r1:8b** | 5.2GB | Complex reasoning, root cause | Medium | Very High |
-| **mistral:7b** | 4.4GB | General chat, fast responses | Fast | Good |
-| **gemma3:12b** | 8.1GB | High quality, detailed analysis | Slower | Excellent |
-| **nomic-embed-text** | 274MB | Text embeddings only | N/A | N/A |
+| **Llama 3 (GGUF)** | Varies | General analysis | Fast | High |
+| **Mistral (GGUF)** | Varies | Fast general responses | Very Fast | Good |
+| **Phi (GGUF)** | Varies | Lightweight local analysis | Very Fast | Medium |
+| **Gemma (GGUF)** | Varies | High-quality responses | Slower | Excellent |
 
 ### How to Choose
 
-- **PC Diagnostics**: `qwen2.5-coder:7b` (optimized for technical content)
-- **Complex Issues**: `deepseek-r1:8b` (better reasoning chains)
-- **Quick Answers**: `mistral:7b` (fastest general model)
-- **Detailed Analysis**: `gemma3:12b` (highest quality, slower)
-
-### Pull New Models
-
-```powershell
-# From command line
-ollama pull modelname:tag
-
-# Verify in module
-Get-LLMStatus
-```
+- **PC Diagnostics**: Llama 3 / Mistral GGUF
+- **Complex Issues**: Larger GGUF models with more context
+- **Quick Answers**: Phi or smaller Mistral GGUF
 
 ## Configuration
 
@@ -254,10 +236,10 @@ Module uses `llm-config.json` for persistence:
 
 ```json
 {
-  "OllamaPath": "C:\\Users\\david\\AppData\\Local\\Programs\\Ollama\\ollama.exe",
-  "OllamaApiUrl": "http://localhost:11434",
-  "LMStudioApiUrl": "http://localhost:1234",
-  "DefaultModel": "qwen2.5-coder:7b",
+  "PcaiInferenceApiUrl": "http://127.0.0.1:8080",
+  "RouterApiUrl": "http://127.0.0.1:8000",
+  "RouterModel": "functiongemma-270m-it",
+  "DefaultModel": "pcai-inference",
   "DefaultTimeout": 120
 }
 ```
@@ -279,7 +261,7 @@ Get-LLMStatus -TestConnection
 # Step 4: Analyze report
 $analysis = Invoke-PCDiagnosis `
     -DiagnosticReportPath "$env:USERPROFILE\Desktop\Hardware-Diagnostics-Report.txt" `
-    -Model "qwen2.5-coder:7b" `
+    -Model "pcai-inference" `
     -SaveReport `
     -Verbose
 
@@ -292,7 +274,7 @@ Get-Content "$env:USERPROFILE\Desktop\PC-Diagnosis-Analysis.txt"
 ```
 PC DIAGNOSTICS ANALYSIS REPORT
 Generated: 2026-01-23 02:30:00
-Model: qwen2.5-coder:7b
+Model: pcai-inference
 
 ================================================================================
 
@@ -326,14 +308,14 @@ Model: qwen2.5-coder:7b
 
 ## Troubleshooting
 
-### Ollama Not Running
+### pcai-inference Not Running
 
 ```powershell
-# Check if Ollama is installed
 Get-LLMStatus
 
-# If installed but not running, start Ollama manually
-& "C:\Users\david\AppData\Local\Programs\Ollama\ollama.exe" serve
+# Start pcai-inference HTTP server
+cd .\Deploy\pcai-inference
+cargo run --release --features "llamacpp,server"
 ```
 
 ### Model Not Found
@@ -341,9 +323,6 @@ Get-LLMStatus
 ```powershell
 # List available models
 Get-LLMStatus
-
-# Pull missing model
-ollama pull qwen2.5-coder:7b
 
 # Verify
 Get-LLMStatus
@@ -363,13 +342,10 @@ Set-LLMConfig -DefaultTimeout 300
 
 ```powershell
 # Test connectivity
-Test-NetConnection localhost -Port 11434
+Test-NetConnection 127.0.0.1 -Port 8080
 
-# Check if Ollama service is running
-Get-Process ollama -ErrorAction SilentlyContinue
-
-# Check LM Studio as fallback
-Get-LLMStatus -IncludeLMStudio
+# Check router (optional)
+Test-NetConnection 127.0.0.1 -Port 8000
 ```
 
 ## Advanced Usage
@@ -422,9 +398,9 @@ foreach ($report in $reports) {
 ## Performance Tips
 
 1. **Use appropriate models**:
-   - Fast queries: `mistral:7b`
-   - Technical analysis: `qwen2.5-coder:7b`
-   - Complex reasoning: `deepseek-r1:8b`
+   - Fast queries: smaller GGUF (Phi/Mistral)
+   - Technical analysis: Llama 3 GGUF
+   - Complex reasoning: larger GGUF variants
 
 2. **Adjust temperature**:
    - Consistent results: `0.1-0.3`
@@ -471,11 +447,11 @@ Hardware diagnostics script that generates reports analyzed by `Invoke-PCDiagnos
 
 ### 1.0.0 (2026-01-23)
 - Initial release
-- Full Ollama API integration
+- pcai-inference integration (OpenAI-compatible HTTP + native FFI)
 - PC diagnostics analysis
 - Interactive chat
 - Configuration management
-- LM Studio fallback support
+- Optional FunctionGemma routing
 
 ## License
 
@@ -486,5 +462,5 @@ Part of the PC-AI project.
 For issues or questions:
 1. Check `Get-Help <FunctionName> -Full`
 2. Run `USAGE_EXAMPLES.ps1` for working examples
-3. Verify Ollama status with `Get-LLMStatus -TestConnection`
+3. Verify pcai-inference status with `Get-LLMStatus -TestConnection`
 

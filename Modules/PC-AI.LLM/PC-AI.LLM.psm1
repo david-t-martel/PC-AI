@@ -4,7 +4,7 @@
 .SYNOPSIS
     PC-AI.LLM PowerShell Module Loader
 .DESCRIPTION
-    Loads the PC-AI.LLM module for Ollama integration with PC diagnostics
+    Loads the PC-AI.LLM module for pcai-inference integration with PC diagnostics
 #>
 
 # Get module paths

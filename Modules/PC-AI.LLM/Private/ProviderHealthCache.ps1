@@ -22,7 +22,7 @@ function Set-ProviderHealthCache {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('ollama', 'vllm', 'lmstudio')]
+        [ValidateSet('pcai-inference', 'ollama', 'vllm', 'lmstudio')]
         [string]$Provider,
 
         [Parameter(Mandatory)]
@@ -76,7 +76,7 @@ function Get-CachedProviderHealth {
     [OutputType([bool])]
     param(
         [Parameter(Mandatory)]
-        [ValidateSet('ollama', 'vllm', 'lmstudio')]
+        [ValidateSet('pcai-inference', 'ollama', 'vllm', 'lmstudio')]
         [string]$Provider,
 
         [Parameter()]
@@ -96,8 +96,12 @@ function Get-CachedProviderHealth {
 
     try {
         switch ($Provider) {
+            'pcai-inference' {
+                $isHealthy = Test-PcaiInferenceConnection -TimeoutSeconds $TimeoutSeconds
+                $message = if ($isHealthy) { 'Connected' } else { 'Connection failed' }
+            }
             'ollama' {
-                $isHealthy = Test-OllamaConnection -TimeoutSeconds $TimeoutSeconds
+                $isHealthy = Test-PcaiInferenceConnection -TimeoutSeconds $TimeoutSeconds
                 $message = if ($isHealthy) { 'Connected' } else { 'Connection failed' }
             }
             'vllm' {

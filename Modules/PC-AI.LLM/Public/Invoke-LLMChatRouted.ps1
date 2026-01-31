@@ -4,8 +4,8 @@
     Routes a user request through FunctionGemma tool-calling, then returns a final LLM response.
 
 .DESCRIPTION
-    Uses FunctionGemma (vLLM OpenAI-compatible) to select and execute PC-AI tools, then
-    forwards tool results to the primary LLM provider (Ollama/vLLM/LM Studio) using
+    Uses FunctionGemma (OpenAI-compatible) to select and execute PC-AI tools, then
+    forwards tool results to the primary LLM provider (pcai-inference/OpenAI-compatible) using
     DIAGNOSE.md or CHAT.md as the system prompt.
 
 .PARAMETER Message
@@ -18,10 +18,10 @@
     Final LLM model to use for narrative response.
 
 .PARAMETER Provider
-    Final LLM provider: auto|ollama|vllm|lmstudio.
+    Final LLM provider: auto|pcai-inference|vllm|lmstudio.
 
 .PARAMETER RouterBaseUrl
-    FunctionGemma vLLM base URL (OpenAI-compatible).
+    FunctionGemma base URL (OpenAI-compatible).
 
 .PARAMETER RouterModel
     FunctionGemma model name.
@@ -59,7 +59,7 @@ function Invoke-LLMChatRouted {
         [string]$Model = $script:ModuleConfig.DefaultModel,
 
         [Parameter()]
-        [ValidateSet('auto', 'ollama', 'vllm', 'lmstudio')]
+        [ValidateSet('auto', 'pcai-inference', 'ollama', 'vllm', 'lmstudio')]
         [string]$Provider = 'auto',
 
         [Parameter()]

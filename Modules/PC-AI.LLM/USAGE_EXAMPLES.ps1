@@ -4,7 +4,7 @@
     Usage examples for PC-AI.LLM PowerShell module
 
 .DESCRIPTION
-    Demonstrates how to use the PC-AI.LLM module for Ollama integration
+    Demonstrates how to use the PC-AI.LLM module for pcai-inference integration
     with PC diagnostics and analysis
 #>
 
@@ -18,10 +18,9 @@ Write-Host ""
 Write-Host "Example 1: Check LLM Status" -ForegroundColor Yellow
 Write-Host "Command: Get-LLMStatus -TestConnection" -ForegroundColor Gray
 $status = Get-LLMStatus -TestConnection
-Write-Host "Ollama Installed: $($status.Ollama.Installed)" -ForegroundColor Green
-Write-Host "API Connected: $($status.Ollama.ApiConnected)" -ForegroundColor Green
-Write-Host "Models Available: $($status.Ollama.Models.Count)" -ForegroundColor Green
-Write-Host "Default Model: $($status.Ollama.DefaultModel)" -ForegroundColor Green
+Write-Host "pcai-inference Available: $($status.PcaiInference.ApiConnected)" -ForegroundColor Green
+Write-Host "Models Available: $($status.PcaiInference.Models.Count)" -ForegroundColor Green
+Write-Host "Default Model: $($status.PcaiInference.DefaultModel)" -ForegroundColor Green
 Write-Host ""
 
 # Example 2: View Configuration
@@ -32,10 +31,10 @@ Write-Host ""
 
 # Example 3: Send a Simple Request
 Write-Host "Example 3: Send a Simple Request" -ForegroundColor Yellow
-Write-Host "Command: Send-OllamaRequest -Prompt 'What is PowerShell?' -Model 'qwen2.5-coder:7b'" -ForegroundColor Gray
+Write-Host "Command: Send-OllamaRequest -Prompt 'What is PowerShell?' -Model 'pcai-inference'" -ForegroundColor Gray
 Write-Host "Note: This will take 5-15 seconds depending on your hardware" -ForegroundColor Gray
 try {
-    $response = Send-OllamaRequest -Prompt "Explain what PowerShell is in one sentence." -Model "qwen2.5-coder:7b"
+    $response = Send-OllamaRequest -Prompt "Explain what PowerShell is in one sentence." -Model "pcai-inference"
     Write-Host "Response: $($response.Response)" -ForegroundColor Green
     Write-Host "Duration: $($response.RequestDurationSeconds) seconds" -ForegroundColor Green
     Write-Host "Tokens/sec: $($response.TokensPerSecond)" -ForegroundColor Green
@@ -47,9 +46,9 @@ Write-Host ""
 
 # Example 4: Interactive Chat (commented out for automated testing)
 Write-Host "Example 4: Interactive Chat" -ForegroundColor Yellow
-Write-Host "Command: Invoke-LLMChat -Interactive -Model 'qwen2.5-coder:7b'" -ForegroundColor Gray
+Write-Host "Command: Invoke-LLMChat -Interactive -Model 'pcai-inference'" -ForegroundColor Gray
 Write-Host "(Uncomment to run interactive chat session)" -ForegroundColor Gray
-# Invoke-LLMChat -Interactive -Model "qwen2.5-coder:7b"
+# Invoke-LLMChat -Interactive -Model "pcai-inference"
 Write-Host ""
 
 # Example 5: Single-Shot Chat
@@ -80,9 +79,9 @@ Write-Host ""
 
 # Example 7: Change Default Model
 Write-Host "Example 7: Change Default Model" -ForegroundColor Yellow
-Write-Host "Command: Set-LLMConfig -DefaultModel 'deepseek-r1:8b'" -ForegroundColor Gray
+Write-Host "Command: Set-LLMConfig -DefaultModel 'pcai-inference'" -ForegroundColor Gray
 Write-Host "(Example only - not executing)" -ForegroundColor Gray
-# Set-LLMConfig -DefaultModel "deepseek-r1:8b"
+# Set-LLMConfig -DefaultModel "pcai-inference"
 Write-Host ""
 
 # Example 8: Get Help

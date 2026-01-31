@@ -3,12 +3,12 @@
 function Invoke-LLMChat {
     <#
     .SYNOPSIS
-        Interactive chat interface with LLM providers (Ollama, vLLM, LM Studio)
+        Interactive chat interface with LLM providers (pcai-inference, FunctionGemma, OpenAI-compatible)
 
     .DESCRIPTION
         Provides a unified chat interface supporting single-shot and interactive modes with automatic
         provider fallback, tool calling via ReAct pattern, streaming responses, and detailed metrics.
-        Supports multiple LLM providers including Ollama, vLLM (OpenAI-compatible), and LM Studio.
+        Supports pcai-inference as the primary OpenAI-compatible endpoint with optional fallback providers.
 
     .PARAMETER Message
         The user message to send to the LLM. Can be piped in for single-shot mode.
@@ -39,7 +39,7 @@ function Invoke-LLMChat {
         Array of message objects (@{role='user/assistant'; content='text'}) to initialize conversation context.
 
     .PARAMETER Provider
-        LLM provider to use: 'auto' (tries all configured), 'ollama', 'vllm', or 'lmstudio'. Default: 'auto'
+        LLM provider to use: 'auto' (tries configured order), 'pcai-inference', 'vllm', or 'lmstudio'. Default: 'auto'
 
     .PARAMETER UseRouter
         Routes the request through FunctionGemma for tool call planning before sending to the main LLM.
@@ -48,7 +48,7 @@ function Invoke-LLMChat {
         Routing mode when UseRouter is enabled: 'chat' (general) or 'diagnose' (diagnostic-specific). Default: 'chat'
 
     .PARAMETER Stream
-        Enables streaming output for Ollama provider (tokens displayed as they are generated).
+        Enables streaming output for OpenAI-compatible providers (tokens displayed as they are generated).
 
     .PARAMETER ShowProgress
         Displays a progress bar during generation with elapsed time updates.
@@ -79,8 +79,8 @@ function Invoke-LLMChat {
         Use FunctionGemma to route and plan diagnostic tool calls
 
     .EXAMPLE
-        Invoke-LLMChat -Message "Write a story" -Stream -Provider ollama
-        Stream tokens as they are generated using Ollama
+        Invoke-LLMChat -Message "Write a story" -Stream -Provider pcai-inference
+        Stream tokens as they are generated using pcai-inference
 
     .OUTPUTS
         PSCustomObject containing Response, RawResponse, Model, History, TotalDuration, Metrics, and Timestamp
@@ -119,7 +119,7 @@ function Invoke-LLMChat {
         [array]$History = @(),
 
         [Parameter()]
-        [ValidateSet('auto', 'ollama', 'vllm', 'lmstudio')]
+        [ValidateSet('auto', 'pcai-inference', 'ollama', 'vllm', 'lmstudio')]
         [string]$Provider = 'auto',
 
         [Parameter()]
@@ -191,7 +191,8 @@ function Invoke-LLMChat {
                 while ($processingResponse -and $toolCallCount -lt $toolCallLimit) {
                     try {
                         $metricsBefore = $null
-                        if ($ShowMetrics) {
+                        $metricsProvider = if ($Provider -eq 'auto') { $script:ModuleConfig.ProviderOrder[0] } else { $Provider }
+                        if ($ShowMetrics -and $metricsProvider -eq 'vllm') {
                             $metricsBefore = Get-VLLMMetricsSnapshot -ApiUrl $script:ModuleConfig.VLLMApiUrl -ModelName $script:ModuleConfig.VLLMModel -TimeoutSeconds 3
                         }
 
@@ -208,9 +209,15 @@ function Invoke-LLMChat {
                         if ($PSBoundParameters.ContainsKey('MaxTokens')) { $params['MaxTokens'] = $MaxTokens }
 
                         $assistantMessage = $null
-                        if ($Stream -and $Provider -eq 'ollama') {
-                            $assistantMessage = Invoke-OllamaChatStream -Messages $params.Messages -Model $Model -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds
-                            $response = [PSCustomObject]@{ Provider = 'ollama'; message = @{ content = $assistantMessage } }
+                        if ($Stream) {
+                            $streamProvider = if ($Provider -eq 'auto') { $script:ModuleConfig.ProviderOrder[0] } else { $Provider }
+                            $streamApiUrl = switch ($streamProvider) {
+                                'vllm' { $script:ModuleConfig.VLLMApiUrl }
+                                'lmstudio' { $script:ModuleConfig.LMStudioApiUrl }
+                                default { $script:ModuleConfig.PcaiInferenceApiUrl }
+                            }
+                            $assistantMessage = Invoke-OpenAIChatStream -Messages $params.Messages -Model $Model -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $streamApiUrl
+                            $response = [PSCustomObject]@{ Provider = $streamProvider; message = @{ content = $assistantMessage } }
                         } else {
                             $response = Invoke-LLMChatWithFallback @params
                             $assistantMessage = $response.message.content
@@ -263,7 +270,8 @@ function Invoke-LLMChat {
             # Single-shot mode
             [void]$conversationHistory.Add(@{ role = 'user'; content = $Message })
             $metricsBefore = $null
-            if ($ShowMetrics) {
+            $metricsProvider = if ($Provider -eq 'auto') { $script:ModuleConfig.ProviderOrder[0] } else { $Provider }
+            if ($ShowMetrics -and $metricsProvider -eq 'vllm') {
                 $metricsBefore = Get-VLLMMetricsSnapshot -ApiUrl $script:ModuleConfig.VLLMApiUrl -ModelName $script:ModuleConfig.VLLMModel -TimeoutSeconds 3
             }
             $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -279,9 +287,15 @@ function Invoke-LLMChat {
             if ($PSBoundParameters.ContainsKey('MaxTokens')) { $params['MaxTokens'] = $MaxTokens }
 
             $assistantMessage = $null
-            if ($Stream -and $Provider -eq 'ollama') {
-                $assistantMessage = Invoke-OllamaChatStream -Messages $params.Messages -Model $Model -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds
-                $response = [PSCustomObject]@{ Provider = 'ollama'; message = @{ content = $assistantMessage } }
+            if ($Stream) {
+                $streamProvider = if ($Provider -eq 'auto') { $script:ModuleConfig.ProviderOrder[0] } else { $Provider }
+                $streamApiUrl = switch ($streamProvider) {
+                    'vllm' { $script:ModuleConfig.VLLMApiUrl }
+                    'lmstudio' { $script:ModuleConfig.LMStudioApiUrl }
+                    default { $script:ModuleConfig.PcaiInferenceApiUrl }
+                }
+                $assistantMessage = Invoke-OpenAIChatStream -Messages $params.Messages -Model $Model -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $streamApiUrl
+                $response = [PSCustomObject]@{ Provider = $streamProvider; message = @{ content = $assistantMessage } }
             } else {
                 $response = Invoke-LLMChatWithFallback @params
                 $assistantMessage = $response.message.content

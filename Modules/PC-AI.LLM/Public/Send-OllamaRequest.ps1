@@ -3,10 +3,10 @@
 function Send-OllamaRequest {
     <#
     .SYNOPSIS
-        Sends a request to the Ollama API for text generation
+        Sends a request to pcai-inference for text generation
 
     .DESCRIPTION
-        Core wrapper function for Ollama API generate endpoint. Supports streaming responses,
+        Core wrapper function for pcai-inference completions endpoint. Supports streaming responses,
         custom models, temperature control, and timeout handling with automatic retries.
 
     .PARAMETER Prompt
@@ -89,19 +89,18 @@ function Send-OllamaRequest {
     )
 
     begin {
-        Write-Verbose "Initializing Ollama request..."
+        Write-Verbose "Initializing pcai-inference request..."
 
-        # Verify Ollama connectivity
-        if (-not (Test-OllamaConnection)) {
-            throw "Cannot connect to Ollama API at $($script:ModuleConfig.OllamaApiUrl). Ensure Ollama is running."
+        # Verify pcai-inference connectivity
+        if (-not (Test-PcaiInferenceConnection)) {
+            throw "Cannot connect to pcai-inference at $($script:ModuleConfig.PcaiInferenceApiUrl). Ensure the server is running."
         }
 
-        # Verify model exists
+        # Verify model exists (best effort)
         $availableModels = Get-OllamaModels
         $modelExists = $availableModels | Where-Object { $_.Name -eq $Model }
-        if (-not $modelExists) {
+        if (-not $modelExists -and $availableModels.Count -gt 0) {
             Write-Warning "Model '$Model' not found. Available models: $($availableModels.Name -join ', ')"
-            throw "Model '$Model' is not available. Pull it with: ollama pull $Model"
         }
     }
 
@@ -134,11 +133,10 @@ function Send-OllamaRequest {
                     $params['MaxTokens'] = $MaxTokens
                 }
 
-                $response = Invoke-OllamaGenerate @params
-
                 if ($Stream) {
-                    # For streaming, output directly
-                    Write-Output $response
+                    $response = Invoke-OpenAICompletionStream -Prompt $Prompt -Model $Model -Temperature $Temperature -MaxTokens $MaxTokens -TimeoutSeconds $TimeoutSeconds -ApiUrl $script:ModuleConfig.PcaiInferenceApiUrl
+                } else {
+                    $response = Invoke-OllamaGenerate @params
                 }
 
                 $success = $true
@@ -156,7 +154,7 @@ function Send-OllamaRequest {
         }
 
         if (-not $success) {
-            throw "Failed to complete Ollama request after $MaxRetries attempts. Last error: $lastError"
+            throw "Failed to complete pcai-inference request after $MaxRetries attempts. Last error: $lastError"
         }
 
         $endTime = Get-Date
@@ -164,33 +162,27 @@ function Send-OllamaRequest {
 
         # Format response
         if (-not $Stream) {
+            $text = $null
+            if ($response.choices -and $response.choices.Count -gt 0) {
+                $text = $response.choices[0].text
+            }
+
             $result = [PSCustomObject]@{
-                Response = $response.response
+                Response = $text
                 Model = $response.model
-                CreatedAt = $response.created_at
-                Done = $response.done
-                Context = $response.context
-                TotalDuration = $response.total_duration
-                LoadDuration = $response.load_duration
-                PromptEvalCount = $response.prompt_eval_count
-                PromptEvalDuration = $response.prompt_eval_duration
-                EvalCount = $response.eval_count
-                EvalDuration = $response.eval_duration
+                CreatedAt = $response.created
+                Usage = $response.usage
                 RequestDurationSeconds = [math]::Round($duration, 2)
                 Timestamp = $startTime
             }
 
-            # Calculate tokens per second if available
-            if ($response.eval_count -and $response.eval_duration) {
-                $tokensPerSecond = ($response.eval_count / ($response.eval_duration / 1000000000))
-                $result | Add-Member -MemberType NoteProperty -Name 'TokensPerSecond' -Value ([math]::Round($tokensPerSecond, 2))
-            }
-
             return $result
+        } else {
+            return $response
         }
     }
 
     end {
-        Write-Verbose "Ollama request completed"
+        Write-Verbose "pcai-inference request completed"
     }
 }

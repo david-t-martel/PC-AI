@@ -76,12 +76,18 @@ public class PcaiInferenceFFI {
     public static extern IntPtr pcai_last_error();
 
     // Helper to get error message
+    // PtrToStringUTF8 only exists in .NET Core/.NET 5+
+    // Use PtrToStringAnsi as fallback for .NET Framework (PowerShell 5.1)
     public static string GetLastError() {
         IntPtr errPtr = pcai_last_error();
         if (errPtr == IntPtr.Zero) {
             return null;
         }
-        return Marshal.PtrToStringUTF8(errPtr);
+        #if NET5_0_OR_GREATER
+            return Marshal.PtrToStringUTF8(errPtr);
+        #else
+            return Marshal.PtrToStringAnsi(errPtr);
+        #endif
     }
 }
 "@
@@ -126,10 +132,12 @@ function Initialize-PcaiInference {
         [string]$DllPath = $null
     )
 
-    # Resolve DLL path
+    # Resolve DLL path - check bin/ first, then fall back to target/release
     if (-not $DllPath) {
         $projectRoot = Split-Path $PSScriptRoot -Parent
-        $DllPath = Join-Path $projectRoot 'Deploy\pcai-inference\target\release\pcai_inference.dll'
+        $binPath = Join-Path $projectRoot 'bin\pcai_inference.dll'
+        $targetPath = Join-Path $projectRoot 'Deploy\pcai-inference\target\release\pcai_inference.dll'
+        $DllPath = if (Test-Path $binPath) { $binPath } else { $targetPath }
     }
 
     $script:DllPath = $DllPath
@@ -292,8 +300,13 @@ function Invoke-PcaiGenerate {
             throw "Generation failed: $error"
         }
 
-        # Convert to string
-        $result = [Marshal]::PtrToStringUTF8($resultPtr)
+        # Convert to string (use Ansi for .NET Framework compatibility)
+        try {
+            $result = [Marshal]::PtrToStringUTF8($resultPtr)
+        }
+        catch {
+            $result = [Marshal]::PtrToStringAnsi($resultPtr)
+        }
 
         # Free the string
         [PcaiInferenceFFI]::pcai_free_string($resultPtr)
@@ -412,6 +425,72 @@ function Test-PcaiInference {
     }
 }
 
+function Test-PcaiDllVersion {
+    <#
+    .SYNOPSIS
+        Check DLL version compatibility with the module
+
+    .DESCRIPTION
+        Compares the module version with the DLL file version to ensure compatibility.
+        Warns if versions don't match.
+
+    .EXAMPLE
+        Test-PcaiDllVersion -Verbose
+    #>
+    [CmdletBinding()]
+    param()
+
+    $moduleVersion = '1.0.0'
+
+    if (-not $script:DllPath -or -not (Test-Path $script:DllPath)) {
+        Write-Warning "DLL not found. Cannot verify version."
+        return $false
+    }
+
+    try {
+        $fileInfo = Get-Item $script:DllPath
+        $dllVersion = $fileInfo.VersionInfo.FileVersion
+
+        if (-not $dllVersion) {
+            Write-Warning "DLL version information not available"
+            return $null
+        }
+
+        Write-Verbose "Module version: $moduleVersion"
+        Write-Verbose "DLL version: $dllVersion"
+
+        if ($dllVersion -ne $moduleVersion) {
+            Write-Warning "Version mismatch: Module=$moduleVersion, DLL=$dllVersion"
+            return $false
+        }
+
+        Write-Verbose "Version check passed"
+        return $true
+    }
+    catch {
+        Write-Warning "Failed to check DLL version: $_"
+        return $null
+    }
+}
+
+#endregion
+
+#region Module Cleanup
+# Register cleanup handler to shutdown backend when module is removed
+$MyInvocation.MyCommand.ScriptBlock.Module.OnRemove = {
+    if ($script:BackendInitialized) {
+        Write-Verbose "Module removal detected - shutting down inference backend..."
+        try {
+            [PcaiInferenceFFI]::pcai_shutdown()
+            $script:BackendInitialized = $false
+            $script:ModelLoaded = $false
+            $script:CurrentBackend = $null
+        }
+        catch {
+            Write-Warning "Error during module cleanup: $_"
+        }
+    }
+}
 #endregion
 
 #region Module Exports
@@ -421,6 +500,7 @@ Export-ModuleMember -Function @(
     'Invoke-PcaiGenerate',
     'Close-PcaiInference',
     'Get-PcaiInferenceStatus',
-    'Test-PcaiInference'
+    'Test-PcaiInference',
+    'Test-PcaiDllVersion'
 )
 #endregion
