@@ -59,6 +59,15 @@ obj/
 *.pdb
 Modules/Archive/
 
+# PC-AI local artifacts (gitignored but searchable for LLM agents)
+.pcai/
+
+# Unified Build System output (.pcai/build/)
+.pcai/build/artifacts/
+.pcai/build/logs/
+.pcai/build/packages/
+!.pcai/.gitkeep
+
 # Rust
 target/
 **/*.rs.bk

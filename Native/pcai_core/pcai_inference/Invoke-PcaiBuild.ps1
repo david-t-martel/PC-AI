@@ -49,6 +49,63 @@ if (-not (Test-Path $ToolsDir)) {
     $ToolsDir = Join-Path $RepoRoot 'Tools'
 }
 
+# Build output directories
+$script:ArtifactsRoot = if ($env:PCAI_ARTIFACTS_ROOT) {
+    $env:PCAI_ARTIFACTS_ROOT
+} else {
+    Join-Path $RepoRoot '.pcai'
+}
+$script:BuildRoot = Join-Path $script:ArtifactsRoot 'build'
+$script:BuildLogsDir = Join-Path $script:BuildRoot 'logs'
+$script:BuildArtifactsDir = Join-Path $script:BuildRoot 'artifacts'
+$script:BuildStartTime = Get-Date
+
+#region Output Formatting
+
+function Write-BuildBanner {
+    param([string]$Title)
+    $width = 70
+    $line = '=' * $width
+    $padding = [math]::Max(0, ($width - $Title.Length - 2) / 2)
+    $paddedTitle = (' ' * [math]::Floor($padding)) + $Title + (' ' * [math]::Ceiling($padding))
+    Write-Host "`n$line" -ForegroundColor Cyan
+    Write-Host $paddedTitle -ForegroundColor Cyan
+    Write-Host "$line`n" -ForegroundColor Cyan
+}
+
+function Write-BuildSection {
+    param([string]$Name)
+    $elapsed = (Get-Date) - $script:BuildStartTime
+    Write-Host "`n[$($elapsed.ToString('mm\:ss'))] " -ForegroundColor DarkGray -NoNewline
+    Write-Host $Name -ForegroundColor Yellow
+}
+
+function Write-BuildInfo {
+    param([string]$Label, [string]$Value, [string]$Color = 'White')
+    Write-Host "  $($Label): " -ForegroundColor DarkGray -NoNewline
+    Write-Host $Value -ForegroundColor $Color
+}
+
+function Write-BuildStatus {
+    param([string]$Message, [ValidateSet('Info', 'Success', 'Warning', 'Error')]$Level = 'Info')
+    $symbol = switch ($Level) {
+        'Info'    { '[..]' }
+        'Success' { '[OK]' }
+        'Warning' { '[!!]' }
+        'Error'   { '[XX]' }
+    }
+    $color = switch ($Level) {
+        'Info'    { 'White' }
+        'Success' { 'Green' }
+        'Warning' { 'Yellow' }
+        'Error'   { 'Red' }
+    }
+    Write-Host "  $symbol " -ForegroundColor $color -NoNewline
+    Write-Host $Message
+}
+
+#endregion
+
 $script:HasMkl = $false
 $script:HasCudnn = $false
 $script:HasTensorRt = $false
@@ -186,7 +243,7 @@ function Initialize-TensorRtEnvironment {
 #region Environment Initialization
 
 function Initialize-BuildEnvironment {
-    Write-Host "`nInitializing Build Environment..." -ForegroundColor Cyan
+    Write-BuildSection "Environment Setup"
 
     # Detect real cargo (bypass wrappers like cargo.ps1)
     $script:cargoExe = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe'
@@ -604,16 +661,18 @@ function Invoke-Build {
     $cargoArgs = @('build', '--bin', $binName, '--features', $featureString, '--message-format=json')
     if ($Configuration -eq 'Release') { $cargoArgs += '--release' }
 
-    # ... rest remains largely same, just updating logs slightly ...
+    # Configure log files in Build/logs directory
     $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-    $logFile = "cargo_build_${BackendName}_$stamp.log"
-    $errorLogFile = "cargo_errors_${BackendName}_$stamp.log"
-    $jsonLogFile = "cargo_output_${BackendName}_$stamp.json"
+    $logDir = if (Test-Path $script:BuildLogsDir) { $script:BuildLogsDir } else { $ProjectRoot }
+    $logFile = Join-Path $logDir "cargo_build_${BackendName}_$stamp.log"
+    $errorLogFile = Join-Path $logDir "cargo_errors_${BackendName}_$stamp.log"
+    $jsonLogFile = Join-Path $logDir "cargo_output_${BackendName}_$stamp.json"
 
-    # Reset logs
-    '' | Out-File $logFile
-    '' | Out-File $errorLogFile
-    '' | Out-File $jsonLogFile
+    # Initialize logs
+    '' | Out-File $logFile -Force
+    '' | Out-File $errorLogFile -Force
+    '' | Out-File $jsonLogFile -Force
+    Write-BuildStatus "Logs: $logDir" 'Info'
 
     Push-Location $ProjectRoot
     $startTime = Get-Date
@@ -735,16 +794,120 @@ function Invoke-Build {
 
 #endregion
 
+function Copy-CompiledArtifacts {
+    param(
+        [string]$Configuration = 'Release',
+        [string]$BackendBuilt = 'all'
+    )
+
+    Write-BuildSection "Collecting Artifacts"
+
+    $targetRoot = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $ProjectRoot 'target' }
+    $configDir = if ($Configuration -eq 'Debug') { 'debug' } else { 'release' }
+    $targetDir = Join-Path $targetRoot $configDir
+
+    if (-not (Test-Path $targetDir)) {
+        Write-BuildStatus "Target directory not found: $targetDir" 'Warning'
+        return
+    }
+
+    # Ensure output directories exist
+    $localBin = Join-Path $env:USERPROFILE '.local\bin'
+    if (-not (Test-Path $localBin)) {
+        New-Item -ItemType Directory -Path $localBin -Force | Out-Null
+    }
+
+    # Create Build/artifacts directories if they exist at repo level
+    $llamacppArtifacts = Join-Path $script:BuildArtifactsDir 'pcai-llamacpp'
+    $mistralrsArtifacts = Join-Path $script:BuildArtifactsDir 'pcai-mistralrs'
+
+    if (Test-Path (Split-Path $script:BuildArtifactsDir -Parent)) {
+        if (-not (Test-Path $llamacppArtifacts)) { New-Item -ItemType Directory -Path $llamacppArtifacts -Force | Out-Null }
+        if (-not (Test-Path $mistralrsArtifacts)) { New-Item -ItemType Directory -Path $mistralrsArtifacts -Force | Out-Null }
+    }
+
+    $artifacts = @(
+        @{ Name = 'pcai-llamacpp.exe'; Backend = 'llamacpp'; Dir = $llamacppArtifacts },
+        @{ Name = 'pcai-mistralrs.exe'; Backend = 'mistralrs'; Dir = $mistralrsArtifacts },
+        @{ Name = 'pcai_inference.dll'; Backend = 'shared'; Dir = $null },
+        @{ Name = 'pcai_inference_lib.dll'; Backend = 'shared'; Dir = $null },
+        @{ Name = 'pcai_core_lib.dll'; Backend = 'shared'; Dir = $null }
+    )
+
+    $copiedCount = 0
+    foreach ($artifact in $artifacts) {
+        $source = Join-Path $targetDir $artifact.Name
+        if (Test-Path $source) {
+            # Copy to ~/.local/bin
+            Copy-Item -Path $source -Destination $localBin -Force
+            $copiedCount++
+
+            # Copy to build artifacts if applicable
+            if ($artifact.Dir -and (Test-Path (Split-Path $artifact.Dir -Parent))) {
+                Copy-Item -Path $source -Destination $artifact.Dir -Force
+            }
+
+            $size = [math]::Round((Get-Item $source).Length / 1MB, 2)
+            Write-BuildStatus "$($artifact.Name) -> ~/.local/bin ($size MB)" 'Success'
+        }
+    }
+
+    if ($copiedCount -eq 0) {
+        Write-BuildStatus "No artifacts found to copy" 'Warning'
+    } else {
+        Write-BuildStatus "Copied $copiedCount artifacts to $localBin" 'Success'
+    }
+}
+
 # Main Execution
+Write-BuildBanner "PCAI-INFERENCE BUILD"
+
+# Initialize version information
+$versionScript = Join-Path $RepoRoot 'Tools\Get-BuildVersion.ps1'
+if (Test-Path $versionScript) {
+    $versionInfo = & $versionScript -SetEnv -Quiet
+    Write-BuildInfo "Version" $versionInfo.Version 'Cyan'
+    Write-BuildInfo "Git" "$($versionInfo.GitHashShort) ($($versionInfo.GitBranch))"
+} else {
+    Write-BuildInfo "Version" "0.1.0+unknown (version script not found)" 'Yellow'
+}
+
+Write-BuildInfo "Backend" $Backend
+Write-BuildInfo "Configuration" $Configuration
+Write-BuildInfo "CUDA" $(if ($EnableCuda) { "Enabled" } else { "Disabled" }) $(if ($EnableCuda) { "Green" } else { "DarkGray" })
+Write-BuildInfo "Cache" $(if ($DisableCache) { "Disabled" } else { "Enabled" })
+
 if ($Clean) {
-    Write-Host 'Cleaning target directory...' -ForegroundColor Yellow
-    if (Test-Path (Join-Path $ProjectRoot 'target')) { Remove-Item (Join-Path $ProjectRoot 'target') -Recurse -Force }
+    Write-BuildSection "Cleaning"
+    if (Test-Path (Join-Path $ProjectRoot 'target')) {
+        Remove-Item (Join-Path $ProjectRoot 'target') -Recurse -Force
+        Write-BuildStatus "Removed target directory" 'Success'
+    }
+}
+
+# Ensure artifact/log directories exist
+if (-not (Test-Path $script:BuildRoot)) {
+    New-Item -ItemType Directory -Path $script:BuildRoot -Force | Out-Null
+}
+if (-not (Test-Path $script:BuildArtifactsDir)) {
+    New-Item -ItemType Directory -Path $script:BuildArtifactsDir -Force | Out-Null
+}
+if (-not (Test-Path $script:BuildLogsDir)) {
+    New-Item -ItemType Directory -Path $script:BuildLogsDir -Force | Out-Null
 }
 
 Initialize-BuildEnvironment
 Clear-IncompleteCmakeConfig
-# Initialize-LlamaCpp -Configuration $Configuration
 
 Invoke-Build -BackendName $Backend
+Copy-CompiledArtifacts -Configuration $Configuration -BackendBuilt $Backend
 
-Write-Host "`nBuild Complete!" -ForegroundColor Green
+# Build Summary
+$totalDuration = (Get-Date) - $script:BuildStartTime
+Write-BuildBanner "BUILD COMPLETE"
+Write-BuildInfo "Total Time" $totalDuration.ToString('hh\:mm\:ss') 'Cyan'
+Write-BuildInfo "Artifacts" "$env:USERPROFILE\.local\bin" 'Green'
+if (Test-Path $script:BuildLogsDir) {
+    Write-BuildInfo "Logs" $script:BuildLogsDir 'DarkGray'
+}
+Write-Host ""

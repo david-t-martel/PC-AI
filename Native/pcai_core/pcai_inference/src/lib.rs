@@ -13,6 +13,7 @@
 
 pub mod backends;
 pub mod config;
+pub mod version;
 
 #[cfg(feature = "server")]
 pub mod http;

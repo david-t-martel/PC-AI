@@ -2,6 +2,10 @@
 !Models/
 !Models/*
 
+# Keep PC-AI local artifacts searchable
+!.pcai/
+!.pcai/**
+
 # Exclude from code search (but keep locally for dev)
 .deprecated/
 **/unsloth_compiled_cache/
@@ -14,10 +18,44 @@
 **/vendor/
 **/candle-kernels*/
 
-# Build output logs
+# Build output - keep visible for LLM agent monitoring
+# Only exclude large binary files, keep logs and manifests visible
+.pcai/build/artifacts/**/*.exe
+.pcai/build/artifacts/**/*.dll
+.pcai/build/artifacts/**/*.pdb
+.pcai/build/packages/*.zip
+!.pcai/build/artifacts/manifest.json
+!.pcai/build/logs/
+!.pcai/.gitkeep
+
+# Keep build logs visible for debugging and monitoring
+!cargo_build_*.log
+!cargo_errors_*.log
+!**/Build/logs/*.log
+
+# Cargo JSON output (large, structured - exclude)
 cargo_output*.json
 **/cargo_output*.json
+
+# Rust target directories (large intermediate files)
+**/target/release/build/
+**/target/release/deps/
+**/target/release/incremental/
+**/target/release/.fingerprint/
+**/target/debug/
+# Keep final binaries paths searchable for path references
+!**/target/release/*.exe
+!**/target/release/*.dll
 
 # Keep documentation searchable
 !**/*.md
 !**/README*
+
+# Keep build scripts and workflows visible
+!Build.ps1
+!**/Invoke-*.ps1
+!**/*.yml
+!**/Tools/*.ps1
+
+# Keep Cargo.toml files visible for dependency analysis
+!**/Cargo.toml
