@@ -1,0 +1,79 @@
+name: Tooling Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_doc_tools:
+        description: "Run documentation tooling"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      run_functiongemma_tools:
+        description: "Run FunctionGemma tooling"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+      run_llm_validation:
+        description: "Run LLM validation helpers"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+      run_help_tools:
+        description: "Run help/coverage tooling"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+jobs:
+  tooling:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Documentation Tooling
+        if: inputs.run_doc_tools == 'true'
+        shell: pwsh
+        run: |
+          if (Test-Path ".\Tools\generate-auto-docs.ps1") { .\Tools\generate-auto-docs.ps1 -BuildDocs }
+          if (Test-Path ".\Tools\generate-functiongemma-tool-docs.ps1") { .\Tools\generate-functiongemma-tool-docs.ps1 }
+          if (Test-Path ".\Tools\generate-api-signature-report.ps1") { .\Tools\generate-api-signature-report.ps1 }
+          if (Test-Path ".\Tools\validate-doc-accuracy.ps1") { .\Tools\validate-doc-accuracy.ps1 }
+          if (Test-Path ".\Tools\update-doc-status.ps1") { .\Tools\update-doc-status.ps1 }
+
+      - name: Help and Coverage Tooling
+        if: inputs.run_help_tools == 'true'
+        shell: pwsh
+        run: |
+          if (Test-Path ".\Tools\update-tool-coverage.ps1") { .\Tools\update-tool-coverage.ps1 }
+          if (Test-Path ".\Tools\Generate-HelpGapsPriority.ps1") { .\Tools\Generate-HelpGapsPriority.ps1 }
+          if (Test-Path ".\Tools\normalize-help-blocks.ps1") { .\Tools\normalize-help-blocks.ps1 }
+          if (Test-Path ".\Tools\update-help-parameters.ps1") { .\Tools\update-help-parameters.ps1 }
+
+      - name: FunctionGemma Tooling
+        if: inputs.run_functiongemma_tools == 'true'
+        shell: pwsh
+        run: |
+          if (Test-Path ".\Tools\prepare-functiongemma-router-data.ps1") { .\Tools\prepare-functiongemma-router-data.ps1 }
+          if (Test-Path ".\Tools\prepare-functiongemma-token-cache.ps1") { .\Tools\prepare-functiongemma-token-cache.ps1 }
+          if (Test-Path ".\Tools\run-functiongemma-tests.ps1") { .\Tools\run-functiongemma-tests.ps1 }
+          if (Test-Path ".\Tools\run-functiongemma-eval.ps1") { .\Tools\run-functiongemma-eval.ps1 }
+
+      - name: LLM Validation Tooling
+        if: inputs.run_llm_validation == 'true'
+        shell: pwsh
+        run: |
+          if (Test-Path ".\Tools\llm-validate.ps1") { .\Tools\llm-validate.ps1 }
+
+      - name: Upload Tooling Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tooling-artifacts
+          path: |
+            Reports/**
+            .pcai/**
+          if-no-files-found: warn
