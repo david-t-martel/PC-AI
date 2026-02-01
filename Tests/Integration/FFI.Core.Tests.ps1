@@ -301,7 +301,7 @@ public static class PcaiCoreTest
                 $tools = Join-Path $ProjectRoot "Config\\pcai-tools.json"
                 $diagnose = Join-Path $ProjectRoot "DIAGNOSE.md"
                 $chat = Join-Path $ProjectRoot "CHAT.md"
-                $scenarios = Join-Path $ProjectRoot "Deploy\\functiongemma-finetune\\scenarios.json"
+                $scenarios = Join-Path $ProjectRoot "Deploy\\rust-functiongemma-train\\examples\\scenarios.json"
                 $outputJsonl = Join-Path $tempDir "router_dataset.jsonl"
                 $outputVectors = Join-Path $tempDir "router_vectors.json"
 

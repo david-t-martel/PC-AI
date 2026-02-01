@@ -6,7 +6,7 @@
 BeforeAll {
     $script:RepoRoot = Join-Path $PSScriptRoot '..\..'
     $script:ToolsPath = Join-Path $script:RepoRoot 'Config\pcai-tools.json'
-    $script:ScenariosPath = Join-Path $script:RepoRoot 'Deploy\functiongemma-finetune\scenarios.json'
+    $script:ScenariosPath = Join-Path $script:RepoRoot 'Deploy\rust-functiongemma-train\examples\scenarios.json'
 
     $script:Tools = (Get-Content -Path $script:ToolsPath -Raw -Encoding UTF8 | ConvertFrom-Json).tools
     $script:ScenarioData = Get-Content -Path $script:ScenariosPath -Raw -Encoding UTF8 | ConvertFrom-Json
