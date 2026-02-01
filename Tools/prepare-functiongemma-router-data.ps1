@@ -36,9 +36,9 @@ $trainRoot = Join-Path $repoRoot 'Deploy\rust-functiongemma-train'
 if (-not $ToolsPath) { $ToolsPath = Join-Path $repoRoot 'Config\pcai-tools.json' }
 if (-not $DiagnosePrompt) { $DiagnosePrompt = Join-Path $repoRoot 'DIAGNOSE.md' }
 if (-not $ChatPrompt) { $ChatPrompt = Join-Path $repoRoot 'CHAT.md' }
-if (-not $ScenariosPath) { $ScenariosPath = Join-Path $repoRoot 'Deploy\functiongemma-finetune\scenarios.json' }
-if (-not $Output) { $Output = Join-Path $repoRoot 'Deploy\functiongemma-finetune\data\rust_router_train.jsonl' }
-if (-not $TestVectors) { $TestVectors = Join-Path $repoRoot 'Deploy\functiongemma-finetune\test_vectors.json' }
+if (-not $ScenariosPath) { $ScenariosPath = Join-Path $repoRoot 'Deploy\rust-functiongemma-train\examples\scenarios.json' }
+if (-not $Output) { $Output = Join-Path $repoRoot 'Deploy\rust-functiongemma-train\data\rust_router_train.jsonl' }
+if (-not $TestVectors) { $TestVectors = Join-Path $repoRoot 'Deploy\rust-functiongemma-train\data\test_vectors.json' }
 
 function Resolve-FullPath {
     param([string]$Path)

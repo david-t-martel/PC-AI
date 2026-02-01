@@ -26,7 +26,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $trainRoot = Join-Path $repoRoot 'Deploy\rust-functiongemma-train'
 
 if (-not $ModelPath) { $ModelPath = Join-Path $repoRoot 'Models\functiongemma-270m-it' }
-if (-not $TestData) { $TestData = Join-Path $repoRoot 'Deploy\functiongemma-finetune\data\rust_router_train.jsonl' }
+if (-not $TestData) { $TestData = Join-Path $repoRoot 'Deploy\rust-functiongemma-train\data\rust_router_train.jsonl' }
 if (-not $Output) { $Output = Join-Path $repoRoot 'Reports\functiongemma_eval_metrics.json' }
 
 if (-not (Test-Path $ModelPath)) {

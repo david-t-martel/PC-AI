@@ -22,7 +22,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $trainRoot = Join-Path $repoRoot 'Deploy\rust-functiongemma-train'
 
-if (-not $Input) { $Input = Join-Path $repoRoot 'Deploy\functiongemma-finetune\data\rust_router_train.jsonl' }
+if (-not $Input) { $Input = Join-Path $repoRoot 'Deploy\rust-functiongemma-train\data\rust_router_train.jsonl' }
 if (-not $TokenizerPath) { $TokenizerPath = Join-Path $repoRoot 'Models\functiongemma-270m-it\tokenizer.json' }
 if (-not $OutputDir) { $OutputDir = Join-Path $repoRoot 'output\functiongemma-token-cache' }
 

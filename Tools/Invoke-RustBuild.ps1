@@ -16,6 +16,9 @@
 .PARAMETER NoLld
   Force link.exe (CARGO_USE_LLD=0).
 
+.PARAMETER DisableCache
+  Disable cache helpers (sccache/ccache) for this invocation.
+
 .PARAMETER LlmDebug
   Enable CargoTools LLM debug defaults (RUST_BACKTRACE, verbose traces).
 
@@ -42,6 +45,7 @@ param(
     [string]$Path = (Get-Location).Path,
     [switch]$UseLld,
     [switch]$NoLld,
+    [switch]$DisableCache,
     [switch]$LlmDebug,
     [switch]$RaPreflight,
     [switch]$Preflight,
@@ -72,6 +76,12 @@ if (Test-Path $lldPath) {
     }
 }
 
+# Default: do not use lld unless explicitly requested
+$env:CARGO_USE_LLD = '0'
+if ($UseLld) { $env:CARGO_USE_LLD = '1' }
+if ($NoLld) { $env:CARGO_USE_LLD = '0' }
+$env:PCAI_USE_LLD = $env:CARGO_USE_LLD
+
 # Configure CUDA environment for candle-core/cudarc builds
 $cudaHelper = Join-Path $PSScriptRoot 'Initialize-CudaEnvironment.ps1'
 if (Test-Path $cudaHelper) {
@@ -96,12 +106,18 @@ if (Test-Path $cmakeHelper) {
     Write-Verbose "CMake helper not found at $cmakeHelper"
 }
 
-# Default: do not use lld unless explicitly requested
-# Default to link.exe unless explicitly enabled
-$env:CARGO_USE_LLD = '0'
-if ($UseLld) { $env:CARGO_USE_LLD = '1' }
-if ($NoLld) { $env:CARGO_USE_LLD = '0' }
+# Configure cache helpers (sccache/ccache) for Rust + C/C++ builds
+$cacheHelper = Join-Path $PSScriptRoot 'Initialize-CacheEnvironment.ps1'
+if (Test-Path $cacheHelper) {
+    . $cacheHelper
+    $cacheInfo = Initialize-CacheEnvironment -DisableCache:$DisableCache -Quiet
+    if ($cacheInfo.SccacheEnabled) { Write-Verbose 'sccache enabled' }
+    if ($cacheInfo.CcacheEnabled) { Write-Verbose 'ccache enabled' }
+} else {
+    Write-Verbose "Cache helper not found at $cacheHelper"
+}
 
+# Default: do not use lld unless explicitly requested
 if ($Preflight) {
     $env:CARGO_PREFLIGHT = '1'
     $env:CARGO_PREFLIGHT_MODE = $PreflightMode

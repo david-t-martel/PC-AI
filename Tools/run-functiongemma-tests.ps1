@@ -84,8 +84,8 @@ if ($runRust) {
         & (Join-Path $repoRoot 'Tools\generate-functiongemma-tool-docs.ps1')
         if ($LASTEXITCODE -ne 0) { throw "Tool documentation generation failed (exit $LASTEXITCODE)" }
 
-        $datasetPath = Join-Path $repoRoot 'Deploy\functiongemma-finetune\data\rust_router_train.jsonl'
-        $vectorsPath = Join-Path $repoRoot 'Deploy\functiongemma-finetune\test_vectors.json'
+        $datasetPath = Join-Path $repoRoot 'Deploy\rust-functiongemma-train\data\rust_router_train.jsonl'
+        $vectorsPath = Join-Path $repoRoot 'Deploy\rust-functiongemma-train\data\test_vectors.json'
         $docsPath = Join-Path $repoRoot 'Deploy\rust-functiongemma\TOOLS.md'
 
         Assert-FileNotEmpty -Path $datasetPath -Label 'Router dataset'
@@ -124,21 +124,25 @@ if ($runRust) {
 }
 
 if ($runPython) {
-    Push-Location $fgRoot
-    try {
-        $env:PYTHONUTF8 = '1'
-        if (-not $env:VLLM_BASE_URL) { $env:VLLM_BASE_URL = 'http://127.0.0.1:8000' }
+    if (-not (Test-Path $fgRoot)) {
+        Write-Warning "Python FunctionGemma repo not found at $fgRoot. Skipping Python tests."
+    } else {
+        Push-Location $fgRoot
+        try {
+            $env:PYTHONUTF8 = '1'
+            if (-not $env:VLLM_BASE_URL) { $env:VLLM_BASE_URL = 'http://127.0.0.1:8000' }
 
-        # Use uv if available, fallback to python.
-        $uv = Get-Command uv -ErrorAction SilentlyContinue
-        if ($uv) {
-            & uv run python -m pytest @pytestArgs .\
-        } else {
-            & python -m pytest @pytestArgs .\
+            # Use uv if available, fallback to python.
+            $uv = Get-Command uv -ErrorAction SilentlyContinue
+            if ($uv) {
+                & uv run python -m pytest @pytestArgs .\
+            } else {
+                & python -m pytest @pytestArgs .\
+            }
+            if ($LASTEXITCODE -ne 0) { throw "Python tests failed (exit $LASTEXITCODE)" }
         }
-        if ($LASTEXITCODE -ne 0) { throw "Python tests failed (exit $LASTEXITCODE)" }
-    }
-    finally {
-        Pop-Location
+        finally {
+            Pop-Location
+        }
     }
 }

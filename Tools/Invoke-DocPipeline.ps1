@@ -327,8 +327,8 @@ function Invoke-TrainingDataGeneration {
             return
         }
 
-        $datasetPath = Join-Path $deployDir 'functiongemma-finetune\data\rust_router_train.jsonl'
-        $vectorsPath = Join-Path $deployDir 'functiongemma-finetune\test_vectors.json'
+        $datasetPath = Join-Path $deployDir 'rust-functiongemma-train\data\rust_router_train.jsonl'
+        $vectorsPath = Join-Path $deployDir 'rust-functiongemma-train\data\test_vectors.json'
         $outputLabel = "dataset: $datasetPath | vectors: $vectorsPath"
         Add-PipelineStep -Name 'TrainingData' -Status 'Success' -Output $outputLabel
     }
@@ -348,8 +348,8 @@ function Invoke-TrainingDataValidation {
 
     Write-Host "`n=== Validating training data ===" -ForegroundColor Cyan
 
-    $datasetPath = Join-Path $deployDir 'functiongemma-finetune\data\rust_router_train.jsonl'
-    $vectorsPath = Join-Path $deployDir 'functiongemma-finetune\test_vectors.json'
+    $datasetPath = Join-Path $deployDir 'rust-functiongemma-train\data\rust_router_train.jsonl'
+    $vectorsPath = Join-Path $deployDir 'rust-functiongemma-train\data\test_vectors.json'
 
     if (-not (Test-Path $datasetPath)) {
         Add-PipelineStep -Name 'Validation' -Status 'Warning' -Error 'Router dataset JSONL not found'

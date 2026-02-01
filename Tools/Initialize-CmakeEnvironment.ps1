@@ -56,9 +56,22 @@ function Convert-CmakePath {
     return ($Path -replace '\\', '/')
 }
 
+function Resolve-LldLink {
+    if ($env:CARGO_LLD_PATH -and (Test-Path $env:CARGO_LLD_PATH)) {
+        return $env:CARGO_LLD_PATH
+    }
+    $default = 'C:\Program Files\LLVM\bin\lld-link.exe'
+    if (Test-Path $default) { return $default }
+    $fromPath = (Get-Command lld-link.exe -ErrorAction SilentlyContinue).Source
+    if ($fromPath -and (Test-Path $fromPath)) { return $fromPath }
+    return $null
+}
+
 function Initialize-CmakeEnvironment {
     [CmdletBinding()]
     param([switch]$Quiet)
+
+    $notes = @()
 
     $cmakeCmds = Get-Command cmake -All -ErrorAction SilentlyContinue
     if (-not $cmakeCmds) {
@@ -112,12 +125,27 @@ function Initialize-CmakeEnvironment {
         $updated = $true
     }
 
+    $useLld = ($env:PCAI_USE_LLD -eq '1') -or ($env:CARGO_USE_LLD -eq '1')
+    if ($useLld) {
+        $lldPath = Resolve-LldLink
+        if ($lldPath) {
+            $lldPath = Convert-CmakePath -Path $lldPath
+            if ($env:CMAKE_LINKER -ne $lldPath) {
+                $env:CMAKE_LINKER = $lldPath
+                $env:CMAKE_LINKER_PowerToys_code = $lldPath
+                $updated = $true
+            }
+        } else {
+            $notes += 'lld-link not found for CMAKE_LINKER.'
+        }
+    }
+
     $result = [PSCustomObject]@{
         Found = $true
         CmakeExe = $cmakeExe
         CmakeRoot = $cmakeRoot
         Updated = $updated
-        Notes = @()
+        Notes = $notes
     }
 
     if (-not $Quiet) {
