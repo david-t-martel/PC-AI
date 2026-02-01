@@ -35,7 +35,7 @@ path-slash.workspace = true
 dunce.workspace = true
 winreg.workspace = true
 libc.workspace = true
-rust-functiongemma-train = { path = "../rust-functiongemma-train", optional = true }
+rust-functiongemma-train = { path = "../../../Deploy/rust-functiongemma-train", optional = true }
 
 [features]
 default = []
@@ -56,8 +56,8 @@ windows = { version = "0.58", features = [
     "Win32_Devices_DeviceAndDriverInstallation",
     "Win32_UI_WindowsAndMessaging",
 ] }
-# We use a specific version for windows-sys in this crate to ensure compatibility with our FFI
-windows-sys = { version = "0.59", features = [
+# windows-sys version is pinned at the workspace level for FFI compatibility
+windows-sys = { workspace = true, features = [
     "Win32_Foundation",
     "Win32_Storage_FileSystem",
     "Win32_Devices_DeviceAndDriverInstallation",

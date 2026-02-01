@@ -82,6 +82,12 @@ if (Test-Path $cmakeHelper) {
     $script:CmakeInfo = Initialize-CmakeEnvironment -Quiet
 }
 
+$cacheHelper = Join-Path $repoRoot 'Tools\Initialize-CacheEnvironment.ps1'
+if (Test-Path $cacheHelper) {
+    . $cacheHelper
+    $script:CacheInfo = Initialize-CacheEnvironment -Quiet
+}
+
 # Colors for output
 $Colors = @{
     Success = 'Green'
@@ -368,6 +374,7 @@ if (-not $SkipRust) {
     # Purge stale DLLs from bin to prevent false success
     Write-BuildInfo 'Purging stale DLLs from staging...'
     Get-ChildItem -Path $BinDir -Filter 'pcai_*.dll' -ErrorAction SilentlyContinue | Remove-Item -Force
+    Get-ChildItem -Path $BinDir -Filter 'rust_functiongemma_runtime.dll' -ErrorAction SilentlyContinue | Remove-Item -Force
 
     Push-Location $RustWorkspace
     try {
@@ -409,7 +416,7 @@ if (-not $SkipRust) {
         $ExeFiles = Get-ChildItem -Path $TargetDir -Filter '*.exe' -ErrorAction SilentlyContinue
 
         foreach ($dll in $DllFiles) {
-            if ($dll.Name -like 'pcai_*.dll') {
+            if ($dll.Name -like 'pcai_*.dll' -or $dll.Name -eq 'rust_functiongemma_runtime.dll') {
                 $RustDlls += $dll
                 $DllSize = [math]::Round($dll.Length / 1KB, 2)
                 Write-BuildSuccess "$($dll.Name) ($DllSize KB)"
