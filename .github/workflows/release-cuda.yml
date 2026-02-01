@@ -1,0 +1,370 @@
+name: Release Native Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags (v1.0.0, v0.1.0-beta, etc.)
+  workflow_dispatch:  # Allow manual triggers for testing
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.backend }} (${{ matrix.cuda && 'CUDA' || 'CPU' }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [llamacpp, mistralrs]
+        cuda: [true, false]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Ninja
+        run: choco install ninja -y
+
+      - name: Install CUDA Toolkit
+        if: matrix.cuda
+        uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: '13.1.0'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "cublas", "curand", "cusolver", "cusparse"]'
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Native/pcai_core/pcai_inference
+          shared-key: pcai-inference-${{ matrix.backend }}-${{ matrix.cuda && 'cuda' || 'cpu' }}
+
+      - name: Set Build Environment
+        shell: pwsh
+        run: |
+          $clPath = (Get-Command cl.exe).Source
+          echo "CC=$clPath" >> $env:GITHUB_ENV
+          echo "CXX=$clPath" >> $env:GITHUB_ENV
+          echo "CMAKE_GENERATOR=Ninja" >> $env:GITHUB_ENV
+
+          if ('${{ matrix.cuda }}' -eq 'true') {
+            echo "CUDA_PATH=$env:CUDA_PATH" >> $env:GITHUB_ENV
+            echo "LLAMA_CUDA=1" >> $env:GITHUB_ENV
+            echo "GGML_CUDA=ON" >> $env:GITHUB_ENV
+            # Target architectures: Turing (75), Ampere (80, 86), Ada (89)
+            echo "CUDAARCHS=75;80;86;89" >> $env:GITHUB_ENV
+            # Force dynamic CRT for CUDA compatibility
+            echo "RUSTFLAGS=-Ctarget-feature=-crt-static" >> $env:GITHUB_ENV
+          }
+
+      - name: Set CUDA Compiler Flags
+        if: matrix.cuda
+        shell: pwsh
+        run: |
+          $crtFlag = '/MD'
+          echo "CL=$crtFlag" >> $env:GITHUB_ENV
+          echo "_CL_=$crtFlag" >> $env:GITHUB_ENV
+          echo "CUDA_NVCC_FLAGS=$crtFlag" >> $env:GITHUB_ENV
+          echo "NVCCFLAGS=--compiler-options $crtFlag" >> $env:GITHUB_ENV
+          echo "CMAKE_ARGS=-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL" >> $env:GITHUB_ENV
+
+      - name: Determine Features
+        id: features
+        shell: pwsh
+        run: |
+          $backend = '${{ matrix.backend }}'
+          $cuda = '${{ matrix.cuda }}' -eq 'true'
+
+          $features = @('ffi', 'server')
+
+          if ($backend -eq 'llamacpp') {
+            $features += 'llamacpp'
+            if ($cuda) { $features += 'cuda-llamacpp' }
+            $binName = 'pcai-llamacpp'
+          } else {
+            $features += 'mistralrs-backend'
+            if ($cuda) { $features += 'cuda-mistralrs' }
+            $binName = 'pcai-mistralrs'
+          }
+
+          $featureString = $features -join ','
+          echo "FEATURES=$featureString" >> $env:GITHUB_OUTPUT
+          echo "BIN_NAME=$binName" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Building $binName with features: $featureString"
+
+      - name: Set Version Info
+        id: version_info
+        shell: pwsh
+        run: |
+          # Use Get-BuildVersion.ps1 to set version environment variables
+          $versionInfo = .\Tools\Get-BuildVersion.ps1 -SetEnv -Quiet
+
+          Write-Host "Version: $($versionInfo.Version)" -ForegroundColor Cyan
+          Write-Host "Git: $($versionInfo.GitHashShort) ($($versionInfo.GitBranch))" -ForegroundColor Cyan
+
+          # Export to GitHub Actions
+          echo "PCAI_VERSION=$($versionInfo.Version)" >> $env:GITHUB_OUTPUT
+          echo "PCAI_SEMVER=$($versionInfo.SemVer)" >> $env:GITHUB_OUTPUT
+          echo "PCAI_GIT_HASH_SHORT=$($versionInfo.GitHashShort)" >> $env:GITHUB_OUTPUT
+
+      - name: Build Binary
+        shell: pwsh
+        env:
+          PCAI_VERSION: ${{ steps.version_info.outputs.PCAI_VERSION }}
+          PCAI_BUILD_VERSION: ${{ steps.version_info.outputs.PCAI_VERSION }}
+        run: |
+          $backend = '${{ matrix.backend }}'
+          $cuda = '${{ matrix.cuda }}' -eq 'true'
+
+          Write-Host "======================================" -ForegroundColor Cyan
+          Write-Host " Building pcai-inference ($backend)" -ForegroundColor Cyan
+          Write-Host " Version: $env:PCAI_VERSION" -ForegroundColor Cyan
+          Write-Host "======================================" -ForegroundColor Cyan
+
+          # Use unified Build.ps1 for consistent artifact handling
+          $buildArgs = @{
+            Component = $backend
+            Configuration = 'Release'
+          }
+          if ($cuda) { $buildArgs['EnableCuda'] = $true }
+
+          .\Build.ps1 @buildArgs
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Build failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Prepare Artifact
+        id: artifact
+        shell: pwsh
+        run: |
+          $backend = '${{ matrix.backend }}'
+          $cuda = '${{ matrix.cuda }}' -eq 'true'
+          $variant = if ($cuda) { 'cuda' } else { 'cpu' }
+          $artifactName = "pcai-inference-$backend-$variant-win64"
+
+          $stagingDir = "staging\$artifactName"
+          New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
+
+          # Copy from .pcai/build/artifacts (unified build output)
+          $binName = '${{ steps.features.outputs.BIN_NAME }}'
+          $artifactDir = ".pcai\build\artifacts\$binName"
+
+          # Fallback to target dir if Build/artifacts not populated
+          if (-not (Test-Path $artifactDir) -or (Get-ChildItem $artifactDir -ErrorAction SilentlyContinue).Count -eq 0) {
+            $artifactDir = 'Native\pcai_core\pcai_inference\target\release'
+          }
+
+          # Copy binary
+          Copy-Item "$artifactDir\$binName.exe" -Destination $stagingDir -Force -ErrorAction SilentlyContinue
+          if (-not (Test-Path "$stagingDir\$binName.exe")) {
+            # Direct fallback
+            Copy-Item "Native\pcai_core\pcai_inference\target\release\$binName.exe" -Destination $stagingDir -Force
+          }
+
+          # Copy DLLs
+          $targetDir = 'Native\pcai_core\pcai_inference\target\release'
+          if (Test-Path "$targetDir\pcai_inference.dll") {
+            Copy-Item "$targetDir\pcai_inference.dll" -Destination $stagingDir -Force
+          }
+          if (Test-Path "$targetDir\pcai_inference_lib.dll") {
+            Copy-Item "$targetDir\pcai_inference_lib.dll" -Destination $stagingDir -Force
+          }
+
+          # Create README
+          $cudaText = if ($cuda) { @"
+
+## CUDA Requirements
+- NVIDIA GPU (RTX 20/30/40 series or newer)
+- CUDA Toolkit 13.x runtime (cudart64_13.dll)
+- Supported GPU architectures: SM 75 (Turing), SM 80/86 (Ampere), SM 89 (Ada)
+"@ } else { '' }
+
+          $readme = @"
+# PC-AI Inference Engine - $backend ($variant)
+
+Pre-compiled binary for Windows x64.
+
+## Files
+- $binName.exe - Main inference server executable
+- pcai_inference*.dll - Shared library for FFI integration
+
+## Usage
+
+Start the server:
+``````powershell
+.\$binName.exe --model path\to\model.gguf --port 8080
+``````
+
+Check health:
+``````powershell
+Invoke-RestMethod http://127.0.0.1:8080/health
+``````
+$cudaText
+
+## System Requirements
+- Windows 10/11 x64
+- x64 CPU with AVX2 support$(if (-not $cuda) { "`n- No GPU required" })
+
+## API Endpoints
+- GET  /health - Health check
+- GET  /v1/models - List loaded models
+- POST /v1/completions - Generate completions
+- POST /v1/chat/completions - Chat completions (OpenAI-compatible)
+
+## More Information
+See https://github.com/${{ github.repository }} for full documentation.
+"@
+
+          $readme | Out-File -FilePath "$stagingDir\README.txt" -Encoding UTF8
+
+          # Create ZIP
+          Compress-Archive -Path "$stagingDir\*" -DestinationPath "$artifactName.zip" -Force
+
+          echo "ARTIFACT_NAME=$artifactName" >> $env:GITHUB_OUTPUT
+          echo "ARTIFACT_PATH=$artifactName.zip" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Created artifact: $artifactName.zip"
+          Get-ChildItem $stagingDir
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.ARTIFACT_NAME }}
+          path: ${{ steps.artifact.outputs.ARTIFACT_PATH }}
+          retention-days: 7
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare Release Assets
+        id: assets
+        shell: bash
+        run: |
+          mkdir -p release-assets
+
+          # Move all ZIP files to release-assets
+          find artifacts -name "*.zip" -exec mv {} release-assets/ \;
+
+          echo "Collected release assets:"
+          ls -la release-assets/
+
+      - name: Determine Version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Generate Release Notes
+        id: notes
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
+          cat > RELEASE_NOTES.md << 'EOF'
+          ## PC-AI Inference Engine v${{ steps.version.outputs.VERSION }}
+
+          Pre-compiled native binaries for Windows x64.
+
+          ### Downloads
+
+          **CUDA (GPU-Accelerated)**
+          Requires NVIDIA GPU (Turing or newer) + CUDA Toolkit 13.x runtime
+
+          | File | Backend | Best For |
+          |------|---------|----------|
+          | `pcai-inference-llamacpp-cuda-win64.zip` | llama.cpp | GGUF models (recommended) |
+          | `pcai-inference-mistralrs-cuda-win64.zip` | mistral.rs | Mistral/Llama3 with optimizations |
+
+          **CPU-Only**
+          No GPU required, runs on any x64 Windows system
+
+          | File | Backend | Notes |
+          |------|---------|-------|
+          | `pcai-inference-llamacpp-cpu-win64.zip` | llama.cpp | Slower but universal |
+          | `pcai-inference-mistralrs-cpu-win64.zip` | mistral.rs | CPU-optimized |
+
+          ### Requirements
+
+          **CUDA builds:**
+          - Windows 10/11 x64
+          - NVIDIA GPU (RTX 20/30/40 series)
+          - CUDA Toolkit 13.x runtime (cudart64_13.dll)
+
+          **CPU builds:**
+          - Windows 10/11 x64
+          - x64 CPU with AVX2 support
+
+          ### GPU Architecture Support (CUDA builds)
+          - SM 75: Turing (RTX 20 series, GTX 16xx)
+          - SM 80: Ampere (RTX 30 series)
+          - SM 86: Ampere (RTX 30 series mobile/workstation)
+          - SM 89: Ada Lovelace (RTX 40 series)
+
+          ### Quick Start
+
+          ```powershell
+          # Extract the ZIP
+          Expand-Archive pcai-inference-llamacpp-cuda-win64.zip -DestinationPath .
+
+          # Start the server
+          .\pcai-llamacpp.exe --model path\to\model.gguf --port 8080
+
+          # Test the endpoint
+          Invoke-RestMethod http://127.0.0.1:8080/health
+          ```
+
+          ### API Endpoints
+          - `GET /health` - Health check
+          - `GET /v1/models` - List loaded models
+          - `POST /v1/completions` - Generate completions
+          - `POST /v1/chat/completions` - Chat completions (OpenAI-compatible)
+
+          ---
+          Built with GitHub Actions from commit ${{ github.sha }}
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: PC-AI Inference v${{ steps.version.outputs.VERSION }}
+          body_path: RELEASE_NOTES.md
+          files: release-assets/*.zip
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

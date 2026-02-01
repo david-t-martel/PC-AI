@@ -216,9 +216,9 @@ jobs:
           arch: x64
 
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.14
+        uses: Jimver/cuda-toolkit@v0.2.30
         with:
-          cuda: '12.4.0'
+          cuda: '13.1.0'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas"]'
 
