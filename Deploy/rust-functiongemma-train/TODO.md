@@ -19,7 +19,7 @@ Deploy/functiongemma-finetune (Python) and to enable a Rust-only router runtime.
 - [x] Router dataset generator (prepare_dataset.py parity) implemented via `prepare-router`:
   - Modes: diagnose/chat
   - System prompts: DIAGNOSE.md + CHAT.md
-  - Scenario file: Deploy/functiongemma-finetune/scenarios.json
+  - Scenario file: Deploy/rust-functiongemma-train/examples/scenarios.json
   - Tool coverage from pcai-tools.json
 - [x] Ensure chat template rendering uses the tokenizer template with tools.
 - [x] Add prompt masking so user/developer content does not contribute to loss.

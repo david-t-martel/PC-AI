@@ -68,7 +68,7 @@ From Deploy/rust-functiongemma-train (direct cargo):
   cargo run --release -- prepare \
     --tools C:\Users\david\PC_AI\Config\pcai-tools.json \
     --output rust_train_data.jsonl \
-    --scenarios C:\Users\david\PC_AI\Deploy\functiongemma-finetune\scenarios.json
+    --scenarios C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\examples\scenarios.json
 
 - Prepare router dataset (tool_calls or NO_TOOL):
   cargo run --release -- prepare-router \
@@ -76,8 +76,8 @@ From Deploy/rust-functiongemma-train (direct cargo):
     --output rust_router_data.jsonl \
     --diagnose-prompt C:\Users\david\PC_AI\DIAGNOSE.md \
     --chat-prompt C:\Users\david\PC_AI\CHAT.md \
-    --scenarios C:\Users\david\PC_AI\Deploy\functiongemma-finetune\scenarios.json \
-    --test-vectors C:\Users\david\PC_AI\Reports\TOOL_TEST_VECTORS.json
+    --scenarios C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\examples\scenarios.json \
+    --test-vectors C:\Users\david\PC_AI\Deploy\rust-functiongemma-train\data\test_vectors.json
 
 - Prepare token cache (faster training):
   cargo run --release -- prepare-cache \
