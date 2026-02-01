@@ -1,0 +1,19 @@
+{
+  "backend": {
+    "type": "mistral_rs"
+  },
+  "model": {
+    "path": "C:\\Users\\david\\PC_AI\\Models\\functiongemma-270m-it",
+    "generation": {
+      "max_tokens": 512,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "stop": []
+    }
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "cors": true
+  }
+}

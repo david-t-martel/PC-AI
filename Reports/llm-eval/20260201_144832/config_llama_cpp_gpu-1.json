@@ -1,0 +1,19 @@
+{
+  "backend": {
+    "type": "llama_cpp"
+  },
+  "model": {
+    "path": "C:\\Users\\david\\PC_AI\\Models\\tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+    "generation": {
+      "max_tokens": 512,
+      "temperature": 0.7,
+      "top_p": 0.95,
+      "stop": []
+    }
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 38596,
+    "cors": true
+  }
+}
