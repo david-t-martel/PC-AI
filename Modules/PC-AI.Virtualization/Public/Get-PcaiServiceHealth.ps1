@@ -120,6 +120,7 @@ function Get-PcaiServiceHealth {
         $NativeDllSearchPaths
     } else {
         @(
+            "$env:USERPROFILE\.local\bin\pcai_inference.dll",
             'T:\RustCache\cargo-target\release\pcai_inference.dll',
             "$PSScriptRoot\..\..\..\Deploy\pcai-inference\target\release\pcai_inference.dll",
             "$env:USERPROFILE\PC_AI\Deploy\pcai-inference\target\release\pcai_inference.dll"

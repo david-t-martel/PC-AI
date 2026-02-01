@@ -10,10 +10,64 @@ $script:ModulePath = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Par
 $script:BackendInitialized = $false
 $script:ModelLoaded = $false
 $script:CurrentBackend = $null
+$script:DllPath = $null
+$script:DllExists = $false
 #endregion
 
 #region Internal Logic
+function Add-EnvPath {
+    param([string]$Path)
+    if (-not $Path) { return }
+    if (-not (Test-Path $Path)) { return }
+    if ($env:PATH -notlike "*$Path*") {
+        $env:PATH = "$Path;$env:PATH"
+    }
+}
+
+function Resolve-PcaiInferenceDll {
+    param([string]$OverridePath)
+
+    if ($OverridePath) {
+        if (Test-Path $OverridePath) {
+            return (Resolve-Path $OverridePath).Path
+        }
+        return $null
+    }
+
+    $projectRoot = Split-Path $script:ModulePath -Parent
+
+    $candidates = @(
+        $env:PCAI_INFERENCE_DLL,
+        (Join-Path $projectRoot 'bin\pcai_inference.dll'),
+        (Join-Path $projectRoot 'bin\Release\pcai_inference.dll'),
+        (Join-Path $projectRoot 'bin\Debug\pcai_inference.dll'),
+        (Join-Path $env:CARGO_TARGET_DIR 'release\pcai_inference.dll' -ErrorAction SilentlyContinue),
+        (Join-Path $env:USERPROFILE '.local\bin\pcai_inference.dll'),
+        'T:\RustCache\cargo-target\release\pcai_inference.dll',
+        (Join-Path $projectRoot 'Native\pcai_core\pcai_inference\target\release\pcai_inference.dll'),
+        (Join-Path $projectRoot 'Deploy\pcai-inference\target\release\pcai_inference.dll')
+    ) | Where-Object { $_ }
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return (Resolve-Path $candidate).Path
+        }
+    }
+
+    return $null
+}
+
 function Initialize-PcaiFFI {
+    param([string]$DllPath)
+
+    $resolvedDll = Resolve-PcaiInferenceDll -OverridePath $DllPath
+    $script:DllPath = $resolvedDll
+    $script:DllExists = $null -ne $resolvedDll -and (Test-Path $resolvedDll)
+
+    if ($script:DllExists) {
+        Add-EnvPath (Split-Path $resolvedDll -Parent)
+    }
+
     # Resolve project bin
     $projectRoot = Split-Path $script:ModulePath -Parent
     $projectBin = Join-Path $projectRoot 'bin'
@@ -38,26 +92,40 @@ function Initialize-PcaiInference {
     [CmdletBinding()]
     param(
         [Parameter()]
-        [ValidateSet('llamacpp', 'mistralrs')]
-        [string]$Backend = 'llamacpp'
+        [ValidateSet('auto', 'llamacpp', 'mistralrs')]
+        [string]$Backend = 'llamacpp',
+
+        [Parameter()]
+        [string]$DllPath
     )
 
-    if (-not (Initialize-PcaiFFI)) {
+    $backendName = if ($Backend -eq 'auto') { 'mistralrs' } else { $Backend }
+
+    if (-not (Initialize-PcaiFFI -DllPath $DllPath)) {
         throw 'PcaiNative.dll not found in bin. Please run build.ps1 first.'
     }
 
-    Write-Verbose "Initializing backend: $Backend"
+    if (-not $script:DllExists) {
+        throw "DLL not found: pcai_inference.dll. Set PCAI_INFERENCE_DLL or build the native backend."
+    }
+
+    Write-Verbose "Initializing backend: $backendName"
 
     try {
-        $result = [PcaiNative.InferenceModule]::pcai_init($Backend)
+        $result = [PcaiNative.InferenceModule]::pcai_init($backendName)
         if ($result -ne 0) {
             $error = [PcaiNative.InferenceModule]::GetLastError()
-            throw "Failed to initialize backend '$Backend': $error"
+            throw "Failed to initialize backend '$backendName': $error"
         }
 
         $script:BackendInitialized = $true
-        $script:CurrentBackend = $Backend
-        Write-Verbose "Backend initialized successfully: $Backend"
+        $script:CurrentBackend = $backendName
+        Write-Verbose "Backend initialized successfully: $backendName"
+        return [PSCustomObject]@{
+            Success = $true
+            Backend = $backendName
+            DllPath = $script:DllPath
+        }
     } catch {
         $script:BackendInitialized = $false
         throw "Backend initialization failed: $_"
@@ -93,6 +161,10 @@ function Import-PcaiModel {
 
         $script:ModelLoaded = $true
         Write-Verbose 'Model loaded successfully'
+        return [PSCustomObject]@{
+            Success   = $true
+            ModelPath = $ModelPath
+        }
     } catch {
         $script:ModelLoaded = $false
         throw "Model loading failed: $_"
@@ -129,6 +201,23 @@ function Invoke-PcaiInference {
     }
 }
 
+function Invoke-PcaiGenerate {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory, Position = 0)]
+        [string]$Prompt,
+
+        [Parameter()]
+        [uint32]$MaxTokens = 512,
+
+        [Parameter()]
+        [ValidateRange(0.0, 2.0)]
+        [float]$Temperature = 0.7
+    )
+
+    return Invoke-PcaiInference -Prompt $Prompt -MaxTokens $MaxTokens -Temperature $Temperature
+}
+
 function Stop-PcaiInference {
     [CmdletBinding()]
     param()
@@ -146,14 +235,80 @@ function Stop-PcaiInference {
     }
 }
 
+function Close-PcaiInference {
+    [CmdletBinding()]
+    param()
+
+    Stop-PcaiInference
+}
+
 function Get-PcaiInferenceStatus {
     [CmdletBinding()]
     param()
 
+    if (-not $script:DllPath) {
+        $script:DllPath = Resolve-PcaiInferenceDll
+        $script:DllExists = $null -ne $script:DllPath -and (Test-Path $script:DllPath)
+    }
+
     return [PSCustomObject]@{
+        DllPath           = $script:DllPath
+        DllExists         = $script:DllExists -and (Test-Path $script:DllPath)
         BackendInitialized = $script:BackendInitialized
         ModelLoaded        = $script:ModelLoaded
         CurrentBackend     = $script:CurrentBackend
+    }
+}
+
+function Test-PcaiInference {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [ValidateSet('auto', 'llamacpp', 'mistralrs')]
+        [string]$Backend = 'auto',
+
+        [Parameter()]
+        [string]$ModelPath,
+
+        [Parameter()]
+        [int]$GpuLayers = -1
+    )
+
+    try {
+        $init = Initialize-PcaiInference -Backend $Backend
+        if ($ModelPath) {
+            $null = Import-PcaiModel -ModelPath $ModelPath -GpuLayers $GpuLayers
+        }
+        return $true
+    } catch {
+        Write-Verbose "Test-PcaiInference failed: $_"
+        return $false
+    } finally {
+        try { Close-PcaiInference -ErrorAction SilentlyContinue } catch {}
+    }
+}
+
+function Test-PcaiDllVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [string]$DllPath
+    )
+
+    $resolved = Resolve-PcaiInferenceDll -OverridePath $DllPath
+    if (-not $resolved) {
+        return [PSCustomObject]@{
+            Success = $false
+            Message = 'pcai_inference.dll not found'
+        }
+    }
+
+    $info = Get-Item $resolved -ErrorAction SilentlyContinue
+    return [PSCustomObject]@{
+        Success        = $true
+        DllPath        = $resolved
+        FileVersion    = $info.VersionInfo.FileVersion
+        ProductVersion = $info.VersionInfo.ProductVersion
     }
 }
 
@@ -174,7 +329,11 @@ Export-ModuleMember -Function @(
     'Initialize-PcaiInference',
     'Import-PcaiModel',
     'Invoke-PcaiInference',
+    'Invoke-PcaiGenerate',
     'Stop-PcaiInference',
-    'Get-PcaiInferenceStatus'
+    'Close-PcaiInference',
+    'Get-PcaiInferenceStatus',
+    'Test-PcaiInference',
+    'Test-PcaiDllVersion'
 )
 #endregion
