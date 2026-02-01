@@ -40,21 +40,72 @@ The agent follows a **collect → parse → route → reason → recommend** wor
 
 ## Commands
 
-### Build pcai-inference (Native LLM Engine)
+### Unified Build System
 
 ```powershell
-# Build with consolidated script (recommended)
-cd Native\pcai_core\pcai_inference
-.\Invoke-PcaiBuild.ps1 -Backend llamacpp -Configuration Release
+# Build all components (recommended)
+.\Build.ps1
 
-# Build with CUDA GPU acceleration
+# Build specific component with CUDA
+.\Build.ps1 -Component llamacpp -EnableCuda
+
+# Build both inference backends
+.\Build.ps1 -Component inference -EnableCuda
+
+# Clean build and create release packages
+.\Build.ps1 -Clean -Package -EnableCuda
+
+# Debug build
+.\Build.ps1 -Component mistralrs -Configuration Debug
+```
+
+**Build Output Structure:**
+```
+.pcai/build/
+├── artifacts/           # Final distributable binaries
+│   ├── pcai-llamacpp/   # llamacpp backend (exe + dll)
+│   ├── pcai-mistralrs/  # mistralrs backend (exe + dll)
+│   ├── functiongemma/   # FunctionGemma router
+│   └── manifest.json    # Build manifest with version + SHA256 hashes
+├── logs/                # Timestamped build logs
+└── packages/            # Release ZIPs (with -Package flag)
+```
+
+Override artifact location: `$env:PCAI_ARTIFACTS_ROOT = 'D:\build'`
+
+### Version Information
+
+```powershell
+# Get version info from git metadata
+.\Tools\Get-BuildVersion.ps1
+
+# Set version environment variables for build
+.\Tools\Get-BuildVersion.ps1 -SetEnv
+
+# Output formats
+.\Tools\Get-BuildVersion.ps1 -Format Json    # JSON output
+.\Tools\Get-BuildVersion.ps1 -Format Env     # Shell export format
+.\Tools\Get-BuildVersion.ps1 -Format Cargo   # Cargo rustc-env format
+```
+
+**Version Format:** `{semver}.{commits}+{hash}[.dirty]`
+- Example: `0.2.0.15+abc1234` (15 commits since v0.2.0, hash abc1234)
+- Example: `0.2.0+abc1234` (exactly at tag v0.2.0)
+- Example: `0.2.0.3+abc1234.dirty` (uncommitted changes)
+
+**Embedded in binaries:**
+- `pcai-llamacpp.exe --version` shows full build info
+- `/version` endpoint returns JSON with git hash, timestamp, features
+
+### Direct Backend Build (Advanced)
+
+```powershell
+# Build with low-level script (for debugging build issues)
+cd Native\pcai_core\pcai_inference
 .\Invoke-PcaiBuild.ps1 -Backend llamacpp -Configuration Release -EnableCuda
 
-# Build both backends (llamacpp + mistralrs)
-.\Invoke-PcaiBuild.ps1 -Backend all -Configuration Release -EnableCuda
-
 # Clean build (wipe target/ first)
-.\Invoke-PcaiBuild.ps1 -Backend llamacpp -Clean
+.\Invoke-PcaiBuild.ps1 -Backend all -Clean
 ```
 
 **Feature Flags:**
@@ -86,6 +137,36 @@ The diagnostic report contains:
 3. **System Event Errors** - Disk/USB errors from last 3 days
 4. **USB Device Status** - USB controllers and device status
 5. **Network Adapter Status** - Physical adapter configuration
+
+### CI/CD: Releasing Native Binaries
+
+The project uses GitHub Actions to build and release pre-compiled CUDA binaries.
+
+**Trigger a release:**
+```bash
+# Tag a version to trigger the release workflow
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+**Manual trigger (for testing):**
+- Go to Actions > "Release Native Binaries" > Run workflow
+- Enter a tag name (e.g., `v1.0.0-beta`)
+
+**Release artifacts (4 variants):**
+| File | Backend | GPU |
+|------|---------|-----|
+| `pcai-inference-llamacpp-cuda-win64.zip` | llama.cpp | CUDA |
+| `pcai-inference-llamacpp-cpu-win64.zip` | llama.cpp | CPU-only |
+| `pcai-inference-mistralrs-cuda-win64.zip` | mistral.rs | CUDA |
+| `pcai-inference-mistralrs-cpu-win64.zip` | mistral.rs | CPU-only |
+
+**CUDA builds target:**
+- SM 75: Turing (RTX 20 series, GTX 16xx)
+- SM 80/86: Ampere (RTX 30 series)
+- SM 89: Ada Lovelace (RTX 40 series)
+
+**Workflow file:** `.github/workflows/release-cuda.yml`
 
 ## Scripts to Migrate from `~\*`
 
