@@ -178,6 +178,12 @@ function Write-BuildSummary {
     if (Test-Path $script:BuildArtifactsDir) {
         Write-Host "  Artifacts: $script:BuildArtifactsDir" -ForegroundColor DarkGray
     }
+    if (Test-Path $script:BuildLogsDir) {
+        Write-Host "  Logs: $script:BuildLogsDir" -ForegroundColor DarkGray
+    }
+    if (Test-Path $script:BuildPackagesDir) {
+        Write-Host "  Packages: $script:BuildPackagesDir" -ForegroundColor DarkGray
+    }
 
     Write-Host ""
 }
@@ -545,6 +551,7 @@ Write-Host "  Configuration: $Configuration" -ForegroundColor White
 Write-Host "  CUDA:          $(if ($EnableCuda) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
 Write-Host "  Clean:         $(if ($Clean) { 'Yes' } else { 'No' })" -ForegroundColor White
 Write-Host "  Package:       $(if ($Package) { 'Yes' } else { 'No' })" -ForegroundColor White
+Write-Host "  Artifacts Root: $script:ArtifactsRoot" -ForegroundColor White
 
 # Clean if requested
 if ($Clean) {

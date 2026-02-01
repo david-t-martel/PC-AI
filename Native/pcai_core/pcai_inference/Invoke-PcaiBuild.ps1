@@ -661,7 +661,7 @@ function Invoke-Build {
     $cargoArgs = @('build', '--bin', $binName, '--features', $featureString, '--message-format=json')
     if ($Configuration -eq 'Release') { $cargoArgs += '--release' }
 
-    # Configure log files in Build/logs directory
+    # Configure log files in .pcai/build/logs directory
     $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
     $logDir = if (Test-Path $script:BuildLogsDir) { $script:BuildLogsDir } else { $ProjectRoot }
     $logFile = Join-Path $logDir "cargo_build_${BackendName}_$stamp.log"
