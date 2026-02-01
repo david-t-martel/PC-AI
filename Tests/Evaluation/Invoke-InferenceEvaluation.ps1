@@ -30,6 +30,27 @@
 .PARAMETER OutputPath
     Path to save evaluation results
 
+.PARAMETER OutputRoot
+    Root folder for evaluation run outputs (defaults to .pcai/evaluation/runs)
+
+.PARAMETER RunLabel
+    Optional label for evaluation run folders
+
+.PARAMETER ProgressMode
+    Progress output mode: auto, stream, bar, silent
+
+.PARAMETER EmitStructuredMessages
+    Emit JSON event lines to the pipeline
+
+.PARAMETER HeartbeatSeconds
+    Heartbeat interval for long-running runs
+
+.PARAMETER RequestTimeoutSec
+    Timeout for HTTP requests per test case
+
+.PARAMETER StopSignalPath
+    Stop signal file path; if present, evaluation will stop gracefully
+
 .EXAMPLE
     .\Invoke-InferenceEvaluation.ps1 -Backend llamacpp -ModelPath "C:\models\llama-3.2-1b.gguf" -Dataset diagnostic
 
@@ -79,9 +100,7 @@ param(
 
     [int]$RequestTimeoutSec = 120,
 
-    [string]$StopSignalPath,
-
-    [switch]$Verbose
+    [string]$StopSignalPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -89,6 +108,11 @@ $ErrorActionPreference = 'Stop'
 # Import required modules
 $scriptRoot = Split-Path -Parent $PSScriptRoot
 $projectRoot = Split-Path -Parent $scriptRoot
+
+$moduleRoot = Join-Path $projectRoot 'Modules'
+if ($env:PSModulePath -notlike "*$moduleRoot*") {
+    $env:PSModulePath = "$moduleRoot;$env:PSModulePath"
+}
 
 if (Test-Path (Join-Path $projectRoot "Modules\PcaiInference.psd1")) {
     Import-Module (Join-Path $projectRoot "Modules\PcaiInference.psd1") -Force -ErrorAction SilentlyContinue
@@ -116,6 +140,8 @@ if (-not $OutputPath) {
     $batchContext = New-PcaiEvaluationRunContext -RunLabel $batchLabel -OutputRoot $OutputRoot -SuiteName 'BatchSummary' -Backend 'batch'
     $OutputPath = Join-Path $batchContext.RunDir 'evaluation_summary.json'
 }
+Write-Host "Output Root: $OutputRoot" -ForegroundColor DarkGray
+Write-Host "Summary Output: $OutputPath" -ForegroundColor DarkGray
 
 #region Helper Functions
 
@@ -445,7 +471,7 @@ try {
         $result = $allResults[$key]
 
         if ($result.Results) {
-            Write-Host "`n  $key`:" -ForegroundColor White
+            Write-Host ("`n  {0}:" -f $key) -ForegroundColor White
             Write-Host "    Pass Rate: $($result.Results.PassRate)%"
             Write-Host "    Avg Score: $($result.Results.AverageScore)"
             Write-Host "    Avg Latency: $([math]::Round($result.Results.AverageLatency, 2))ms"

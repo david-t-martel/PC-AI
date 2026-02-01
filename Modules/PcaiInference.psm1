@@ -100,6 +100,9 @@ function Initialize-PcaiInference {
     )
 
     $backendName = if ($Backend -eq 'auto') { 'mistralrs' } else { $Backend }
+    if ($backendName -eq 'llamacpp') {
+        $backendName = 'llama_cpp'
+    }
 
     if (-not (Initialize-PcaiFFI -DllPath $DllPath)) {
         throw 'PcaiNative.dll not found in bin. Please run build.ps1 first.'

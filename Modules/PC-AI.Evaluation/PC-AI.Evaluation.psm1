@@ -287,6 +287,9 @@ function Invoke-EvaluationSuite {
     .PARAMETER StopSignalPath
         Stop signal file path; if present, evaluation will stop gracefully
 
+    .PARAMETER RunContext
+        Pre-created run context (output paths + identifiers)
+
     .EXAMPLE
         $results = Invoke-EvaluationSuite -Suite $suite -Backend 'llamacpp' -ModelPath "C:\models\llama-3.2-1b.gguf"
     #>
@@ -353,6 +356,7 @@ function Invoke-EvaluationSuite {
         TotalTests = $Suite.TestCases.Count
         Completed = 0
         Cancelled = $false
+        LastProgressUtc = $null
     }
     if ($Backend -eq 'ollama' -and $BaseUrl -eq 'http://127.0.0.1:8080') {
         $BaseUrl = 'http://127.0.0.1:11434'
@@ -372,7 +376,10 @@ function Invoke-EvaluationSuite {
         $backendReady = Initialize-EvaluationBackend -Backend $Backend -ModelPath $ModelPath -BaseUrl $BaseUrl -GpuLayers $GpuLayers
 
         if (-not $backendReady) {
-            Write-Error "Failed to initialize backend: $Backend"
+            Write-Warning "Failed to initialize backend: $Backend"
+            Write-EvaluationEvent -Type 'backend_error' -Message "Backend initialization failed: $Backend" -Data @{
+                backend = $Backend
+            } -Level 'warn'
             return $null
         }
 
@@ -619,13 +626,21 @@ function Write-EvaluationProgress {
     )
 
     $percent = if ($Total -gt 0) { [math]::Round(($Completed / $Total) * 100, 1) } else { 0 }
-    $status = "Test $Completed of $Total: $TestCaseId"
+    $status = "Test {0} of {1}: {2}" -f $Completed, $Total, $TestCaseId
 
     if ($script:EvaluationConfig.ProgressMode -in @('auto', 'bar')) {
         Write-Progress -Activity "Running Evaluation" -Status $status -PercentComplete $percent
     }
 
     if ($script:EvaluationConfig.ProgressMode -in @('auto', 'stream')) {
+        $interval = [int]($script:EvaluationConfig.ProgressIntervalSeconds ?? 0)
+        if ($interval -gt 0 -and $script:EvaluationRunState) {
+            $last = $script:EvaluationRunState.LastProgressUtc
+            if ($last -and ((Get-Date) - $last).TotalSeconds -lt $interval) {
+                return
+            }
+            $script:EvaluationRunState.LastProgressUtc = Get-Date
+        }
         $elapsedText = if ($Elapsed) { $Elapsed.ToString('hh\:mm\:ss') } else { '00:00:00' }
         $line = "progress=$Completed/$Total ($percent%) elapsed=$elapsedText test=$TestCaseId"
         if ($script:EvaluationConfig.ProgressLogPath) {
@@ -651,6 +666,30 @@ function Get-EvaluationRunState {
     param()
 
     return $script:EvaluationRunState
+}
+
+function Stop-EvaluationRun {
+    [CmdletBinding()]
+    param(
+        [string]$StopSignalPath
+    )
+
+    $path = if ($StopSignalPath) { $StopSignalPath } else { $script:EvaluationConfig.StopSignalPath }
+    if (-not $path) {
+        Write-Warning "No stop signal path configured."
+        return $false
+    }
+
+    $dir = Split-Path -Parent $path
+    if ($dir -and -not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+
+    New-Item -ItemType File -Path $path -Force | Out-Null
+    Write-EvaluationEvent -Type 'cancel_requested' -Message "Stop signal created: $path" -Data @{
+        stopSignal = $path
+    } -Level 'warn'
+    return $true
 }
 
 function Get-PcaiCompiledBinaryPath {
@@ -706,9 +745,10 @@ function New-PcaiServerConfigFile {
     $uri = [Uri]$BaseUrl
     $serverPort = if ($uri.Port -gt 0) { $uri.Port } else { 8080 }
 
+    $backendType = if ($Backend -eq 'llamacpp') { 'llama_cpp' } else { $Backend }
     $config = @{
         backend = @{
-            type = $Backend
+            type = $backendType
         }
         model = @{
             path = $ModelPath
@@ -873,31 +913,39 @@ function Initialize-EvaluationBackend {
         { $_ -in 'llamacpp', 'mistralrs' } {
             # Native FFI backend
             try {
-                Import-Module PcaiInference -ErrorAction Stop
+                if (-not (Get-Module -Name PcaiInference)) {
+                    $projectRoot = Get-PcaiProjectRoot
+                    $localModule = Join-Path $projectRoot 'Modules\PcaiInference.psd1'
+                    if (Test-Path $localModule) {
+                        Import-Module $localModule -Force -ErrorAction Stop
+                    } else {
+                        Import-Module PcaiInference -ErrorAction Stop
+                    }
+                }
 
                 $initResult = Initialize-PcaiInference -Backend $Backend
                 if (-not $initResult.Success) {
-                    Write-Error "Failed to initialize $Backend backend"
+                    Write-Warning "Failed to initialize $Backend backend"
                     return $false
                 }
 
                 if ($ModelPath) {
                     $loadResult = Import-PcaiModel -ModelPath $ModelPath -GpuLayers $GpuLayers
                     if (-not $loadResult.Success) {
-                        Write-Error "Failed to load model: $ModelPath"
+                        Write-Warning "Failed to load model: $ModelPath"
                         return $false
                     }
                 }
 
                 return $true
             } catch {
-                Write-Error "Backend initialization failed: $_"
+                Write-Warning "Backend initialization failed: $_"
                 return $false
             }
         }
         { $_ -in 'llamacpp-bin', 'mistralrs-bin' } {
             if (-not $ModelPath) {
-                Write-Error "ModelPath is required for compiled backend: $Backend"
+                Write-Warning "ModelPath is required for compiled backend: $Backend"
                 return $false
             }
 
@@ -909,7 +957,7 @@ function Initialize-EvaluationBackend {
                 $null = Start-PcaiCompiledServer -Backend $backendName -ModelPath $ModelPath -BaseUrl $BaseUrl -GpuLayers $GpuLayers -Device $device
                 return $true
             } catch {
-                Write-Error "Compiled backend initialization failed: $_"
+                Write-Warning "Compiled backend initialization failed: $_"
                 return $false
             }
         }

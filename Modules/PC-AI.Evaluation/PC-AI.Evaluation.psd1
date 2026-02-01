@@ -49,6 +49,13 @@
         'Import-EvaluationDataset'
         'Export-EvaluationDataset'
 
+        # Evaluation Run Utilities
+        'Get-PcaiArtifactsRoot'
+        'Initialize-EvaluationPaths'
+        'New-PcaiEvaluationRunContext'
+        'Get-EvaluationRunState'
+        'Stop-EvaluationRun'
+
         # Quality Metrics (internal but exported for testing)
         'Measure-Coherence'
         'Measure-Toxicity'
