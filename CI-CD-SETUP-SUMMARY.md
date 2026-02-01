@@ -20,14 +20,36 @@ The complete CI/CD pipeline for PC_AI has been successfully created. Here's what
    - Validates module manifests
    - Generates security reports
 
-3. **release.yml** - Automated release workflow
+3. **rust-inference.yml** - Rust inference build/test workflow
+   - Cargo check/test/clippy/fmt for `Deploy/pcai-inference`
+   - MSVC build, optional CUDA build
+   - Inference DLL integration tests
+
+4. **release-cuda.yml** - Native binary release workflow
+   - Builds CPU + CUDA binaries for `llamacpp` + `mistralrs`
+   - Packages artifacts from `.pcai/build/artifacts`
+   - Uploads release assets on tags
+
+5. **docs-pipeline.yml** - Documentation pipeline
+   - Runs `Tools/Invoke-DocPipeline.ps1` and `generate-auto-docs.ps1`
+   - Uploads `Reports/**` and `.pcai/**` as artifacts
+
+6. **evaluation-smoke.yml** - LLM evaluation smoke test
+   - Starts a mock OpenAI-compatible server
+   - Runs `Tests/Evaluation/Invoke-InferenceEvaluation.ps1`
+   - Uploads `.pcai/evaluation/runs/**`
+
+7. **tooling-automation.yml** - On-demand tooling runner
+   - Executes `Tools/` helper scripts based on dispatch inputs
+
+8. **release.yml** - Automated release workflow
    - Triggers on version tags (e.g., `v1.0.0`)
    - Runs full test suite
    - Builds release package
    - Generates release notes
    - Creates GitHub release with artifacts
 
-4. **scheduled-checks.yml** - Daily maintenance workflow
+9. **scheduled-checks.yml** - Daily maintenance workflow
    - Runs daily at 6 AM UTC
    - Checks for module updates
    - Validates workflows
@@ -65,6 +87,7 @@ The complete CI/CD pipeline for PC_AI has been successfully created. Here's what
    - IDE files
    - Backup files
    - Credentials and secrets
+   - Local artifacts in `.pcai/`
 
 5. **.gitattributes** - Git line ending handling
    - Proper CRLF/LF handling per file type
@@ -352,5 +375,5 @@ For issues or questions:
 ---
 
 **Pipeline Created:** 2026-01-23
-**Last Updated:** 2026-01-23
+**Last Updated:** 2026-02-01
 **Status:** ✓ Production Ready

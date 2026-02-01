@@ -35,11 +35,42 @@ Local-first diagnostics agent guidance for PC_AI (PowerShell + Rust/C# + local L
 - HVSocket aliases: `Config/hvsock-proxy.conf` (optional)
 - Router entry points: `Invoke-FunctionGemmaReAct`, `Invoke-LLMChatRouted`
 
-## pcai-inference compilation
+## Unified Build System
 
-Build the native LLM inference engine from `Native/pcai_core/pcai_inference/`:
+The project uses a unified build orchestrator for all components:
 
 ```powershell
+# Build all components (recommended)
+.\Build.ps1
+
+# Build specific backend with CUDA
+.\Build.ps1 -Component llamacpp -EnableCuda
+
+# Build both inference backends
+.\Build.ps1 -Component inference -EnableCuda
+
+# Clean build and create release packages
+.\Build.ps1 -Clean -Package -EnableCuda
+```
+
+**Output structure:**
+```
+.pcai/build/
+├── artifacts/           # Final distributable binaries
+│   ├── pcai-llamacpp/   # llamacpp backend
+│   ├── pcai-mistralrs/  # mistralrs backend
+│   └── manifest.json    # Build manifest with version + SHA256 hashes
+├── logs/                # Timestamped build logs
+└── packages/            # Release ZIPs (with -Package flag)
+```
+
+## pcai-inference compilation
+
+For direct backend builds (debugging/advanced):
+
+```powershell
+cd Native\pcai_core\pcai_inference
+
 # CPU-only build (llamacpp backend)
 .\Invoke-PcaiBuild.ps1 -Backend llamacpp -Configuration Release
 
@@ -53,7 +84,7 @@ Build the native LLM inference engine from `Native/pcai_core/pcai_inference/`:
 **Build prerequisites:**
 - Visual Studio 2022 C++ Build Tools + Windows SDK
 - CMake 3.x (auto-detected from VS)
-- CUDA 12.x (for `-EnableCuda`)
+- CUDA 12.x+ (for `-EnableCuda`)
 
 **Performance optimizations (auto-enabled):**
 - sccache: Compiler caching for faster rebuilds
@@ -67,6 +98,36 @@ Build the native LLM inference engine from `Native/pcai_core/pcai_inference/`:
 | `llamacpp` | Mature, GGUF support, lower VRAM | Default, most models |
 | `mistralrs` | Flash attention, cuDNN, newer arch | Mistral/Llama3 with 12GB+ VRAM |
 
+## Version System
+
+Version info is embedded at compile time from git metadata:
+
+```powershell
+# Get version info
+.\Tools\Get-BuildVersion.ps1
+
+# Output as JSON
+.\Tools\Get-BuildVersion.ps1 -Format Json
+
+# Set environment variables for builds
+.\Tools\Get-BuildVersion.ps1 -SetEnv
+```
+
+**Version format:** `{semver}.{commits}+{hash}[.dirty]`
+- `0.2.0.15+abc1234` - 15 commits since v0.2.0
+- `0.2.0+abc1234` - exactly at tag v0.2.0
+- `0.2.0.3+abc1234.dirty` - uncommitted changes
+
+**Runtime access:**
+```powershell
+# Check binary version
+.\pcai-llamacpp.exe --version
+.\pcai-llamacpp.exe --version-json
+
+# HTTP endpoint
+GET http://127.0.0.1:8080/version
+```
+
 ## LLM runtime debugging (native-first)
 
 Use these when diagnosing LLM stack failures or routing issues:
@@ -77,6 +138,30 @@ Use these when diagnosing LLM stack failures or routing issues:
 - LLM endpoints:
     - pcai-inference: `GET http://127.0.0.1:8080/health` or `/v1/models`
     - FunctionGemma router: `GET http://127.0.0.1:8000/health` or `/v1/models`
+
+## LLM evaluation harness
+
+Use the evaluation runner to benchmark inference backends and capture structured outputs:
+
+- Runner: `Tests\Evaluation\Invoke-InferenceEvaluation.ps1`
+- Default output root: `.pcai\evaluation\runs\`
+- Per-run outputs: `events.jsonl`, `progress.log`, `summary.json`, `stop.signal`
+
+Example:
+```powershell
+pwsh .\Tests\Evaluation\Invoke-InferenceEvaluation.ps1 `
+  -Backend llamacpp-bin `
+  -ModelPath "C:\Models\tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf" `
+  -Dataset diagnostic `
+  -MaxTestCases 5 `
+  -ProgressMode stream `
+  -RunLabel local-smoke
+```
+
+Stop a run:
+```powershell
+Stop-EvaluationRun
+```
 
 ## Tooling update workflow
 
@@ -91,13 +176,34 @@ Use these when diagnosing LLM stack failures or routing issues:
 - Emit compact, stable JSON for LLM ingestion.
 - Use C ABI (`extern "C"`) + C# P/Invoke wrapper for PowerShell.
 
+## CI/CD: Native Binary Releases
+
+Pre-compiled CUDA binaries are published via GitHub Actions on version tags:
+
+```bash
+# Tag a release
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+**Release artifacts (4 variants):**
+| File | Backend | GPU |
+|------|---------|-----|
+| `pcai-inference-llamacpp-cuda-win64.zip` | llama.cpp | CUDA |
+| `pcai-inference-llamacpp-cpu-win64.zip` | llama.cpp | CPU-only |
+| `pcai-inference-mistralrs-cuda-win64.zip` | mistral.rs | CUDA |
+| `pcai-inference-mistralrs-cpu-win64.zip` | mistral.rs | CPU-only |
+
+**CUDA GPU targets:** SM 75 (Turing), SM 80/86 (Ampere), SM 89 (Ada)
+
+**Workflow:** `.github/workflows/release-cuda.yml`
+
 ## Known gaps / TODOs
 
 - Define a versioned C ABI contract for Rust DLL exports (error codes, ownership).
 - Standardize JSON schemas for native outputs (schema folder + version pinning).
 - Provide progress + streaming updates for long native operations.
 - Finalize eval split + QLoRA quantization for rust-functiongemma-train.
-- Publish precompiled CUDA binaries via GitHub Releases.
 
 ## Documentation automation
 

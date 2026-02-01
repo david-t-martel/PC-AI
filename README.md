@@ -199,6 +199,42 @@ Invoke-LLMChatRouted -Message "Check disk health and summarize issues." -Mode di
 Invoke-LLMChat -Message "Explain WSL vs Docker." -UseRouter -RouterMode chat
 ```
 
+## Evaluation & Benchmarking
+
+PC-AI ships an evaluation harness for LLM backends with structured progress logging and run outputs.
+
+**Runner:** `Tests\Evaluation\Invoke-InferenceEvaluation.ps1`
+
+**What it does:**
+- Loads a dataset (built-in or custom JSON)
+- Starts/initializes the requested backend
+- Runs test cases and aggregates metrics
+- Writes run outputs to `.pcai\evaluation\runs\<timestamp-label>\`
+
+**Outputs per run:**
+- `events.jsonl` (structured event stream for LLM agents)
+- `progress.log` (progress snapshots)
+- `summary.json` (aggregate results)
+
+**Example (compiled llama.cpp backend):**
+
+```powershell
+pwsh .\Tests\Evaluation\Invoke-InferenceEvaluation.ps1 `
+  -Backend llamacpp-bin `
+  -ModelPath "C:\Models\tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf" `
+  -Dataset diagnostic `
+  -MaxTestCases 5 `
+  -ProgressMode stream `
+  -RunLabel local-smoke
+```
+
+**Stop a running evaluation:**
+Create the `stop.signal` file in the run folder (shown in output), or call:
+
+```powershell
+Stop-EvaluationRun
+```
+
 ### HVSocket / VSock Endpoints
 `Config/llm-config.json` supports HVSocket aliases for local routing. Use the `hvsock://` scheme
 to resolve endpoints through `Config/hvsock-proxy.conf` (if configured).

@@ -44,6 +44,18 @@ The PC_AI project uses **GitHub Actions** for automated testing, security scanni
 
 ## Workflows
 
+### Workflow Inventory
+
+- **PowerShell Tests**: `.github/workflows/powershell-tests.yml`
+- **Rust Inference Build & Test**: `.github/workflows/rust-inference.yml`
+- **CUDA/CPU Native Releases**: `.github/workflows/release-cuda.yml`
+- **Documentation Pipeline**: `.github/workflows/docs-pipeline.yml`
+- **Evaluation Smoke**: `.github/workflows/evaluation-smoke.yml`
+- **Tooling Automation**: `.github/workflows/tooling-automation.yml`
+- **Security Scan**: `.github/workflows/security.yml`
+- **Release**: `.github/workflows/release.yml`
+- **Scheduled Checks**: `.github/workflows/scheduled-checks.yml`
+
 ### 1. PowerShell Tests (`.github/workflows/powershell-tests.yml`)
 
 **Triggers:**
@@ -126,7 +138,59 @@ Get-ChildItem -Recurse -Filter *.psd1 | ForEach-Object {
 }
 ```
 
-### 3. Release (`.github/workflows/release.yml`)
+### 3. Rust Inference Build & Test (`.github/workflows/rust-inference.yml`)
+
+**Triggers:**
+- Push to `main`/`develop` for inference code paths
+- PRs to `main`
+
+**Jobs:**
+- Cargo checks/tests/clippy/fmt for `Deploy/pcai-inference`
+- Windows MSVC build
+- Optional CUDA build (push only)
+- Integration tests for the inference DLL
+
+### 4. CUDA/CPU Native Releases (`.github/workflows/release-cuda.yml`)
+
+**Triggers:**
+- Version tags (`v*`) and manual dispatch
+
+**What it does:**
+- Builds CPU + CUDA binaries for `llamacpp` and `mistralrs`
+- Packages artifacts from `.pcai/build/artifacts`
+- Uploads release assets
+
+### 5. Documentation Pipeline (`.github/workflows/docs-pipeline.yml`)
+
+**Triggers:**
+- Pushes that affect docs or tooling
+- Manual dispatch
+
+**What it does:**
+- Runs `Tools/Invoke-DocPipeline.ps1 -Mode DocsOnly`
+- Runs `Tools/generate-auto-docs.ps1 -BuildDocs`
+- Generates API signature report
+- Uploads `Reports/**` and `.pcai/**` artifacts
+
+### 6. Evaluation Smoke (`.github/workflows/evaluation-smoke.yml`)
+
+**Triggers:**
+- Manual dispatch
+
+**What it does:**
+- Starts a local mock OpenAI-compatible server
+- Runs `Tests/Evaluation/Invoke-InferenceEvaluation.ps1` against `-Backend http`
+- Uploads `.pcai/evaluation/runs/**` outputs
+
+### 7. Tooling Automation (`.github/workflows/tooling-automation.yml`)
+
+**Triggers:**
+- Manual dispatch with toggles
+
+**What it does:**
+- Runs helper tooling in `Tools/` on demand (docs, help coverage, FunctionGemma prep/tests)
+
+### 8. Release (`.github/workflows/release.yml`)
 
 **Triggers:**
 - Git tags matching `v*` (e.g., `v1.0.0`)
@@ -142,6 +206,8 @@ Get-ChildItem -Recurse -Filter *.psd1 | ForEach-Object {
    - Installation script
 4. **Generate Release Notes** - Auto-generated from template
 5. **Create GitHub Release** - Upload artifacts and notes
+
+For native inference binaries (CPU/CUDA), see **release-cuda.yml**.
 
 ```powershell
 # Create a release:
@@ -165,7 +231,13 @@ PC-AI-1.0.0/
 └── README.md
 ```
 
-### 4. Scheduled Checks (`.github/workflows/scheduled-checks.yml`)
+## Artifacts and Local Outputs
+
+- Build and evaluation outputs are stored in `.pcai/` (gitignored but `rg`-searchable).
+- Evaluation runs create `.pcai\evaluation\runs\<timestamp-label>\` with `events.jsonl`, `progress.log`, and `summary.json`.
+- CI workflows upload `Reports/**` and `.pcai/**` as artifacts when enabled.
+
+### 9. Scheduled Checks (`.github/workflows/scheduled-checks.yml`)
 
 **Triggers:**
 - Daily at 6 AM UTC

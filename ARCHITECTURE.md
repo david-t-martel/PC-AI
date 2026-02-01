@@ -19,6 +19,7 @@ PC-AI.ps1 (CLI)
   └─ Modules (PowerShell)
      ├─ PC-AI.Hardware / Network / USB / Virtualization / Performance / Cleanup
      ├─ PC-AI.LLM (LLM orchestration + routing)
+     ├─ PC-AI.Evaluation (LLM evaluation + benchmarking)
      └─ PC-AI.Acceleration (Rust CLI + native DLLs)
           └─ Native/ (Rust + C# P/Invoke)
 ```
@@ -59,6 +60,7 @@ User Request
 - `DIAGNOSE.md`, `DIAGNOSE_LOGIC.md`: diagnostic system prompts.
 - `CHAT.md`: general chat system prompt.
 - `Config/hvsock-proxy.conf`: optional HVSocket aliases for local routing.
+- `.pcai/`: local build + evaluation artifacts (gitignored, rg-accessible).
 
 ## Extending Tool Coverage
 
@@ -77,3 +79,11 @@ User Request
 - `Tools/Invoke-DocPipeline.ps1`: full documentation + training pipeline (Rust, PowerShell, C#).
 - `Tools/generate-auto-docs.ps1`: lightweight auto-docs summary.
 - Reports written to `Reports/` (e.g. `DOC_PIPELINE_REPORT.md`, `AUTO_DOCS_SUMMARY.md`).
+
+## Evaluation Flow (LLM Backends)
+
+1. Load evaluation suite + dataset in `Modules/PC-AI.Evaluation`.
+2. Initialize backend (FFI or compiled server).
+3. Execute test cases with streaming progress + JSONL events.
+4. Persist outputs under `.pcai\evaluation\runs\<timestamp-label>\`.
+5. Optional: compare baselines and regressions.
