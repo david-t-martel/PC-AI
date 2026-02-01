@@ -16,6 +16,9 @@
 .PARAMETER EnableCuda
     Enable CUDA support for GPU acceleration
 
+.PARAMETER DisableCache
+    Disable sccache/ccache configuration for this build
+
 .PARAMETER Clean
     Clean build directories before building
 #>
@@ -37,41 +40,164 @@ $ErrorActionPreference = 'Stop'
 $ProjectRoot = $PSScriptRoot
 $RepoRoot = Split-Path -Parent $ProjectRoot
 $ToolsDir = Join-Path $RepoRoot 'Tools'
+if (-not (Test-Path $ToolsDir)) {
+    $RepoRoot = Split-Path -Parent $RepoRoot
+    $ToolsDir = Join-Path $RepoRoot 'Tools'
+}
+if (-not (Test-Path $ToolsDir)) {
+    $RepoRoot = Split-Path -Parent $RepoRoot
+    $ToolsDir = Join-Path $RepoRoot 'Tools'
+}
+
+$script:HasMkl = $false
+$script:HasCudnn = $false
+$script:HasTensorRt = $false
+$script:MsVcRuntime = $null
+
+function Add-EnvPath {
+    param([string]$Value)
+    if (-not $Value) { return $false }
+    if (-not (Test-Path $Value)) { return $false }
+    if ($env:PATH -notlike "*$Value*") {
+        $env:PATH = "$Value;$env:PATH"
+        return $true
+    }
+    return $false
+}
+
+function Add-EnvList {
+    param(
+        [string]$Name,
+        [string]$Value
+    )
+    if (-not $Name -or -not $Value) { return $false }
+    if (-not (Test-Path $Value)) { return $false }
+    $item = Get-Item -Path "Env:$Name" -ErrorAction SilentlyContinue
+    $current = if ($item) { $item.Value } else { $null }
+    if ($current -notlike "*$Value*") {
+        if ($current) {
+            Set-Item -Path "Env:$Name" -Value "$Value;$current"
+        } else {
+            Set-Item -Path "Env:$Name" -Value "$Value"
+        }
+        return $true
+    }
+    return $false
+}
+
+function Initialize-OneApiEnvironment {
+    $script:HasMkl = $false
+
+    $oneApiRoot = $env:ONEAPI_ROOT
+    if (-not $oneApiRoot) { $oneApiRoot = 'C:\Program Files (x86)\Intel\oneAPI' }
+    if (-not (Test-Path $oneApiRoot)) { return }
+
+    if (-not $env:ONEAPI_ROOT) { $env:ONEAPI_ROOT = $oneApiRoot }
+
+    $mklRoot = $env:MKLROOT
+    if (-not $mklRoot) {
+        $candidate = Join-Path $oneApiRoot 'mkl\latest'
+        if (Test-Path $candidate) { $mklRoot = $candidate }
+    }
+
+    if ($mklRoot -and (Test-Path $mklRoot)) {
+        $env:MKLROOT = $mklRoot
+        Add-EnvPath (Join-Path $mklRoot 'bin')
+        Add-EnvPath (Join-Path $mklRoot 'redist\intel64')
+        Add-EnvList -Name 'LIB' -Value (Join-Path $mklRoot 'lib\intel64')
+        Add-EnvList -Name 'INCLUDE' -Value (Join-Path $mklRoot 'include')
+        $script:HasMkl = $true
+        Write-Host "  Intel oneAPI MKL detected: $mklRoot" -ForegroundColor Green
+    }
+}
+
+function Initialize-CudnnEnvironment {
+    param([string]$CudaPath)
+
+    $script:HasCudnn = $false
+    $candidates = @()
+    if ($env:CUDNN_PATH) { $candidates += $env:CUDNN_PATH }
+    if ($env:CUDNN_HOME) { $candidates += $env:CUDNN_HOME }
+    if ($CudaPath) { $candidates += $CudaPath }
+    $candidates += 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA'
+
+    $resolved = $null
+    foreach ($candidate in $candidates | Select-Object -Unique) {
+        if (-not $candidate) { continue }
+        if (-not (Test-Path $candidate)) { continue }
+
+        $bin = Join-Path $candidate 'bin'
+        $lib = Join-Path $candidate 'lib\x64'
+        $include = Join-Path $candidate 'include'
+        $dll = Get-ChildItem -Path $bin -Filter 'cudnn64*.dll' -ErrorAction SilentlyContinue | Select-Object -First 1
+        $libFile = Get-ChildItem -Path $lib -Filter 'cudnn*.lib' -ErrorAction SilentlyContinue | Select-Object -First 1
+
+        if ($dll -and $libFile) {
+            $resolved = $candidate
+            break
+        }
+    }
+
+    if ($resolved) {
+        $env:CUDNN_PATH = $resolved
+        $env:CUDNN_HOME = $resolved
+        Add-EnvPath (Join-Path $resolved 'bin')
+        Add-EnvList -Name 'LIB' -Value (Join-Path $resolved 'lib\x64')
+        Add-EnvList -Name 'INCLUDE' -Value (Join-Path $resolved 'include')
+        $script:HasCudnn = $true
+        Write-Host "  cuDNN detected: $resolved" -ForegroundColor Green
+    }
+}
+
+function Initialize-TensorRtEnvironment {
+    $script:HasTensorRt = $false
+    $candidates = @()
+    if ($env:TENSORRT_PATH) { $candidates += $env:TENSORRT_PATH }
+    if ($env:TENSORRT_HOME) { $candidates += $env:TENSORRT_HOME }
+    $candidates += 'C:\Program Files\NVIDIA GPU Computing Toolkit\TensorRT'
+
+    $resolved = $null
+    foreach ($candidate in $candidates | Select-Object -Unique) {
+        if (-not $candidate) { continue }
+        if (-not (Test-Path $candidate)) { continue }
+
+        $bin = Join-Path $candidate 'bin'
+        $lib = Join-Path $candidate 'lib'
+        $dll = Get-ChildItem -Path $bin -Filter 'nvinfer*.dll' -ErrorAction SilentlyContinue | Select-Object -First 1
+        $libFile = Get-ChildItem -Path $lib -Filter 'nvinfer*.lib' -ErrorAction SilentlyContinue | Select-Object -First 1
+
+        if ($dll -and $libFile) {
+            $resolved = $candidate
+            break
+        }
+    }
+
+    if ($resolved) {
+        $env:TENSORRT_PATH = $resolved
+        $env:TENSORRT_HOME = $resolved
+        Add-EnvPath (Join-Path $resolved 'bin')
+        Add-EnvList -Name 'LIB' -Value (Join-Path $resolved 'lib')
+        Add-EnvList -Name 'INCLUDE' -Value (Join-Path $resolved 'include')
+        $script:HasTensorRt = $true
+        Write-Host "  TensorRT detected: $resolved" -ForegroundColor Green
+    }
+}
 
 #region Environment Initialization
 
 function Initialize-BuildEnvironment {
     Write-Host "`nInitializing Build Environment..." -ForegroundColor Cyan
 
-    # 1. Initialize CUDA if requested
-    if ($EnableCuda) {
-        $cudaHelper = Join-Path $ToolsDir 'Initialize-CudaEnvironment.ps1'
-        if (Test-Path $cudaHelper) {
-            . $cudaHelper
-            $cudaInfo = Initialize-CudaEnvironment -Quiet
-            if ($cudaInfo.Found) {
-                Write-Host "  CUDA initialized: $($cudaInfo.CudaPath)" -ForegroundColor Green
-                $env:LLAMA_CUDA = '1'
-                $env:GGML_CUDA = 'ON'
-
-                # Explicitly set CUDA compiler for CMake
-                $nvccPath = (Join-Path $cudaInfo.CudaPath 'bin\nvcc.exe') -replace '\\', '/'
-                if (Test-Path $nvccPath) {
-                    $env:CMAKE_CUDA_COMPILER = $nvccPath
-                    Write-Host "    nvcc identified: $nvccPath" -ForegroundColor Green
-
-                    # Set NVCC_CCBIN for candle/mistralrs
-                    $clPath = (Get-Command cl.exe -ErrorAction SilentlyContinue).Source -replace '\\', '/'
-                    if ($clPath) {
-                        $env:NVCC_CCBIN = $clPath
-                    }
-                }
-            } else {
-                Write-Host '  CUDA not found, building CPU-only' -ForegroundColor Yellow
-                $script:EnableCuda = $false
-            }
-        }
+    # Detect real cargo (bypass wrappers like cargo.ps1)
+    $script:cargoExe = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe'
+    if (-not (Test-Path $script:cargoExe)) {
+        $realCargo = (Get-Command cargo.exe -ErrorAction SilentlyContinue | Where-Object { $_.Source -notlike '*local\bin*' } | Select-Object -First 1)
+        if ($realCargo) { $script:cargoExe = $realCargo.Source }
     }
+    if (-not (Test-Path $script:cargoExe)) { $script:cargoExe = 'cargo.exe' } # Last resort fallback
+    Write-Host "  Cargo identified: $script:cargoExe" -ForegroundColor Gray
+
+    # [CUDA Logic moved to end of function to avoid being cleared by MSVC init]
 
     # 2. Locate stable CMake
     Write-Host '  Locating stable CMake (VS 3.x)...' -ForegroundColor Cyan
@@ -90,7 +216,10 @@ function Initialize-BuildEnvironment {
         $env:CMAKE_COMMAND = $vsCmake
         $env:CMAKE_PROGRAM = $vsCmake
         $env:CMAKE_EXECUTABLE = $vsCmake
-        $env:CMAKE_ROOT = Join-Path (Split-Path $cmakeBin -Parent) 'share\cmake-3.31' # Approximate, but usually safer to unset
+
+        # CRITICAL: Do NOT set CMAKE_ROOT manually unless you are 100% sure of the versioned module path.
+        # Most modern CMake installations handle this automatically.
+        if (Test-Path Env:CMAKE_ROOT) { Remove-Item Env:CMAKE_ROOT }
 
         Write-Host "  CMake prioritized: $vsCmake" -ForegroundColor Green
         & $vsCmake --version | Select-Object -First 1
@@ -99,10 +228,10 @@ function Initialize-BuildEnvironment {
     }
 
     # Clear variables that might still pollute CMake
-    @('CMAKE_MODULE_PATH', 'CMAKE_TOOLCHAIN_FILE', 'CMAKE_PREFIX_PATH', 'CMAKE_ROOT') | ForEach-Object {
+    @('CMAKE_MODULE_PATH', 'CMAKE_TOOLCHAIN_FILE', 'CMAKE_PREFIX_PATH', 'CMAKE_ROOT', 'CMAKE_ROOT_PowerToys_code', 'CMAKE_PREFIX_PATH_PowerToys_code', 'CMAKE_PROGRAM_PowerToys_code') | ForEach-Object {
         if (Get-Item "Env:$_" -ErrorAction SilentlyContinue) {
             Write-Host "    Clearing $_" -ForegroundColor Yellow
-            Remove-Item "Env:$_" -ErrorAction SilentlyContinue
+            Set-Item "Env:$_" -Value ''
         }
     }
 
@@ -115,8 +244,8 @@ function Initialize-BuildEnvironment {
             Write-Host '  Initializing MSVC via Launch-VsDevShell.ps1...' -ForegroundColor Cyan
             & $devShell -SkipAutomaticLocation -HostArch amd64 -Arch amd64
 
-            # CRITICAL: Clear polluted environment variables IMMEDIATELY
-            @('CL', '_CL_', 'LINK', '_LINK_') | ForEach-Object {
+            # CRITICAL: Clear polluted environment variables (Only ones that actually cause issues)
+            @('LINK', '_LINK_') | ForEach-Object {
                 if (Get-Item "Env:$_" -ErrorAction SilentlyContinue) {
                     Write-Host "    Clearing polluted env var: $_" -ForegroundColor Yellow
                     Remove-Item "Env:$_" -ErrorAction SilentlyContinue
@@ -130,6 +259,10 @@ function Initialize-BuildEnvironment {
                 $env:CXX = $clPath
                 $env:CMAKE_C_COMPILER = $clPath
                 $env:CMAKE_CXX_COMPILER = $clPath
+                $clDir = Split-Path $clPath -Parent
+                if ($env:PATH -notlike "*$clDir*") {
+                    $env:PATH = "$clDir;$env:PATH"
+                }
                 Write-Host "    cl.exe identified: $clPath" -ForegroundColor Green
             }
 
@@ -155,6 +288,16 @@ function Initialize-BuildEnvironment {
         }
     }
 
+    # Align runtime across MSVC/CMake/CUDA (Debug -> /MDd, Release -> /MD)
+    if ($Configuration -eq 'Debug') {
+        $script:MsVcRuntime = 'MultiThreadedDebugDLL'
+    } else {
+        $script:MsVcRuntime = 'MultiThreadedDLL'
+    }
+
+    # Intel oneAPI/MKL environment (CPU acceleration)
+    Initialize-OneApiEnvironment
+
     # 4. Configure Caching and Generator
     if (Get-Command ninja -ErrorAction SilentlyContinue) {
         $env:CMAKE_GENERATOR = 'Ninja'
@@ -162,20 +305,67 @@ function Initialize-BuildEnvironment {
         Write-Host "  Generator: Ninja enabled ($($env:CMAKE_MAKE_PROGRAM))" -ForegroundColor Green
     }
 
-    if (-not $DisableCache -and (Get-Command sccache -ErrorAction SilentlyContinue)) {
+    if (-not $env:PCAI_USE_LLD) {
+        $lldPath = $env:CARGO_LLD_PATH
+        if (-not $lldPath) { $lldPath = 'C:\Program Files\LLVM\bin\lld-link.exe' }
+        if (Test-Path $lldPath) { $env:PCAI_USE_LLD = '1' }
+    }
+    $useLld = ($env:PCAI_USE_LLD -eq '1') -or ($env:CARGO_USE_LLD -eq '1')
+    if ($useLld) {
+        $lldPath = $env:CARGO_LLD_PATH
+        if (-not $lldPath) {
+            $lldPath = 'C:\Program Files\LLVM\bin\lld-link.exe'
+        }
+        if (Test-Path $lldPath) {
+            $env:CMAKE_LINKER = $lldPath -replace '\\', '/'
+            Write-Host "  Linker: lld-link enabled ($($env:CMAKE_LINKER))" -ForegroundColor Green
+        } else {
+            Write-Host '  Linker: lld-link requested but not found' -ForegroundColor Yellow
+        }
+    }
+
+    if ($EnableCuda -and $env:PCAI_DISABLE_CUDA_LAUNCHER -ne '1' -and $env:PCAI_ENABLE_CUDA_LAUNCHER -ne '1') {
+        $env:PCAI_DISABLE_CUDA_LAUNCHER = '1'
+        Write-Host '  CUDA cache launcher disabled by default (set PCAI_ENABLE_CUDA_LAUNCHER=1 to override)' -ForegroundColor Yellow
+    }
+
+    $cacheHelper = Join-Path $ToolsDir 'Initialize-CacheEnvironment.ps1'
+    if (Test-Path $cacheHelper) {
+        . $cacheHelper
+        $cacheInfo = Initialize-CacheEnvironment -DisableCache:$DisableCache -Quiet
+
+        if ($DisableCache) {
+            Write-Host '  Caching: explicitly disabled via parameter' -ForegroundColor Yellow
+        } elseif ($cacheInfo.SccacheEnabled -or $cacheInfo.CcacheEnabled) {
+            $cacheModes = @()
+            if ($cacheInfo.SccacheEnabled) { $cacheModes += 'sccache' }
+            if ($cacheInfo.CcacheEnabled) { $cacheModes += 'ccache' }
+            Write-Host "  Caching: $($cacheModes -join ', ') enabled" -ForegroundColor Green
+        } else {
+            Write-Host '  Caching: no cache tool detected' -ForegroundColor Gray
+        }
+
+        if (-not $DisableCache -and $cacheInfo.SccacheEnabled -and (Get-Command sccache -ErrorAction SilentlyContinue)) {
+            sccache --start-server
+        }
+    } elseif ($DisableCache) {
+        Write-Host '  Caching: explicitly disabled via parameter' -ForegroundColor Yellow
+        $env:RUSTC_WRAPPER = ''
+        $env:CMAKE_C_COMPILER_LAUNCHER = ''
+        $env:CMAKE_CXX_COMPILER_LAUNCHER = ''
+        $env:CMAKE_CUDA_COMPILER_LAUNCHER = ''
+    } elseif (Get-Command sccache -ErrorAction SilentlyContinue) {
         $env:RUSTC_WRAPPER = 'sccache'
         $env:CMAKE_C_COMPILER_LAUNCHER = 'sccache'
         $env:CMAKE_CXX_COMPILER_LAUNCHER = 'sccache'
-        # Alignment with mistralrs .cargo/config.toml
+        $env:CMAKE_CUDA_COMPILER_LAUNCHER = 'sccache'
         $env:SCCACHE_SERVER_PORT = '4226'
         $env:SCCACHE_CACHE_COMPRESSION = 'zstd'
         $env:SCCACHE_DIRECT = 'true'
         Write-Host '  Caching: sccache enabled' -ForegroundColor Green
-    } elseif ($DisableCache) {
-        Write-Host '  Caching: explicitly disabled' -ForegroundColor Yellow
-        Remove-Item Env:RUSTC_WRAPPER -ErrorAction SilentlyContinue
-        Remove-Item Env:CMAKE_C_COMPILER_LAUNCHER -ErrorAction SilentlyContinue
-        Remove-Item Env:CMAKE_CXX_COMPILER_LAUNCHER -ErrorAction SilentlyContinue
+        sccache --start-server
+    } else {
+        Write-Host '  Caching: sccache not found in PATH' -ForegroundColor Gray
     }
 
     # llamacpp specific optimizations
@@ -184,6 +374,64 @@ function Initialize-BuildEnvironment {
     $env:LLAMA_BUILD_TESTS = 'OFF'
     $env:LLAMA_BUILD_EXAMPLES = 'OFF'
     $env:LLAMA_BUILD_TOOLS = 'OFF'
+
+    # 5. Initialize CUDA and CRT OVERRIDES (Must be last to survive sanitization)
+    Write-Host "  DEBUG: Step 5 EnableCuda check (Value: $EnableCuda, Script: $($script:EnableCuda))" -ForegroundColor Gray
+    if ($EnableCuda -or $script:EnableCuda) {
+        $cudaHelper = Join-Path $ToolsDir 'Initialize-CudaEnvironment.ps1'
+        if (Test-Path $cudaHelper) {
+            . $cudaHelper
+            $cudaInfo = Initialize-CudaEnvironment -Quiet
+            if ($cudaInfo.Found) {
+                Write-Host "  CUDA initialized: $($cudaInfo.CudaPath)" -ForegroundColor Green
+                $env:LLAMA_CUDA = '1'
+                $env:GGML_CUDA = 'ON'
+
+                # CRT Mismatch Resolution: Force /MD (Dynamic Release) globally
+                # This fixes the mismatch between llama-cpp (/MD) and mistralrs-cuda (often /MT)
+                $env:RUSTFLAGS = '-Ctarget-feature=-crt-static'
+                $crtFlag = if ($Configuration -eq 'Debug') { '/MDd' } else { '/MD' }
+                $env:CUDA_NVCC_FLAGS = $crtFlag
+                $env:NVCCFLAGS = "--compiler-options $crtFlag"
+                $runtimeArg = "-DCMAKE_MSVC_RUNTIME_LIBRARY=$script:MsVcRuntime"
+                if ($env:CMAKE_ARGS) {
+                    if ($env:CMAKE_ARGS -notmatch 'CMAKE_MSVC_RUNTIME_LIBRARY') {
+                        $env:CMAKE_ARGS = "$($env:CMAKE_ARGS) $runtimeArg"
+                    }
+                } else {
+                    $env:CMAKE_ARGS = $runtimeArg
+                }
+
+                # FORCE MSVC to use dynamic runtime via internal compiler vars
+                $env:CL = $crtFlag
+                $env:_CL_ = $crtFlag
+
+                # Help bindgen find CUDA
+                $env:LIB += ";$($cudaInfo.CudaPath)\lib\x64"
+                $env:INCLUDE += ";$($cudaInfo.CudaPath)\include"
+
+                # Explicitly set CUDA compiler for CMake
+                $nvccPath = (Join-Path $cudaInfo.CudaPath 'bin\nvcc.exe') -replace '\\', '/'
+                if (Test-Path $nvccPath) {
+                    $env:CMAKE_CUDA_COMPILER = $nvccPath
+                    Write-Host "    nvcc identified (forcing /MD): $nvccPath" -ForegroundColor Green
+
+                    # Set NVCC_CCBIN for candle/mistralrs
+                    $clPath = (Get-Command cl.exe -ErrorAction SilentlyContinue).Source -replace '\\', '/'
+                    if ($clPath) {
+                        $env:NVCC_CCBIN = $clPath
+                    }
+                }
+
+                # Optional CUDA libraries (cuDNN/TensorRT)
+                Initialize-CudnnEnvironment -CudaPath $cudaInfo.CudaPath
+                Initialize-TensorRtEnvironment
+            } else {
+                Write-Host '  CUDA not found, building CPU-only' -ForegroundColor Yellow
+                $script:EnableCuda = $false
+            }
+        }
+    }
 }
 
 function Initialize-LlamaCpp {
@@ -206,25 +454,31 @@ function Initialize-LlamaCpp {
         return
     }
 
+    # Find the llama-cpp-sys-2 directory reliably using cargo metadata
+    Write-Host '  Locating llama-cpp-sys-2 source...' -ForegroundColor Cyan
+    try {
+        $meta = cargo metadata --format-version 1 | ConvertFrom-Json
+        $pkg = $meta.packages | Where-Object { $_.name -eq 'llama-cpp-sys-2' }
+        if (-not $pkg) {
+            Write-Host '    llama-cpp-sys-2 not found in metadata.' -ForegroundColor Yellow
+            return
+        }
+
+        $llamaSrcDir = (Join-Path (Split-Path $pkg.manifest_path -Parent) 'llama.cpp') -replace '\\', '/'
+        Write-Host "    Source identified: $llamaSrcDir" -ForegroundColor Green
+    } catch {
+        Write-Host "    Failed to get metadata: $($_.Exception.Message)" -ForegroundColor Red
+        return
+    }
+
     foreach ($dir in $llamaBuildDirs) {
         $outDir = Join-Path $dir.FullName 'out'
         $cmakeBuildDir = Join-Path $outDir 'build'
 
-        # We need the source directory. Cargo usually puts it in $HOME/.cargo/registry/src/...
-        # But we can try to guess it from the build script or use the T:\ path if on user's system
-        $cargoHome = if ($env:CARGO_HOME) { $env:CARGO_HOME } else { Join-Path $env:USERPROFILE '.cargo' }
-        $registrySrc = Join-Path $cargoHome 'registry\src\index.crates.io-*'
-
-        $llamaSrcRoot = Get-ChildItem $registrySrc -Filter 'llama-cpp-sys-2-*' -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
-        if (-not $llamaSrcRoot) {
-            Write-Host '  Could not find llama-cpp-sys-2 source in registry.' -ForegroundColor Yellow
+        if (-not (Test-Path $llamaSrcDir)) {
+            Write-Host "    Source not found at $llamaSrcDir" -ForegroundColor Red
             continue
         }
-        $llamaSrcDir = (Join-Path $llamaSrcRoot.FullName 'llama.cpp') -replace '\\', '/'
-
-        Write-Host "  Found llama.cpp source: $llamaSrcDir" -ForegroundColor Gray
-        $cmakeBuildDir = $cmakeBuildDir -replace '\\', '/'
-        Write-Host "  Configuring in: $cmakeBuildDir" -ForegroundColor Gray
 
         if (-not (Test-Path $cmakeBuildDir)) { New-Item -ItemType Directory -Path $cmakeBuildDir -Force | Out-Null }
 
@@ -241,6 +495,7 @@ function Initialize-LlamaCpp {
             "-DCMAKE_CXX_COMPILER=$clPath",
             "-DCMAKE_RC_COMPILER=$rcPath",
             "-DCMAKE_BUILD_TYPE=$Configuration",
+            "-DCMAKE_MSVC_RUNTIME_LIBRARY=$script:MsVcRuntime",
             "-DCMAKE_INSTALL_PREFIX=$outDir",
             '-DGGML_CUDA=ON',
             '-DLLAMA_CURL=OFF',
@@ -255,6 +510,9 @@ function Initialize-LlamaCpp {
             $nvccPath = "$cudaPath/bin/nvcc.exe"
             if (Test-Path $nvccPath) {
                 $cmakeArgs += "-DCMAKE_CUDA_COMPILER=$nvccPath"
+                if ($env:CUDAARCHS) {
+                    $cmakeArgs += "-DCMAKE_CUDA_ARCHITECTURES=$($env:CUDAARCHS)"
+                }
             }
         }
 
@@ -269,21 +527,25 @@ function Initialize-LlamaCpp {
 
 function Clear-IncompleteCmakeConfig {
     Write-Host 'Checking for incomplete CMake configurations (Nuclear Evasion)...' -ForegroundColor DarkCyan
-    $targetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $ProjectRoot 'target' }
+
+    # 1. Use cargo metadata to find registry paths reliably
+    Write-Host '  Locating build artifacts folder...' -ForegroundColor Gray
+    try {
+        $metadata = & $script:cargoExe metadata --format-version 1 --no-deps | ConvertFrom-Json
+        $targetDir = $metadata.target_directory
+    } catch {
+        $targetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $ProjectRoot 'target' }
+    }
+
     if (-not (Test-Path $targetDir)) { return }
 
-    # Targeted cleaning for troublesome crates
-    Write-Host '  Selective cleaning for candle and llama-cpp...' -ForegroundColor Cyan
-    $llamaBuildDirs = Get-ChildItem $targetDir -Recurse -Filter 'llama-cpp-sys-2-*' -Directory -ErrorAction SilentlyContinue
-    $candleBuildDirs = Get-ChildItem $targetDir -Recurse -Filter 'candle-core-*' -Directory -ErrorAction SilentlyContinue
-    foreach ($dir in ($llamaBuildDirs + $candleBuildDirs)) {
-        $outDir = Join-Path $dir.FullName 'out'
-        $cmakeBuildDir = Join-Path $outDir 'build'
-        $cacheFile = Join-Path $cmakeBuildDir 'CMakeCache.txt'
-        $ninjaFile = Join-Path $cmakeBuildDir 'build.ninja'
-        if ((Test-Path $cacheFile) -and -not (Test-Path $ninjaFile)) {
-            Write-Host "    Cleaning incomplete config: $dir" -ForegroundColor Yellow
-            Remove-Item $outDir -Recurse -Force -ErrorAction SilentlyContinue
+    # Targeted cleaning for troublesome crates (ALWAYS wipe when changing CRT/CUDA flags)
+    Write-Host '  Aggressive cleaning for candle and mistralrs (Due to CRT changes)...' -ForegroundColor Cyan
+    $badCrates = @('mistralrs-core-*', 'candle-core-*', 'candle-kernels-*', 'llama-cpp-sys-2-*')
+    foreach ($pattern in $badCrates) {
+        Get-ChildItem $targetDir -Recurse -Filter $pattern -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "    Wiping stale build artifacts: $($_.Name)" -ForegroundColor Yellow
+            Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 
@@ -295,17 +557,6 @@ function Clear-IncompleteCmakeConfig {
             Remove-Item (Split-Path $dir -Parent) -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
-
-    <# Aggressive cleaning for ALL CMake-based crates - DISABLED: Wipes bindings.rs
-    Write-Host '  Aggressive cleaning for ALL CMake-based crates...' -ForegroundColor Cyan
-    if (Test-Path $targetDir) {
-        Get-ChildItem $targetDir -Recurse -Filter 'CMakeCache.txt' -ErrorAction SilentlyContinue | ForEach-Object {
-            $parentDir = Split-Path $_.DirectoryName -Parent # This should be the 'out' directory
-            Write-Host "    Wiping: $parentDir" -ForegroundColor Yellow
-            Remove-Item $parentDir -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
-    #>
 }
 
 #endregion
@@ -315,73 +566,170 @@ function Clear-IncompleteCmakeConfig {
 function Invoke-Build {
     param([string]$BackendName)
 
-    Write-Host "`n=== Building Backend: $BackendName ($Configuration) ===" -ForegroundColor Magenta
+    if ($BackendName -eq 'all') {
+        Invoke-Build -BackendName 'llamacpp'
+        Invoke-Build -BackendName 'mistralrs'
+        return
+    }
+
+    $binName = if ($BackendName -eq 'llamacpp') { 'pcai-llamacpp' } else { 'pcai-mistralrs' }
+    Write-Host "`n=== Building Binary: $binName ($Configuration) ===" -ForegroundColor Magenta
 
     $features = @('ffi', 'server')
-    if ($BackendName -eq 'llamacpp' -or $BackendName -eq 'all') { $features += 'llamacpp' }
-    if ($BackendName -eq 'mistralrs' -or $BackendName -eq 'all') { $features += 'mistralrs-backend' }
-    if ($EnableCuda) { $features += 'cuda' }
+    if ($BackendName -eq 'llamacpp') {
+        $features += 'llamacpp'
+    } else {
+        $features += 'mistralrs-backend'
+    }
+
+    $useMkl = $script:HasMkl -and ($env:PCAI_DISABLE_MKL -ne '1')
+    $useCudnn = $script:HasCudnn -and ($env:PCAI_DISABLE_CUDNN -ne '1')
+
+    if ($EnableCuda) {
+        if ($BackendName -eq 'llamacpp') {
+            $features += 'cuda-llamacpp'
+        } else {
+            $features += 'cuda-mistralrs'
+            if ($useCudnn) { $features += 'mistralrs/cudnn' }
+            if ($env:PCAI_ENABLE_FLASH_ATTN -eq '1') { $features += 'mistralrs/flash-attn' }
+            if ($env:PCAI_ENABLE_FLASH_ATTN_V3 -eq '1') { $features += 'mistralrs-core/flash-attn-v3' }
+        }
+    } elseif ($BackendName -eq 'mistralrs') {
+        if ($useMkl) { $features += 'mistralrs/mkl' }
+    }
 
     $featureString = ($features | Select-Object -Unique) -join ','
     Write-Host "  Features: $featureString" -ForegroundColor Cyan
 
-    $cargoArgs = @('build', '--features', $featureString, '--message-format=json')
+    $cargoArgs = @('build', '--bin', $binName, '--features', $featureString, '--message-format=json')
     if ($Configuration -eq 'Release') { $cargoArgs += '--release' }
 
-    $env:RUST_BACKTRACE = 'full'
-    Write-Host '  Verifying environment before build...' -ForegroundColor Gray
-    & cmake --version | Select-Object -First 1
-    & cl.exe 2>&1 | Select-Object -First 1
+    # ... rest remains largely same, just updating logs slightly ...
+    $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+    $logFile = "cargo_build_${BackendName}_$stamp.log"
+    $errorLogFile = "cargo_errors_${BackendName}_$stamp.log"
+    $jsonLogFile = "cargo_output_${BackendName}_$stamp.json"
+
+    # Reset logs
+    '' | Out-File $logFile
+    '' | Out-File $errorLogFile
+    '' | Out-File $jsonLogFile
 
     Push-Location $ProjectRoot
     $startTime = Get-Date
+    $script:BuildStartTime = $startTime
+    $script:BuildLastLineTime = $startTime
+    $script:BuildLastPkg = 'initializing'
+    $heartbeatSeconds = 120
+    if ($env:PCAI_BUILD_HEARTBEAT_SECONDS) {
+        $parsed = 0
+        if ([int]::TryParse($env:PCAI_BUILD_HEARTBEAT_SECONDS, [ref]$parsed)) {
+            if ($parsed -gt 0) { $heartbeatSeconds = $parsed }
+        }
+    }
+    $heartbeatTimer = $null
+    $heartbeatEvent = $null
+    if ($heartbeatSeconds -gt 0) {
+        $heartbeatTimer = New-Object System.Timers.Timer
+        $heartbeatTimer.Interval = $heartbeatSeconds * 1000
+        $heartbeatTimer.AutoReset = $true
+        $heartbeatEvent = Register-ObjectEvent -InputObject $heartbeatTimer -EventName Elapsed -Action {
+            $now = Get-Date
+            $elapsed = $now - $script:BuildStartTime
+            $since = $now - $script:BuildLastLineTime
+            $pkg = if ($script:BuildLastPkg) { $script:BuildLastPkg } else { 'unknown' }
+            Write-Host ("  Build heartbeat: {0:mm\\:ss} elapsed, last package: {1}, last output {2:mm\\:ss} ago" -f $elapsed, $pkg, $since) -ForegroundColor DarkGray
+        }
+        $heartbeatTimer.Start()
+    }
 
+    if (Get-Command sccache -ErrorAction SilentlyContinue) {
+        Write-Host '  Sccache status (Start):' -ForegroundColor Gray
+        sccache --show-stats | Select-Object -First 3
+    }
+
+    # CRT Mismatch Resolution: Force /MD (Dynamic Release) globally
+    if ($EnableCuda) {
+        $env:RUSTFLAGS = '-Ctarget-feature=-crt-static'
+        $crtFlag = if ($Configuration -eq 'Debug') { '/MDd' } else { '/MD' }
+        $env:CUDA_NVCC_FLAGS = $crtFlag
+        $env:NVCCFLAGS = "--compiler-options $crtFlag"
+        $env:CL = $crtFlag
+        $env:_CL_ = $crtFlag
+        $runtimeArg = "-DCMAKE_MSVC_RUNTIME_LIBRARY=$script:MsVcRuntime"
+        if ($env:CMAKE_ARGS) {
+            if ($env:CMAKE_ARGS -notmatch 'CMAKE_MSVC_RUNTIME_LIBRARY') {
+                $env:CMAKE_ARGS = "$($env:CMAKE_ARGS) $runtimeArg"
+            }
+        } else {
+            $env:CMAKE_ARGS = $runtimeArg
+        }
+        Write-Host "  Forced CRT: $crtFlag enabled for CUDA build." -ForegroundColor Green
+    }
+
+    # Low-memory CUDA build mode (favor success over peak optimization)
+    $lowMemCuda = ($env:PCAI_CUDA_FULL_OPT -ne '1') -and $EnableCuda -and ($BackendName -eq 'mistralrs')
+    if ($lowMemCuda) {
+        if (-not $env:CARGO_BUILD_JOBS) { $env:CARGO_BUILD_JOBS = '1' }
+        if (-not $env:RAYON_NUM_THREADS) { $env:RAYON_NUM_THREADS = '1' }
+        if ($env:RUSTFLAGS) {
+            if ($env:RUSTFLAGS -notmatch 'opt-level') { $env:RUSTFLAGS = "$($env:RUSTFLAGS) -C opt-level=2" }
+        } else {
+            $env:RUSTFLAGS = '-C opt-level=2'
+        }
+        Write-Host '  CUDA low-mem mode: CARGO_BUILD_JOBS=1, RAYON_NUM_THREADS=1, opt-level=2' -ForegroundColor Yellow
+    }
+
+    $prevErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     try {
         Write-Host "  Executing: cargo $($cargoArgs -join ' ')" -ForegroundColor Gray
 
-        $process = Start-Process -FilePath 'cargo.exe' -ArgumentList $cargoArgs -NoNewWindow -PassThru -RedirectStandardOutput 'cargo_stdout.json' -RedirectStandardError 'cargo_stderr.log'
-
         $lastPkg = ''
-        while (-not $process.HasExited) {
-            if (Test-Path 'cargo_stdout.json') {
+        & $script:cargoExe @cargoArgs 2>&1 | ForEach-Object {
+            $line = $_.ToString()
+            $script:BuildLastLineTime = Get-Date
+            if ($line -match '^{') {
+                $line | Out-File $jsonLogFile -Append
                 try {
-                    # Tail the output file to get the latest compiler artifacts
-                    $lines = Get-Content 'cargo_stdout.json' -Tail 5 -ErrorAction SilentlyContinue
-                    foreach ($line in $lines) {
-                        if ($line -match '"reason":"compiler-artifact"') {
-                            $msg = $line | ConvertFrom-Json -ErrorAction SilentlyContinue
-                            if ($msg -and $msg.package_id) {
-                                $pkg = $msg.package_id.Split(' ')[0]
-                                if ($pkg -ne $lastPkg) {
-                                    Write-Progress -Activity "Building $BackendName" -Status "Compiling: $pkg"
-                                    $lastPkg = $pkg
-                                }
-                            }
+                    $msg = $line | ConvertFrom-Json -ErrorAction SilentlyContinue
+                    if ($msg -and $msg.reason -eq 'compiler-artifact') {
+                        $pkg = $msg.package_id.Split(' ')[0]
+                        if ($pkg -ne $lastPkg) {
+                            Write-Progress -Activity "Building $binName" -Status "Compiling: $pkg"
+                            $lastPkg = $pkg
+                            $script:BuildLastPkg = $pkg
                         }
                     }
                 } catch {}
+            } else {
+                if ($line -match 'Compiling ([^ ]+)') {
+                    $script:BuildLastPkg = $Matches[1]
+                }
+                $line | Out-File $logFile -Append
+                if ($line -match 'error(\[|:)' -or $line -match 'panic') {
+                    $line | Out-File $errorLogFile -Append
+                    Write-Host $line -ForegroundColor Red
+                } elseif ($line -match 'warning:') {
+                    # Write-Host $line -ForegroundColor Yellow
+                } else {
+                    Write-Host $line
+                }
             }
-            Start-Sleep -Seconds 1
         }
 
-        if ($process.ExitCode -ne 0) {
-            Write-Host "`nBuild FAILED with Exit Code: $($process.ExitCode)" -ForegroundColor Red
-            if (Test-Path 'cargo_stderr.log') {
-                Write-Host "`n--- Tail of Error Log ---" -ForegroundColor Red
-                Get-Content 'cargo_stderr.log' -Tail 20
-            }
-
-            # Diagnostic for -1 (Crash)
-            if ($process.ExitCode -eq -1 -or $process.ExitCode -gt 128) {
-                Write-Host "`nCRITICAL: Build process crashed or timed out. Check system memory and disk locks." -ForegroundColor Yellow
-            }
-
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "`nBuild FAILED for $binName with Exit Code: $LASTEXITCODE" -ForegroundColor Red
             throw "Build failed for $BackendName"
         }
     } finally {
+        if ($heartbeatTimer) { $heartbeatTimer.Stop() }
+        if ($heartbeatEvent) { Unregister-Event -SourceIdentifier $heartbeatEvent.SourceIdentifier -ErrorAction SilentlyContinue }
+        if ($heartbeatTimer) { $heartbeatTimer.Dispose() }
+        $ErrorActionPreference = $prevErrorActionPreference
+        Pop-Location
         $duration = (Get-Date) - $startTime
         Write-Host ('  Duration: {0:n2}s' -f $duration.TotalSeconds) -ForegroundColor Gray
-        Pop-Location
     }
 }
 
@@ -397,10 +745,6 @@ Initialize-BuildEnvironment
 Clear-IncompleteCmakeConfig
 # Initialize-LlamaCpp -Configuration $Configuration
 
-if ($Backend -eq 'all') {
-    Invoke-Build -BackendName 'all'
-} else {
-    Invoke-Build -BackendName $Backend
-}
+Invoke-Build -BackendName $Backend
 
 Write-Host "`nBuild Complete!" -ForegroundColor Green

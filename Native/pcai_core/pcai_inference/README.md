@@ -11,7 +11,7 @@ Dual-backend LLM inference engine for PC diagnostics with native Rust performanc
 - **Flexible Deployment**
   - HTTP server with OpenAI-compatible API (feature: `server`)
   - C FFI exports for PowerShell integration (feature: `ffi`)
-  - Optional CUDA acceleration (feature: `cuda`)
+  - Optional CUDA acceleration (features: `cuda-llamacpp`, `cuda-mistralrs`)
 
 - **Production Ready**
   - Async/await with Tokio
@@ -81,7 +81,9 @@ curl -X POST http://localhost:8080/v1/completions \
 |---------|-------------|---------|
 | `llamacpp` | llama.cpp backend via llama-cpp-2 | Yes |
 | `mistralrs-backend` | mistral.rs backend | No |
-| `cuda` | CUDA GPU acceleration | No |
+| `cuda-llamacpp` | CUDA for llama.cpp backend | No |
+| `cuda-mistralrs` | CUDA for mistral.rs backend | No |
+| `cuda` | CUDA GPU acceleration (umbrella) | No |
 | `server` | HTTP server with Axum | Yes |
 | `ffi` | C FFI exports for PowerShell | No |
 

@@ -1,6 +1,19 @@
 # Test CMake configuration directly
 $ErrorActionPreference = 'Stop'
 
+$repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+$toolsDir = Join-Path $repoRoot 'Tools'
+$cacheHelper = Join-Path $toolsDir 'Initialize-CacheEnvironment.ps1'
+if (Test-Path $cacheHelper) {
+    . $cacheHelper
+    Initialize-CacheEnvironment -Quiet | Out-Null
+}
+$cmakeHelper = Join-Path $toolsDir 'Initialize-CmakeEnvironment.ps1'
+if (Test-Path $cmakeHelper) {
+    . $cmakeHelper
+    Initialize-CmakeEnvironment -Quiet | Out-Null
+}
+
 # Setup VS environment
 $devShell = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\Launch-VsDevShell.ps1"
 & $devShell -SkipAutomaticLocation -HostArch amd64 -Arch amd64

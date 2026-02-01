@@ -4,7 +4,7 @@
         "llamacpp": {
             "enabled": true,
             "requires": ["cmake", "msvc", "ninja"],
-            "features": ["llamacpp", "cuda"],
+            "features": ["llamacpp", "cuda-llamacpp"],
             "env": {
                 "CMAKE_GENERATOR": "Ninja",
                 "CMAKE_TOOLCHAIN_FILE": "cmake/toolchain-msvc.cmake"

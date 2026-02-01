@@ -91,7 +91,7 @@ cargo build --features mistralrs-backend --no-default-features
 ### With CUDA (Linux/WSL2 only)
 
 ```bash
-cargo build --features mistralrs-backend,cuda --no-default-features
+cargo build --features mistralrs-backend,cuda-mistralrs --no-default-features
 ```
 
 Note: CUDA requires appropriate CUDA toolkit and drivers installed.

@@ -7,50 +7,59 @@ description = "Dual-backend LLM inference engine for PC diagnostics (llama.cpp a
 license = "MIT"
 
 [lib]
+name = "pcai_inference_lib"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Core dependencies
-anyhow = "1.0"
-thiserror = "2.0"
-tokio = { version = "1.41", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-async-trait = "0.1"
-uuid = { version = "1.11", features = ["v4"] }
-futures = "0.3"
-reqwest = { version = "0.12", features = ["json"] }
+anyhow.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+async-trait.workspace = true
+uuid.workspace = true
+futures.workspace = true
+reqwest.workspace = true
 
 # HTTP server (optional)
-axum = { version = "0.7", optional = true }
-tower-http = { version = "0.6", features = ["trace", "cors"], optional = true }
+axum = { workspace = true, optional = true }
+tower-http = { workspace = true, optional = true }
 
 # Backend: llama.cpp (optional) - CUDA disabled by default for CPU-only builds
-llama-cpp-2 = { version = "0.1", optional = true, features = ["sampler"] }
-encoding_rs = { version = "0.8", optional = true }
+llama-cpp-2 = { workspace = true, optional = true }
+encoding_rs = { workspace = true, optional = true }
 
 # Backend: mistral.rs (optional)
-# Using local fork with CUDA 13.0 improvements (CPU-only on Windows due to bindgen_cuda issues)
-mistralrs = { path = "T:/projects/rust-mistral/mistral.rs/mistralrs", optional = true }
-mistralrs-core = { path = "T:/projects/rust-mistral/mistral.rs/mistralrs-core", optional = true }
+# Switched from local path to external crate as per USER directive
+mistralrs = { workspace = true, optional = true }
+mistralrs-core = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = "3.14"
 
 [features]
-default = ["llamacpp", "server"]
+default = ["server"]
 llamacpp = ["dep:llama-cpp-2", "dep:encoding_rs"]
 mistralrs-backend = ["dep:mistralrs", "dep:mistralrs-core"]
 # CUDA feature gates GPU acceleration for backends
-cuda = ["llama-cpp-2/cuda", "mistralrs/cuda", "mistralrs-core/cuda"]
+cuda-llamacpp = ["llama-cpp-2/cuda"]
+cuda-mistralrs = ["mistralrs/cuda", "mistralrs-core/cuda"]
+# Back-compat umbrella feature
+cuda = ["cuda-llamacpp", "cuda-mistralrs"]
 server = ["dep:axum", "dep:tower-http"]
 ffi = []
 
 [build-dependencies]
 
 [[bin]]
-name = "pcai-inference"
-path = "src/main.rs"
-required-features = ["server"]
+name = "pcai-llamacpp"
+path = "src/bin/llamacpp.rs"
+required-features = ["llamacpp", "server"]
+
+[[bin]]
+name = "pcai-mistralrs"
+path = "src/bin/mistralrs.rs"
+required-features = ["mistralrs-backend", "server"]
