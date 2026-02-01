@@ -41,7 +41,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet('llamacpp', 'mistralrs', 'http', 'ollama', 'all')]
+    [ValidateSet('llamacpp', 'mistralrs', 'llamacpp-bin', 'mistralrs-bin', 'http', 'ollama', 'all')]
     [string]$Backend = 'llamacpp',
 
     [string]$ModelPath,
@@ -56,11 +56,30 @@ param(
 
     [string]$OutputPath,
 
+    [string]$OutputRoot,
+
+    [string]$RunLabel,
+
     [int]$MaxTokens = 512,
 
     [float]$Temperature = 0.7,
 
     [int]$GpuLayers = -1,
+
+    [string]$BaseUrl,
+
+    [int]$MaxTestCases = 0,
+
+    [ValidateSet('auto', 'stream', 'bar', 'silent')]
+    [string]$ProgressMode = 'auto',
+
+    [switch]$EmitStructuredMessages,
+
+    [int]$HeartbeatSeconds = 15,
+
+    [int]$RequestTimeoutSec = 120,
+
+    [string]$StopSignalPath,
 
     [switch]$Verbose
 )
@@ -71,8 +90,12 @@ $ErrorActionPreference = 'Stop'
 $scriptRoot = Split-Path -Parent $PSScriptRoot
 $projectRoot = Split-Path -Parent $scriptRoot
 
+if (Test-Path (Join-Path $projectRoot "Modules\PcaiInference.psd1")) {
+    Import-Module (Join-Path $projectRoot "Modules\PcaiInference.psd1") -Force -ErrorAction SilentlyContinue
+} else {
+    Import-Module (Join-Path $projectRoot "Modules\PcaiInference.psm1") -Force -ErrorAction SilentlyContinue
+}
 Import-Module (Join-Path $projectRoot "Modules\PC-AI.Evaluation\PC-AI.Evaluation.psd1") -Force
-Import-Module (Join-Path $projectRoot "Modules\PcaiInference.psm1") -Force -ErrorAction SilentlyContinue
 
 Write-Host @"
 
@@ -81,6 +104,18 @@ Write-Host @"
 ╚══════════════════════════════════════════════════════════════╝
 
 "@ -ForegroundColor Cyan
+
+if (-not $OutputRoot) {
+    $OutputRoot = Join-Path (Get-PcaiArtifactsRoot) 'evaluation\runs'
+}
+if (-not (Test-Path $OutputRoot)) {
+    New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
+}
+if (-not $OutputPath) {
+    $batchLabel = if ($RunLabel) { "$RunLabel-summary" } else { 'batch-summary' }
+    $batchContext = New-PcaiEvaluationRunContext -RunLabel $batchLabel -OutputRoot $OutputRoot -SuiteName 'BatchSummary' -Backend 'batch'
+    $OutputPath = Join-Path $batchContext.RunDir 'evaluation_summary.json'
+}
 
 #region Helper Functions
 
@@ -101,7 +136,10 @@ function Format-Duration {
 }
 
 function Test-BackendAvailable {
-    param([string]$Backend)
+    param(
+        [string]$Backend,
+        [string]$BaseUrl
+    )
 
     switch ($Backend) {
         { $_ -in 'llamacpp', 'mistralrs' } {
@@ -112,15 +150,34 @@ function Test-BackendAvailable {
             }
             return Test-Path $dllPath
         }
+        { $_ -in 'llamacpp-bin', 'mistralrs-bin' } {
+            $binaryName = if ($Backend -eq 'llamacpp-bin') { 'pcai-llamacpp.exe' } else { 'pcai-mistralrs.exe' }
+            $candidateDirs = @(
+                $env:PCAI_BIN_DIR,
+                $env:PCAI_LOCAL_BIN,
+                (Join-Path $env:USERPROFILE '.local\bin'),
+                (Join-Path $env:CARGO_TARGET_DIR 'release'),
+                'T:\RustCache\cargo-target\release'
+            ) | Where-Object { $_ }
+
+            foreach ($dir in $candidateDirs) {
+                if (Test-Path (Join-Path $dir $binaryName)) {
+                    return $true
+                }
+            }
+            return $false
+        }
         'http' {
             try {
-                $null = Invoke-RestMethod -Uri "http://127.0.0.1:8080/health" -TimeoutSec 2
+                $target = if ($BaseUrl) { $BaseUrl } else { "http://127.0.0.1:8080" }
+                $null = Invoke-RestMethod -Uri "$target/health" -TimeoutSec 2
                 return $true
             } catch { return $false }
         }
         'ollama' {
             try {
-                $null = Invoke-RestMethod -Uri "http://127.0.0.1:11434/api/tags" -TimeoutSec 2
+                $target = if ($BaseUrl) { $BaseUrl } else { "http://127.0.0.1:11434" }
+                $null = Invoke-RestMethod -Uri "$target/api/tags" -TimeoutSec 2
                 return $true
             } catch { return $false }
         }
@@ -139,14 +196,28 @@ function Invoke-BackendEvaluation {
         [string]$Dataset,
         [int]$MaxTokens,
         [float]$Temperature,
-        [int]$GpuLayers
+        [int]$GpuLayers,
+        [string]$BaseUrl,
+        [int]$MaxTestCases,
+        [string]$OutputRoot,
+        [string]$RunLabel,
+        [string]$ProgressMode,
+        [switch]$EmitStructuredMessages,
+        [int]$HeartbeatSeconds,
+        [int]$RequestTimeoutSec,
+        [string]$StopSignalPath
     )
 
     Write-Section "Evaluating Backend: $Backend"
 
     # Check availability
-    if (-not (Test-BackendAvailable -Backend $Backend)) {
+    if (-not (Test-BackendAvailable -Backend $Backend -BaseUrl $BaseUrl)) {
         Write-Warning "Backend '$Backend' is not available. Skipping."
+        return $null
+    }
+
+    if ($Backend -in @('llamacpp', 'mistralrs', 'llamacpp-bin', 'mistralrs-bin') -and -not $ModelPath) {
+        Write-Error "ModelPath is required for backend '$Backend'"
         return $null
     }
 
@@ -163,6 +234,10 @@ function Invoke-BackendEvaluation {
         return $null
     }
 
+    if ($MaxTestCases -gt 0) {
+        $testCases = $testCases | Select-Object -First $MaxTestCases
+    }
+
     Write-Host "  Loaded $($testCases.Count) test cases from '$Dataset'" -ForegroundColor Gray
 
     # Add test cases to suite
@@ -171,12 +246,27 @@ function Invoke-BackendEvaluation {
     }
 
     # Run evaluation
+    $effectiveBaseUrl = $BaseUrl
+    if (-not $effectiveBaseUrl) {
+        $effectiveBaseUrl = if ($Backend -eq 'ollama') { 'http://127.0.0.1:11434' } else { 'http://127.0.0.1:8080' }
+    }
+
+    $runLabelEffective = if ($RunLabel) { "$RunLabel-$Backend-$Dataset" } else { "$Backend-$Dataset" }
+
     $results = Invoke-EvaluationSuite -Suite $suite `
         -Backend $Backend `
         -ModelPath $ModelPath `
+        -BaseUrl $effectiveBaseUrl `
         -MaxTokens $MaxTokens `
         -Temperature $Temperature `
-        -GpuLayers $GpuLayers
+        -GpuLayers $GpuLayers `
+        -RunLabel $runLabelEffective `
+        -OutputRoot $OutputRoot `
+        -ProgressMode $ProgressMode `
+        -EmitStructuredMessages:$EmitStructuredMessages `
+        -HeartbeatSeconds $HeartbeatSeconds `
+        -RequestTimeoutSec $RequestTimeoutSec `
+        -StopSignalPath $StopSignalPath
 
     return @{
         Backend = $Backend
@@ -204,9 +294,14 @@ function Invoke-ABTestEvaluation {
 
     Write-Section "A/B Test: $variantA vs $variantB"
 
+    if ($variantA -match '-bin' -or $variantB -match '-bin') {
+        Write-Error "A/B testing currently supports only FFI backends (llamacpp, mistralrs)."
+        return
+    }
+
     # Check both backends available
     foreach ($v in $variants) {
-        if (-not (Test-BackendAvailable -Backend $v)) {
+        if (-not (Test-BackendAvailable -Backend $v -BaseUrl $null)) {
             Write-Error "Backend '$v' is not available for A/B test"
             return
         }
@@ -306,7 +401,16 @@ try {
                 -Dataset $Dataset `
                 -MaxTokens $MaxTokens `
                 -Temperature $Temperature `
-                -GpuLayers $GpuLayers
+                -GpuLayers $GpuLayers `
+                -BaseUrl $BaseUrl `
+                -MaxTestCases $MaxTestCases `
+                -OutputRoot $OutputRoot `
+                -RunLabel $RunLabel `
+                -ProgressMode $ProgressMode `
+                -EmitStructuredMessages:$EmitStructuredMessages `
+                -HeartbeatSeconds $HeartbeatSeconds `
+                -RequestTimeoutSec $RequestTimeoutSec `
+                -StopSignalPath $StopSignalPath
 
             if ($evalResult) {
                 $allResults[$be] = $evalResult

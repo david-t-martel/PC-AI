@@ -133,10 +133,8 @@ function Test-InferenceDllAvailable {
         $ProjectRoot = Get-ProjectRoot -StartPath $PSScriptRoot
     }
 
-    $binDir = Join-Path $ProjectRoot "bin"
-    $dllPath = Join-Path $binDir "pcai_inference.dll"
-
-    return Test-Path $dllPath
+    $dllPath = Resolve-InferenceDllPath -ProjectRoot $ProjectRoot
+    return $null -ne $dllPath
 }
 
 function Get-InferenceDllPath {
@@ -155,8 +153,39 @@ function Get-InferenceDllPath {
         $ProjectRoot = Get-ProjectRoot -StartPath $PSScriptRoot
     }
 
-    $binDir = Join-Path $ProjectRoot "bin"
-    return Join-Path $binDir "pcai_inference.dll"
+    return Resolve-InferenceDllPath -ProjectRoot $ProjectRoot
+}
+
+function Resolve-InferenceDllPath {
+    <#
+    .SYNOPSIS
+        Resolve the best available pcai_inference.dll path.
+    #>
+    param(
+        [Parameter(Mandatory = $false)]
+        [string]$ProjectRoot
+    )
+
+    if (-not $ProjectRoot) {
+        $ProjectRoot = Get-ProjectRoot -StartPath $PSScriptRoot
+    }
+
+    $candidates = @(
+        (Join-Path $ProjectRoot "bin\pcai_inference.dll"),
+        (Join-Path $ProjectRoot "bin\Release\pcai_inference.dll"),
+        (Join-Path $ProjectRoot "bin\Debug\pcai_inference.dll"),
+        (Join-Path $env:USERPROFILE ".local\bin\pcai_inference.dll"),
+        (Join-Path $env:CARGO_TARGET_DIR "release\pcai_inference.dll"),
+        'T:\RustCache\cargo-target\release\pcai_inference.dll'
+    ) | Where-Object { $_ }
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
 }
 
 function Assert-TestPrerequisites {
@@ -257,7 +286,7 @@ function Get-TestPaths {
     $binDir = Join-Path $projectRoot "bin"
     $deployDir = Join-Path $projectRoot "Deploy\pcai-inference"
     $modulePath = Join-Path $projectRoot "Modules\PcaiInference.psm1"
-    $dllPath = Join-Path $binDir "pcai_inference.dll"
+    $dllPath = Resolve-InferenceDllPath -ProjectRoot $projectRoot
 
     return @{
         ProjectRoot = $projectRoot

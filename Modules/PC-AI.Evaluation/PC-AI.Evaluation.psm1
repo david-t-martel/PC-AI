@@ -28,12 +28,30 @@ $script:EvaluationConfig = @{
     JudgeProvider = 'anthropic'
     BaselinePath = Join-Path $PSScriptRoot 'Baselines'
     DatasetPath = Join-Path $PSScriptRoot 'Datasets'
-    ResultsPath = Join-Path $PSScriptRoot 'Results'
+    ResultsPath = $null
+    ArtifactsRoot = $null
+    EvaluationRoot = $null
+    RunRoot = $null
+    HttpBaseUrl = 'http://127.0.0.1:8080'
+    OllamaBaseUrl = 'http://127.0.0.1:11434'
+    OllamaModel = 'llama3.2'
+    ProgressMode = 'auto'
+    EmitStructuredMessages = $false
+    ProgressLogPath = $null
+    EventsLogPath = $null
+    StopSignalPath = $null
+    HeartbeatSeconds = 15
+    ProgressIntervalSeconds = 2
 }
 
 $script:CurrentSuite = $null
 $script:ABTests = @{}
 $script:Baselines = @{}
+$script:CompiledServerProcess = $null
+$script:CompiledServerConfigPath = $null
+$script:CompiledServerBaseUrl = $null
+$script:CompiledServerBackend = $null
+$script:EvaluationRunState = $null
 
 #endregion
 
@@ -248,6 +266,27 @@ function Invoke-EvaluationSuite {
     .PARAMETER Parallel
         Run test cases in parallel
 
+    .PARAMETER RunLabel
+        Label for the evaluation run (used in output folder naming)
+
+    .PARAMETER OutputRoot
+        Root folder for evaluation run outputs (defaults to .pcai/evaluation/runs)
+
+    .PARAMETER ProgressMode
+        Progress output mode: auto, stream, bar, silent
+
+    .PARAMETER EmitStructuredMessages
+        Emit JSON event lines to the pipeline for LLM-friendly parsing
+
+    .PARAMETER HeartbeatSeconds
+        Interval for heartbeat status events
+
+    .PARAMETER RequestTimeoutSec
+        Timeout for HTTP requests per test case
+
+    .PARAMETER StopSignalPath
+        Stop signal file path; if present, evaluation will stop gracefully
+
     .EXAMPLE
         $results = Invoke-EvaluationSuite -Suite $suite -Backend 'llamacpp' -ModelPath "C:\models\llama-3.2-1b.gguf"
     #>
@@ -257,7 +296,7 @@ function Invoke-EvaluationSuite {
         [EvaluationSuite]$Suite,
 
         [Parameter(Mandatory)]
-        [ValidateSet('llamacpp', 'mistralrs', 'http', 'ollama')]
+        [ValidateSet('llamacpp', 'mistralrs', 'llamacpp-bin', 'mistralrs-bin', 'http', 'ollama')]
         [string]$Backend,
 
         [string]$ModelPath,
@@ -270,72 +309,555 @@ function Invoke-EvaluationSuite {
 
         [int]$MaxTokens = 512,
 
-        [float]$Temperature = 0.7
+        [float]$Temperature = 0.7,
+
+        [string]$RunLabel,
+
+        [string]$OutputRoot,
+
+        [ValidateSet('auto', 'stream', 'bar', 'silent')]
+        [string]$ProgressMode = 'auto',
+
+        [switch]$EmitStructuredMessages,
+
+        [int]$HeartbeatSeconds = 15,
+
+        [int]$RequestTimeoutSec = 120,
+
+        [string]$StopSignalPath,
+
+        [pscustomobject]$RunContext
     )
 
     Write-Host "Starting evaluation suite: $($Suite.Name)" -ForegroundColor Cyan
     Write-Host "Backend: $Backend | Test cases: $($Suite.TestCases.Count)" -ForegroundColor Gray
+    Initialize-EvaluationPaths
 
-    # Initialize backend
-    $backendReady = Initialize-EvaluationBackend -Backend $Backend -ModelPath $ModelPath -BaseUrl $BaseUrl -GpuLayers $GpuLayers
-
-    if (-not $backendReady) {
-        Write-Error "Failed to initialize backend: $Backend"
-        return $null
+    if (-not $RunContext) {
+        $RunContext = New-PcaiEvaluationRunContext -RunLabel $RunLabel -OutputRoot $OutputRoot -SuiteName $Suite.Name -Backend $Backend
     }
 
-    $startTime = [datetime]::UtcNow
+    $script:EvaluationConfig.ProgressMode = $ProgressMode
+    $script:EvaluationConfig.EmitStructuredMessages = [bool]$EmitStructuredMessages
+    $script:EvaluationConfig.HeartbeatSeconds = $HeartbeatSeconds
+    $script:EvaluationConfig.ProgressLogPath = $RunContext.ProgressLogPath
+    $script:EvaluationConfig.EventsLogPath = $RunContext.EventsLogPath
+    $script:EvaluationConfig.StopSignalPath = if ($StopSignalPath) { $StopSignalPath } else { $RunContext.StopSignalPath }
 
-    # Run test cases
-    $testCases = $Suite.TestCases
-    $progress = 0
+    $script:EvaluationRunState = [ordered]@{
+        RunId = $RunContext.RunId
+        RunDir = $RunContext.RunDir
+        Suite = $Suite.Name
+        Backend = $Backend
+        StartTimeUtc = (Get-Date).ToUniversalTime().ToString('o')
+        TotalTests = $Suite.TestCases.Count
+        Completed = 0
+        Cancelled = $false
+    }
+    if ($Backend -eq 'ollama' -and $BaseUrl -eq 'http://127.0.0.1:8080') {
+        $BaseUrl = 'http://127.0.0.1:11434'
+    }
 
-    foreach ($testCase in $testCases) {
-        $progress++
-        Write-Progress -Activity "Running Evaluation" -Status "Test $progress of $($testCases.Count): $($testCase.Id)" -PercentComplete (($progress / $testCases.Count) * 100)
+    $summary = $null
 
-        $result = Invoke-SingleTestCase -TestCase $testCase -Backend $Backend -MaxTokens $MaxTokens -Temperature $Temperature
+    try {
+        Write-EvaluationEvent -Type 'start' -Message "Evaluation started: $($Suite.Name)" -Data @{
+            backend = $Backend
+            runId = $RunContext.RunId
+            runDir = $RunContext.RunDir
+            stopSignal = $script:EvaluationConfig.StopSignalPath
+            totalTests = $Suite.TestCases.Count
+        }
+        # Initialize backend
+        $backendReady = Initialize-EvaluationBackend -Backend $Backend -ModelPath $ModelPath -BaseUrl $BaseUrl -GpuLayers $GpuLayers
 
-        # Calculate metrics
-        foreach ($metric in $Suite.Metrics) {
-            try {
-                $metricValue = & $metric.Calculator $result
-                $result.Metrics[$metric.Name] = $metricValue
-            } catch {
-                Write-Warning "Failed to calculate metric $($metric.Name): $_"
-                $result.Metrics[$metric.Name] = $null
+        if (-not $backendReady) {
+            Write-Error "Failed to initialize backend: $Backend"
+            return $null
+        }
+
+        $startTime = [datetime]::UtcNow
+        $lastHeartbeat = Get-Date
+
+        # Run test cases
+        $testCases = $Suite.TestCases
+        $progress = 0
+
+        foreach ($testCase in $testCases) {
+            $progress++
+            if (Test-EvaluationStopSignal) {
+                $script:EvaluationRunState.Cancelled = $true
+                Write-EvaluationEvent -Type 'cancel' -Message "Stop signal detected. Cancelling evaluation run." -Data @{
+                    runId = $RunContext.RunId
+                    completed = $progress - 1
+                } -Level 'warn'
+                break
+            }
+
+            Write-EvaluationEvent -Type 'test_start' -Message "Running test case $($testCase.Id)" -Data @{
+                index = $progress
+                total = $testCases.Count
+                testCaseId = $testCase.Id
+            }
+
+            $result = Invoke-SingleTestCase -TestCase $testCase -Backend $Backend -MaxTokens $MaxTokens -Temperature $Temperature -RequestTimeoutSec $RequestTimeoutSec
+
+            # Calculate metrics
+            foreach ($metric in $Suite.Metrics) {
+                try {
+                    $metricValue = & $metric.Calculator $result
+                    $result.Metrics[$metric.Name] = $metricValue
+                } catch {
+                    Write-Warning "Failed to calculate metric $($metric.Name): $_"
+                    Write-EvaluationEvent -Type 'metric_error' -Message "Metric calculation failed: $($metric.Name)" -Data @{
+                        testCaseId = $testCase.Id
+                        error = $_.Exception.Message
+                    } -Level 'warn'
+                    $result.Metrics[$metric.Name] = $null
+                }
+            }
+
+            # Calculate overall score (weighted average of normalized metrics)
+            $result.OverallScore = Calculate-OverallScore -Result $result -Metrics $Suite.Metrics
+
+            # Determine pass/fail
+            $result.Status = if ($result.ErrorMessage) { 'error' }
+                             elseif ($result.OverallScore -ge 0.7) { 'pass' }
+                             else { 'fail' }
+
+            $Suite.Results.Add($result)
+
+            $script:EvaluationRunState.Completed = $progress
+            Write-EvaluationProgress -Completed $progress -Total $testCases.Count -TestCaseId $testCase.Id -Elapsed ((Get-Date) - $startTime)
+            Write-EvaluationEvent -Type 'test_complete' -Message "Completed test case $($testCase.Id)" -Data @{
+                index = $progress
+                total = $testCases.Count
+                status = $result.Status
+                duration_ms = [math]::Round($result.Duration.TotalMilliseconds, 2)
+            }
+
+            if ($HeartbeatSeconds -gt 0 -and ((Get-Date) - $lastHeartbeat).TotalSeconds -ge $HeartbeatSeconds) {
+                $lastHeartbeat = Get-Date
+                Write-EvaluationEvent -Type 'heartbeat' -Message "Evaluation heartbeat" -Data @{
+                    completed = $progress
+                    total = $testCases.Count
+                }
             }
         }
 
-        # Calculate overall score (weighted average of normalized metrics)
-        $result.OverallScore = Calculate-OverallScore -Result $result -Metrics $Suite.Metrics
+        if ($script:EvaluationConfig.ProgressMode -in @('auto', 'bar')) {
+            Write-Progress -Activity "Running Evaluation" -Completed
+        }
 
-        # Determine pass/fail
-        $result.Status = if ($result.ErrorMessage) { 'error' }
-                         elseif ($result.OverallScore -ge 0.7) { 'pass' }
-                         else { 'fail' }
+        $endTime = [datetime]::UtcNow
+        $totalDuration = $endTime - $startTime
 
-        $Suite.Results.Add($result)
+        # Generate summary
+        $summary = $Suite.GetSummary()
+        $summary.TotalDuration = $totalDuration
+        $summary.Backend = $Backend
+        $summary.Model = $ModelPath ?? $BaseUrl
+        $summary.Cancelled = $script:EvaluationRunState.Cancelled
+
+        if ($RunContext -and $RunContext.SummaryPath) {
+            $summary | ConvertTo-Json -Depth 6 | Set-Content -Path $RunContext.SummaryPath
+        }
+
+        Write-Host "`nEvaluation Complete" -ForegroundColor Green
+        Write-Host "  Pass Rate: $($summary.PassRate)%" -ForegroundColor $(if ($summary.PassRate -ge 80) { 'Green' } elseif ($summary.PassRate -ge 60) { 'Yellow' } else { 'Red' })
+        Write-Host "  Average Score: $($summary.AverageScore)" -ForegroundColor Gray
+        Write-Host "  Average Latency: $([math]::Round($summary.AverageLatency, 2))ms" -ForegroundColor Gray
+        Write-Host "  Total Duration: $($totalDuration.ToString('mm\:ss\.fff'))" -ForegroundColor Gray
+        Write-Host "  Run Dir: $($RunContext.RunDir)" -ForegroundColor DarkGray
+        if ($summary.Cancelled) {
+            Write-Host "  Status: CANCELLED" -ForegroundColor Yellow
+        }
+
+        Write-EvaluationEvent -Type 'complete' -Message "Evaluation complete" -Data @{
+            runId = $RunContext.RunId
+            totalDurationSec = [math]::Round($totalDuration.TotalSeconds, 2)
+            passRate = $summary.PassRate
+            cancelled = $summary.Cancelled
+        }
+
+        return $summary
+    } finally {
+        Stop-EvaluationBackend -Backend $Backend
+    }
+}
+
+function Get-PcaiProjectRoot {
+    $moduleRoot = Split-Path -Parent $PSScriptRoot
+    return Split-Path -Parent $moduleRoot
+}
+
+function Get-PcaiArtifactsRoot {
+    [CmdletBinding()]
+    param()
+
+    $projectRoot = Get-PcaiProjectRoot
+    $root = if ($env:PCAI_ARTIFACTS_ROOT) {
+        $env:PCAI_ARTIFACTS_ROOT
+    } else {
+        Join-Path $projectRoot '.pcai'
     }
 
-    Write-Progress -Activity "Running Evaluation" -Completed
+    if (-not (Test-Path $root)) {
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+    }
 
-    $endTime = [datetime]::UtcNow
-    $totalDuration = $endTime - $startTime
+    return $root
+}
 
-    # Generate summary
-    $summary = $Suite.GetSummary()
-    $summary.TotalDuration = $totalDuration
-    $summary.Backend = $Backend
-    $summary.Model = $ModelPath ?? $BaseUrl
+function Initialize-EvaluationPaths {
+    $artifactsRoot = Get-PcaiArtifactsRoot
+    $evalRoot = Join-Path $artifactsRoot 'evaluation'
+    $runRoot = Join-Path $evalRoot 'runs'
+    $resultsRoot = Join-Path $evalRoot 'results'
 
-    Write-Host "`nEvaluation Complete" -ForegroundColor Green
-    Write-Host "  Pass Rate: $($summary.PassRate)%" -ForegroundColor $(if ($summary.PassRate -ge 80) { 'Green' } elseif ($summary.PassRate -ge 60) { 'Yellow' } else { 'Red' })
-    Write-Host "  Average Score: $($summary.AverageScore)" -ForegroundColor Gray
-    Write-Host "  Average Latency: $([math]::Round($summary.AverageLatency, 2))ms" -ForegroundColor Gray
-    Write-Host "  Total Duration: $($totalDuration.ToString('mm\:ss\.fff'))" -ForegroundColor Gray
+    foreach ($path in @($evalRoot, $runRoot, $resultsRoot)) {
+        if (-not (Test-Path $path)) {
+            New-Item -ItemType Directory -Path $path -Force | Out-Null
+        }
+    }
 
-    return $summary
+    $script:EvaluationConfig.ArtifactsRoot = $artifactsRoot
+    $script:EvaluationConfig.EvaluationRoot = $evalRoot
+    $script:EvaluationConfig.RunRoot = $runRoot
+    $script:EvaluationConfig.ResultsPath = $resultsRoot
+}
+
+function New-PcaiEvaluationRunContext {
+    [CmdletBinding()]
+    param(
+        [string]$RunLabel,
+        [string]$OutputRoot,
+        [string]$SuiteName,
+        [string]$Backend
+    )
+
+    Initialize-EvaluationPaths
+
+    $root = if ($OutputRoot) { $OutputRoot } else { $script:EvaluationConfig.RunRoot }
+    if (-not (Test-Path $root)) {
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+    }
+
+    $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+    $safeLabel = if ($RunLabel) { ($RunLabel -replace '[^a-zA-Z0-9_.-]', '-') } else { $null }
+    $runId = if ($safeLabel) { "$timestamp-$safeLabel" } else { $timestamp }
+    $runDir = Join-Path $root $runId
+
+    if (-not (Test-Path $runDir)) {
+        New-Item -ItemType Directory -Path $runDir -Force | Out-Null
+    }
+
+    return [pscustomobject]@{
+        RunId = $runId
+        RunDir = $runDir
+        SuiteName = $SuiteName
+        Backend = $Backend
+        ProgressLogPath = Join-Path $runDir 'progress.log'
+        EventsLogPath = Join-Path $runDir 'events.jsonl'
+        SummaryPath = Join-Path $runDir 'summary.json'
+        StopSignalPath = Join-Path $runDir 'stop.signal'
+        CreatedUtc = (Get-Date).ToUniversalTime().ToString('o')
+    }
+}
+
+function Write-EvaluationEvent {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Type,
+        [Parameter(Mandatory)]
+        [string]$Message,
+        [hashtable]$Data,
+        [ValidateSet('info', 'warn', 'error')]
+        [string]$Level = 'info'
+    )
+
+    $payload = [ordered]@{
+        ts = (Get-Date).ToUniversalTime().ToString('o')
+        type = $Type
+        level = $Level
+        message = $Message
+        data = $Data
+    }
+
+    $json = $payload | ConvertTo-Json -Depth 8 -Compress
+
+    if ($script:EvaluationConfig.EventsLogPath) {
+        $eventsDir = Split-Path -Parent $script:EvaluationConfig.EventsLogPath
+        if ($eventsDir -and -not (Test-Path $eventsDir)) {
+            New-Item -ItemType Directory -Path $eventsDir -Force | Out-Null
+        }
+        Add-Content -Path $script:EvaluationConfig.EventsLogPath -Value $json
+    }
+
+    if ($script:EvaluationConfig.ProgressMode -in @('auto', 'stream')) {
+        $color = switch ($Level) {
+            'info' { 'Gray' }
+            'warn' { 'Yellow' }
+            'error' { 'Red' }
+        }
+        Write-Host "[pcai.eval] $Message" -ForegroundColor $color
+    }
+
+    if ($script:EvaluationConfig.EmitStructuredMessages) {
+        Write-Output $json
+    }
+}
+
+function Write-EvaluationProgress {
+    [CmdletBinding()]
+    param(
+        [int]$Completed,
+        [int]$Total,
+        [string]$TestCaseId,
+        [timespan]$Elapsed
+    )
+
+    $percent = if ($Total -gt 0) { [math]::Round(($Completed / $Total) * 100, 1) } else { 0 }
+    $status = "Test $Completed of $Total: $TestCaseId"
+
+    if ($script:EvaluationConfig.ProgressMode -in @('auto', 'bar')) {
+        Write-Progress -Activity "Running Evaluation" -Status $status -PercentComplete $percent
+    }
+
+    if ($script:EvaluationConfig.ProgressMode -in @('auto', 'stream')) {
+        $elapsedText = if ($Elapsed) { $Elapsed.ToString('hh\:mm\:ss') } else { '00:00:00' }
+        $line = "progress=$Completed/$Total ($percent%) elapsed=$elapsedText test=$TestCaseId"
+        if ($script:EvaluationConfig.ProgressLogPath) {
+            $progressDir = Split-Path -Parent $script:EvaluationConfig.ProgressLogPath
+            if ($progressDir -and -not (Test-Path $progressDir)) {
+                New-Item -ItemType Directory -Path $progressDir -Force | Out-Null
+            }
+            Add-Content -Path $script:EvaluationConfig.ProgressLogPath -Value $line
+        }
+        Write-Host "[pcai.eval] $line" -ForegroundColor DarkGray
+    }
+}
+
+function Test-EvaluationStopSignal {
+    if ($script:EvaluationConfig.StopSignalPath -and (Test-Path $script:EvaluationConfig.StopSignalPath)) {
+        return $true
+    }
+    return $false
+}
+
+function Get-EvaluationRunState {
+    [CmdletBinding()]
+    param()
+
+    return $script:EvaluationRunState
+}
+
+function Get-PcaiCompiledBinaryPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('llamacpp', 'mistralrs')]
+        [string]$Backend
+    )
+
+    $binaryName = if ($Backend -eq 'llamacpp') { 'pcai-llamacpp.exe' } else { 'pcai-mistralrs.exe' }
+    $projectRoot = Get-PcaiProjectRoot
+
+    $candidates = @(
+        $env:PCAI_BIN_DIR,
+        $env:PCAI_LOCAL_BIN,
+        (Join-Path $env:USERPROFILE '.local\bin'),
+        (Join-Path $projectRoot 'bin'),
+        (Join-Path $env:CARGO_TARGET_DIR 'release'),
+        'T:\RustCache\cargo-target\release',
+        (Join-Path $projectRoot 'Native\pcai_core\pcai_inference\target\release'),
+        (Join-Path $projectRoot 'Deploy\pcai-inference\target\release')
+    ) | Where-Object { $_ }
+
+    foreach ($dir in $candidates) {
+        $candidate = Join-Path $dir $binaryName
+        if (Test-Path $candidate) {
+            return (Resolve-Path $candidate).Path
+        }
+    }
+
+    return $null
+}
+
+function New-PcaiServerConfigFile {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('llamacpp', 'mistralrs')]
+        [string]$Backend,
+
+        [Parameter(Mandatory)]
+        [string]$ModelPath,
+
+        [Parameter(Mandatory)]
+        [string]$BaseUrl,
+
+        [int]$GpuLayers = -1,
+
+        [string]$Device
+    )
+
+    $uri = [Uri]$BaseUrl
+    $serverPort = if ($uri.Port -gt 0) { $uri.Port } else { 8080 }
+
+    $config = @{
+        backend = @{
+            type = $Backend
+        }
+        model = @{
+            path = $ModelPath
+            generation = @{
+                max_tokens = 512
+                temperature = 0.7
+                top_p = 0.95
+                stop = @()
+            }
+        }
+        server = @{
+            host = $uri.Host
+            port = $serverPort
+            cors = $true
+        }
+    }
+
+    if ($Backend -eq 'llamacpp' -and $GpuLayers -ge 0) {
+        $config.backend.n_gpu_layers = $GpuLayers
+    }
+
+    if ($Backend -eq 'mistralrs' -and $Device) {
+        $config.backend.device = $Device
+    }
+
+    $configPath = Join-Path ([IO.Path]::GetTempPath()) ("pcai-{0}-{1}.json" -f $Backend, [guid]::NewGuid().ToString('N'))
+    $config | ConvertTo-Json -Depth 6 | Set-Content -Path $configPath -Encoding UTF8
+    return $configPath
+}
+
+function Start-PcaiCompiledServer {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet('llamacpp', 'mistralrs')]
+        [string]$Backend,
+
+        [Parameter(Mandatory)]
+        [string]$ModelPath,
+
+        [Parameter(Mandatory)]
+        [string]$BaseUrl,
+
+        [int]$GpuLayers = -1,
+
+        [string]$Device,
+
+        [int]$TimeoutSeconds = 60
+    )
+
+    if (-not (Test-Path $ModelPath)) {
+        throw "Model file not found: $ModelPath"
+    }
+
+    $binaryPath = Get-PcaiCompiledBinaryPath -Backend $Backend
+    if (-not $binaryPath) {
+        throw "Compiled backend binary not found for $Backend. Build and copy to .local\\bin or set PCAI_BIN_DIR."
+    }
+
+    $configPath = New-PcaiServerConfigFile -Backend $Backend -ModelPath $ModelPath -BaseUrl $BaseUrl -GpuLayers $GpuLayers -Device $Device
+
+    $previousConfig = $env:PCAI_CONFIG
+    $env:PCAI_CONFIG = $configPath
+    $process = Start-Process -FilePath $binaryPath -WorkingDirectory (Split-Path $binaryPath -Parent) -NoNewWindow -PassThru
+    if ($previousConfig) {
+        $env:PCAI_CONFIG = $previousConfig
+    } else {
+        Remove-Item Env:PCAI_CONFIG -ErrorAction SilentlyContinue
+    }
+
+    $script:CompiledServerProcess = $process
+    $script:CompiledServerConfigPath = $configPath
+    $script:CompiledServerBaseUrl = $BaseUrl
+    $script:CompiledServerBackend = $Backend
+
+    Write-EvaluationEvent -Type 'backend_start' -Message "Starting compiled backend: $Backend" -Data @{
+        backend = $Backend
+        baseUrl = $BaseUrl
+        pid = $process.Id
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $null = Invoke-RestMethod -Uri "$BaseUrl/health" -Method Get -TimeoutSec 3 -ErrorAction Stop
+            return $true
+        } catch {
+            Start-Sleep -Seconds 1
+        }
+    }
+
+    try {
+        if ($process -and (-not $process.HasExited)) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+    } catch { }
+
+    if ($configPath -and (Test-Path $configPath)) {
+        Remove-Item $configPath -Force -ErrorAction SilentlyContinue
+    }
+
+    $script:CompiledServerProcess = $null
+    $script:CompiledServerConfigPath = $null
+    $script:CompiledServerBaseUrl = $null
+    $script:CompiledServerBackend = $null
+
+    throw "Compiled server for $Backend did not become ready within $TimeoutSeconds seconds."
+}
+
+function Stop-EvaluationBackend {
+    [CmdletBinding()]
+    param(
+        [string]$Backend
+    )
+
+    if ($script:CompiledServerProcess) {
+        try {
+            if (-not $script:CompiledServerProcess.HasExited) {
+                $script:CompiledServerProcess.CloseMainWindow() | Out-Null
+                Start-Sleep -Seconds 2
+                if (-not $script:CompiledServerProcess.HasExited) {
+                    Stop-Process -Id $script:CompiledServerProcess.Id -Force -ErrorAction SilentlyContinue
+                }
+            }
+        } catch { }
+    }
+
+    if ($script:CompiledServerConfigPath -and (Test-Path $script:CompiledServerConfigPath)) {
+        Remove-Item $script:CompiledServerConfigPath -Force -ErrorAction SilentlyContinue
+    }
+
+    $script:CompiledServerProcess = $null
+    $script:CompiledServerConfigPath = $null
+    $script:CompiledServerBaseUrl = $null
+    $script:CompiledServerBackend = $null
+
+    if ($Backend -in @('llamacpp', 'mistralrs')) {
+        try {
+            if (Get-Command Close-PcaiInference -ErrorAction SilentlyContinue) {
+                Close-PcaiInference -ErrorAction SilentlyContinue
+            } elseif (Get-Command Stop-PcaiInference -ErrorAction SilentlyContinue) {
+                Stop-PcaiInference -ErrorAction SilentlyContinue
+            }
+        } catch { }
+    }
+
+    Write-EvaluationEvent -Type 'backend_stop' -Message "Backend stopped: $Backend" -Data @{
+        backend = $Backend
+    }
 }
 
 function Initialize-EvaluationBackend {
@@ -373,9 +895,28 @@ function Initialize-EvaluationBackend {
                 return $false
             }
         }
+        { $_ -in 'llamacpp-bin', 'mistralrs-bin' } {
+            if (-not $ModelPath) {
+                Write-Error "ModelPath is required for compiled backend: $Backend"
+                return $false
+            }
+
+            $backendName = if ($Backend -eq 'llamacpp-bin') { 'llamacpp' } else { 'mistralrs' }
+            $script:EvaluationConfig.HttpBaseUrl = $BaseUrl
+            try {
+                $device = $env:PCAI_MISTRAL_DEVICE
+                if (-not $device) { $device = $env:PCAI_DEVICE }
+                $null = Start-PcaiCompiledServer -Backend $backendName -ModelPath $ModelPath -BaseUrl $BaseUrl -GpuLayers $GpuLayers -Device $device
+                return $true
+            } catch {
+                Write-Error "Compiled backend initialization failed: $_"
+                return $false
+            }
+        }
         'http' {
             # Test HTTP endpoint
             try {
+                $script:EvaluationConfig.HttpBaseUrl = $BaseUrl
                 $response = Invoke-RestMethod -Uri "$BaseUrl/health" -Method Get -TimeoutSec 5 -ErrorAction Stop
                 return $true
             } catch {
@@ -386,6 +927,7 @@ function Initialize-EvaluationBackend {
         'ollama' {
             # Test Ollama endpoint
             try {
+                $script:EvaluationConfig.OllamaBaseUrl = $BaseUrl
                 $response = Invoke-RestMethod -Uri "$BaseUrl/api/tags" -Method Get -TimeoutSec 5 -ErrorAction Stop
                 return $true
             } catch {
@@ -404,7 +946,8 @@ function Invoke-SingleTestCase {
         [EvaluationTestCase]$TestCase,
         [string]$Backend,
         [int]$MaxTokens = 512,
-        [float]$Temperature = 0.7
+        [float]$Temperature = 0.7,
+        [int]$RequestTimeoutSec = 120
     )
 
     $result = [EvaluationResult]::new()
@@ -427,7 +970,7 @@ function Invoke-SingleTestCase {
             { $_ -in 'llamacpp', 'mistralrs' } {
                 $result.Response = Invoke-PcaiGenerate -Prompt $TestCase.Prompt -MaxTokens $MaxTokens -Temperature $Temperature
             }
-            'http' {
+            { $_ -in 'http', 'llamacpp-bin', 'mistralrs-bin' } {
                 $body = @{
                     prompt = $TestCase.Prompt
                     max_tokens = $MaxTokens
@@ -435,7 +978,7 @@ function Invoke-SingleTestCase {
                 } | ConvertTo-Json
 
                 $response = Invoke-RestMethod -Uri "$script:EvaluationConfig.HttpBaseUrl/v1/completions" `
-                    -Method Post -Body $body -ContentType 'application/json'
+                    -Method Post -Body $body -ContentType 'application/json' -TimeoutSec $RequestTimeoutSec
                 $result.Response = $response.choices[0].text
             }
             'ollama' {
@@ -450,7 +993,7 @@ function Invoke-SingleTestCase {
                 } | ConvertTo-Json
 
                 $response = Invoke-RestMethod -Uri "$script:EvaluationConfig.OllamaBaseUrl/api/generate" `
-                    -Method Post -Body $body -ContentType 'application/json'
+                    -Method Post -Body $body -ContentType 'application/json' -TimeoutSec $RequestTimeoutSec
                 $result.Response = $response.response
             }
         }

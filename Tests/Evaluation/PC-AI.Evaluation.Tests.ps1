@@ -325,8 +325,11 @@ Describe "Integration Tests" -Tag "Integration" {
             $altPath = if ($env:CARGO_TARGET_DIR) {
                 Join-Path $env:CARGO_TARGET_DIR "release\pcai_inference.dll"
             } else { $null }
+            $localBinPath = Join-Path $env:USERPROFILE ".local\bin\pcai_inference.dll"
 
-            $available = (Test-Path $dllPath) -or ($altPath -and (Test-Path $altPath))
+            $available = (Test-Path $dllPath) -or
+                ($altPath -and (Test-Path $altPath)) -or
+                (Test-Path $localBinPath)
 
             if ($available) {
                 Write-Host "  Native DLL available for integration testing" -ForegroundColor Green
