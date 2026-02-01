@@ -82,6 +82,8 @@ pub struct PathAnalysisJson {
     pub status: String,
     pub total_entries: u32,
     pub unique_entries: u32,
+    pub machine_total_entries: u32,
+    pub user_total_entries: u32,
     pub duplicate_count: u32,
     pub non_existent_count: u32,
     pub empty_count: u32,
@@ -92,6 +94,8 @@ pub struct PathAnalysisJson {
     pub issues: Vec<PathIssue>,
     pub duplicates: Vec<DuplicateGroup>,
     pub non_existent: Vec<PathEntryRef>,
+    pub machine_entries: Vec<PathEntryRef>,
+    pub user_entries: Vec<PathEntryRef>,
     pub recommendations: Vec<String>,
 }
 
@@ -191,6 +195,7 @@ pub fn analyze_path() -> (PathAnalysisStats, PathAnalysisJson) {
     let mut seen: HashMap<String, Vec<(usize, String, String)>> = HashMap::new();
 
     let mut stats = PathAnalysisStats::default();
+    let mut all_entries = Vec::new();
     let mut issues = Vec::new();
     let mut non_existent_entries = Vec::new();
 
@@ -212,6 +217,12 @@ pub fn analyze_path() -> (PathAnalysisStats, PathAnalysisJson) {
         seen.entry(normalized.clone())
             .or_default()
             .push((idx, entry_str.clone(), source.to_string()));
+
+        all_entries.push(PathEntryRef {
+            path: entry_str.clone(),
+            source: source.to_string(),
+            index: idx,
+        });
 
         // Check for empty entries
         if entry.trim().is_empty() {
@@ -367,10 +378,25 @@ pub fn analyze_path() -> (PathAnalysisStats, PathAnalysisJson) {
         ));
     }
 
+    let machine_entries: Vec<PathEntryRef> = all_entries
+        .iter()
+        .filter(|e| e.source == "Machine")
+        .cloned()
+        .collect();
+    let user_entries: Vec<PathEntryRef> = all_entries
+        .iter()
+        .filter(|e| e.source == "User")
+        .cloned()
+        .collect();
+    let machine_total_entries = machine_entries.len() as u32;
+    let user_total_entries = user_entries.len() as u32;
+
     let json = PathAnalysisJson {
         status: "Success".to_string(),
         total_entries: stats.total_entries,
         unique_entries: stats.unique_entries,
+        machine_total_entries,
+        user_total_entries,
         duplicate_count: stats.duplicate_count,
         non_existent_count: stats.non_existent_count,
         empty_count: stats.empty_count,
@@ -381,6 +407,8 @@ pub fn analyze_path() -> (PathAnalysisStats, PathAnalysisJson) {
         issues,
         duplicates: duplicate_groups,
         non_existent: non_existent_entries,
+        machine_entries,
+        user_entries,
         recommendations,
     };
 

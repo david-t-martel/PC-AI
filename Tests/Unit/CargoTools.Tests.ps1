@@ -19,6 +19,17 @@ BeforeAll {
     $script:cargoAvailable = $null -ne (Get-Command cargo -ErrorAction SilentlyContinue)
 }
 
+# Initialize for discovery-time Skip checks
+if (-not (Get-Variable -Name cargoToolsAvailable -Scope Script -ErrorAction SilentlyContinue)) {
+    $script:cargoToolsAvailable = $false
+}
+if (-not (Get-Variable -Name cargoAvailable -Scope Script -ErrorAction SilentlyContinue)) {
+    $script:cargoAvailable = $false
+}
+if (-not (Get-Variable -Name hasInit -Scope Script -ErrorAction SilentlyContinue)) {
+    $script:hasInit = $false
+}
+
 Describe 'CargoTools Module' -Tag 'Unit', 'CargoTools', 'Fast' {
     Context 'Module Availability' {
         It 'Should be discoverable in module path' -Skip:(-not $script:cargoToolsAvailable) {

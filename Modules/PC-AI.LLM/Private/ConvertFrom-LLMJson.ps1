@@ -20,8 +20,8 @@ function ConvertFrom-LLMJson {
 
         # Size guard: 5MB limit to prevent OOM
         if ($Content.Length -gt 5MB) {
-            Write-Error "Content too large for JSON extraction ($($Content.Length) bytes)"
             if ($Strict) { throw "Content exceeded 5MB limit" }
+            Write-Error "Content too large for JSON extraction ($($Content.Length) bytes)"
             return $Content
         }
 

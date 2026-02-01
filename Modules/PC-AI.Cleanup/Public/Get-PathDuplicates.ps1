@@ -70,14 +70,14 @@ function Get-PathDuplicates {
 
         if ([string]::IsNullOrEmpty($PathValue)) {
             return [PSCustomObject]@{
-                Source = $Source
-                TotalEntries = 0
-                UniqueEntries = 0
-                Duplicates = @()
-                NonExistent = @()
-                EmptyEntries = 0
+                Source                   = $Source
+                TotalEntries             = 0
+                UniqueEntries            = 0
+                Duplicates               = @()
+                NonExistent              = @()
+                EmptyEntries             = 0
                 EntriesWithTrailingSlash = @()
-                AllEntries = @()
+                AllEntries               = @()
             }
         }
 
@@ -100,14 +100,14 @@ function Get-PathDuplicates {
             $expandedPath = [Environment]::ExpandEnvironmentVariables($item.Trim())
 
             $entry = [PSCustomObject]@{
-                Index = $index
-                OriginalValue = $item
-                NormalizedValue = $normalizedPath
-                ExpandedValue = $expandedPath
-                Exists = Test-Path -Path $expandedPath -ErrorAction SilentlyContinue
+                Index            = $index
+                OriginalValue    = $item
+                NormalizedValue  = $normalizedPath
+                ExpandedValue    = $expandedPath
+                Exists           = Test-Path -Path $expandedPath -ErrorAction SilentlyContinue
                 HasTrailingSlash = $item.Trim().EndsWith('\') -or $item.Trim().EndsWith('/')
-                IsDuplicate = $false
-                DuplicateOf = $null
+                IsDuplicate      = $false
+                DuplicateOf      = $null
             }
 
             # Check for duplicates
@@ -115,8 +115,7 @@ function Get-PathDuplicates {
                 $entry.IsDuplicate = $true
                 $entry.DuplicateOf = $seenPaths[$normalizedPath]
                 $duplicates += $entry
-            }
-            else {
+            } else {
                 $seenPaths[$normalizedPath] = $index
             }
 
@@ -131,25 +130,116 @@ function Get-PathDuplicates {
         $trailingSlashEntries = $entries | Where-Object { $_.HasTrailingSlash }
 
         return [PSCustomObject]@{
-            Source = $Source
-            TotalEntries = $entries.Count
-            UniqueEntries = $entries.Count - $duplicates.Count
-            Duplicates = $duplicates
-            NonExistent = $nonExistent
-            EmptyEntries = $emptyEntries
+            Source                   = $Source
+            TotalEntries             = $entries.Count
+            UniqueEntries            = $entries.Count - $duplicates.Count
+            Duplicates               = $duplicates
+            NonExistent              = $nonExistent
+            EmptyEntries             = $emptyEntries
             EntriesWithTrailingSlash = $trailingSlashEntries
-            AllEntries = $entries
+            AllEntries               = $entries
         }
     }
 
     $result = [PSCustomObject]@{
-        Timestamp = Get-Date
-        UserPath = $null
-        MachinePath = $null
-        ProcessPath = $null
+        Timestamp       = Get-Date
+        UserPath        = $null
+        MachinePath     = $null
+        ProcessPath     = $null
         CrossDuplicates = @()
-        Summary = $null
+        Summary         = $null
     }
+
+    # Check for native acceleration
+    $useNative = (-not $env:PCAI_DISABLE_NATIVE) -and [PcaiNative.PcaiCore]::IsAvailable
+
+    if ($useNative) {
+        Write-Verbose 'Using native PCAI core for PATH analysis'
+        $nativeJson = [PcaiNative.PcaiCore]::AnalyzePathJson()
+        if ($nativeJson) {
+            $report = $nativeJson | ConvertFrom-Json
+
+            # Helper to map native entries to PSCustomObject
+            function Map-NativeEntry($nativeEntry, $issues) {
+                $path = $nativeEntry.path
+                $source = $nativeEntry.source
+                $index = $nativeEntry.index
+
+                $issue = $issues | Where-Object { $_.path -eq $path -and $_.source -eq $source }
+
+                return [PSCustomObject]@{
+                    Index            = $index + 1 # Convert to 1-based for PS consistency
+                    OriginalValue    = $path
+                    NormalizedValue  = $path.Trim().TrimEnd('\', '/').ToLowerInvariant()
+                    ExpandedValue    = [Environment]::ExpandEnvironmentVariables($path)
+                    Exists           = ($issue -and $issue.issue_type -eq 'NonExistent') ? $false : $true
+                    HasTrailingSlash = ($issue -and $issue.issue_type -eq 'TrailingSlash')
+                    IsDuplicate      = ($issue -and ($issue.issue_type -eq 'Duplicate' -or $issue.issue_type -eq 'CrossDuplicate'))
+                    DuplicateOf      = ($issue -and $issue.duplicate_of) ? $issue.duplicate_of : $null
+                    IssueType        = $issue ? $issue.issue_type : 'None'
+                    Severity         = $issue ? $issue.severity : 'None'
+                    Description      = $issue ? $issue.description : 'OK'
+                }
+            }
+
+            # Map native report to PowerShell structure
+            $result = [PSCustomObject]@{
+                Timestamp       = Get-Date
+                UserPath        = [PSCustomObject]@{
+                    Source                   = 'User'
+                    TotalEntries             = $report.user_total_entries
+                    UniqueEntries            = $report.user_unique_entries
+                    Duplicates               = @($report.issues | Where-Object { $_.source -eq 'User' -and ($_.issue_type -eq 'Duplicate' -or $_.issue_type -eq 'CrossDuplicate') })
+                    NonExistent              = @($report.issues | Where-Object { $_.source -eq 'User' -and $_.issue_type -eq 'NonExistent' })
+                    EmptyEntries             = $report.empty_count # Shared or filtered
+                    EntriesWithTrailingSlash = @($report.issues | Where-Object { $_.source -eq 'User' -and $_.issue_type -eq 'TrailingSlash' })
+                    AllEntries               = @($report.user_entries | ForEach-Object { Map-NativeEntry $_ $report.issues })
+                }
+                MachinePath     = [PSCustomObject]@{
+                    Source                   = 'Machine'
+                    TotalEntries             = $report.machine_total_entries
+                    UniqueEntries            = $report.machine_unique_entries
+                    Duplicates               = @($report.issues | Where-Object { $_.source -eq 'Machine' -and ($_.issue_type -eq 'Duplicate' -or $_.issue_type -eq 'CrossDuplicate') })
+                    NonExistent              = @($report.issues | Where-Object { $_.source -eq 'Machine' -and $_.issue_type -eq 'NonExistent' })
+                    EmptyEntries             = $report.empty_count # Shared or filtered
+                    EntriesWithTrailingSlash = @($report.issues | Where-Object { $_.source -eq 'Machine' -and $_.issue_type -eq 'TrailingSlash' })
+                    AllEntries               = @($report.machine_entries | ForEach-Object { Map-NativeEntry $_ $report.issues })
+                }
+                ProcessPath     = $null # Native analysis focused on persistent PATH
+                CrossDuplicates = @()
+                Summary         = [PSCustomObject]@{
+                    HealthStatus         = $report.health_status
+                    TotalDuplicates      = $report.duplicate_count
+                    TotalNonExistent     = $report.non_existent_count
+                    TotalCrossDuplicates = $report.cross_duplicate_count
+                    TotalEmptyEntries    = $report.empty_count
+                    Recommendations      = $report.recommendations
+                }
+                NativeReport    = $report
+            }
+
+            # Map cross-duplicates explicitly
+            foreach ($duplicate in $report.duplicates) {
+                $hasUser = $duplicate.entries | Where-Object { $_.source -eq 'User' }
+                $hasMachine = $duplicate.entries | Where-Object { $_.source -eq 'Machine' }
+
+                if ($hasUser -and $hasMachine) {
+                    $result.CrossDuplicates += [PSCustomObject]@{
+                        Path           = $duplicate.normalized_path
+                        UserIndex      = ($hasUser | Select-Object -First 1).index + 1
+                        MachineIndex   = ($hasMachine | Select-Object -First 1).index + 1
+                        Recommendation = 'Remove from User PATH (Machine PATH takes precedence)'
+                    }
+                }
+            }
+
+            Write-CleanupLog -Message "Native PATH analysis complete: $($report.health_status) ($($report.elapsed_ms)ms)" -Level Info
+            return $result
+        }
+    }
+
+    # Fallback to PowerShell-based analysis
+    Write-Verbose 'Using PowerShell-based PATH analysis'
 
     # Analyze User PATH
     if ($Target -eq 'User' -or $Target -eq 'Both') {
@@ -184,10 +274,10 @@ function Get-PathDuplicates {
         foreach ($entry in $result.MachinePath.AllEntries) {
             if (-not $entry.IsDuplicate -and $userNormalized.ContainsKey($entry.NormalizedValue)) {
                 $result.CrossDuplicates += [PSCustomObject]@{
-                    Path = $entry.OriginalValue
+                    Path           = $entry.OriginalValue
                     NormalizedPath = $entry.NormalizedValue
-                    UserIndex = $userNormalized[$entry.NormalizedValue].Index
-                    MachineIndex = $entry.Index
+                    UserIndex      = $userNormalized[$entry.NormalizedValue].Index
+                    MachineIndex   = $entry.Index
                     Recommendation = 'Remove from User PATH (Machine PATH takes precedence)'
                 }
             }
@@ -245,12 +335,12 @@ function Get-PathDuplicates {
     }
 
     $result.Summary = [PSCustomObject]@{
-        HealthStatus = $healthStatus
-        TotalDuplicates = $totalDuplicates
-        TotalNonExistent = $totalNonExistent
+        HealthStatus         = $healthStatus
+        TotalDuplicates      = $totalDuplicates
+        TotalNonExistent     = $totalNonExistent
         TotalCrossDuplicates = $result.CrossDuplicates.Count
-        TotalEmptyEntries = $totalEmpty
-        Recommendations = $recommendations
+        TotalEmptyEntries    = $totalEmpty
+        Recommendations      = $recommendations
     }
 
     Write-CleanupLog -Message "PATH analysis complete: $healthStatus - $totalDuplicates duplicates, $totalNonExistent non-existent" -Level Info

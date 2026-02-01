@@ -10,6 +10,14 @@
 **/*.tfevents.*
 **/runs/
 
+# Vendored dependencies (CUDA kernels, etc.)
+**/vendor/
+**/candle-kernels*/
+
+# Build output logs
+cargo_output*.json
+**/cargo_output*.json
+
 # Keep documentation searchable
 !**/*.md
 !**/README*

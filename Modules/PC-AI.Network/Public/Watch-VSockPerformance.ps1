@@ -76,6 +76,12 @@ function Watch-VSockPerformance {
     $monitoringData = @()
     $startTime = Get-Date
     $endTime = if ($Duration -gt 0) { $startTime.AddSeconds($Duration) } else { $null }
+    $loopCount = 0
+    $maxIterations = $null
+    if ($Duration -gt 0) {
+        $safeInterval = [math]::Max($RefreshInterval, 1)
+        $maxIterations = [math]::Ceiling($Duration / $safeInterval) + 1
+    }
 
     # Previous statistics for delta calculation
     $previousStats = @{}
@@ -94,6 +100,16 @@ function Watch-VSockPerformance {
         Write-Host ""
     }
 
+    $canUseCursor = $false
+    if (-not $Quiet -and $Host -and $Host.UI -and $Host.UI.RawUI) {
+        try {
+            $null = $Host.UI.RawUI.CursorPosition
+            $canUseCursor = ($Host.Name -eq 'ConsoleHost')
+        } catch {
+            $canUseCursor = $false
+        }
+    }
+
     # Get TCP global parameters once
     $tcpGlobal = $null
     try {
@@ -103,15 +119,8 @@ function Watch-VSockPerformance {
 
     try {
         while ($true) {
+            $loopCount++
             $currentTime = Get-Date
-
-            # Check duration limit
-            if ($endTime -and $currentTime -ge $endTime) {
-                if (-not $Quiet) {
-                    Write-Host "`n[*] Monitoring duration completed" -ForegroundColor Yellow
-                }
-                break
-            }
 
             # Get adapters
             $adapters = Get-NetAdapter | Where-Object {
@@ -199,18 +208,24 @@ function Watch-VSockPerformance {
 
             # Display output
             if (-not $Quiet -and $interfaceMetrics.Count -gt 0) {
-                # Move cursor to top (after header)
-                $cursorPos = $Host.UI.RawUI.CursorPosition
-                $cursorPos.Y = 8
-                $Host.UI.RawUI.CursorPosition = $cursorPos
+                if ($canUseCursor) {
+                    try {
+                        # Move cursor to top (after header)
+                        $cursorPos = $Host.UI.RawUI.CursorPosition
+                        $cursorPos.Y = 8
+                        $Host.UI.RawUI.CursorPosition = $cursorPos
 
-                # Clear previous content
-                for ($i = 0; $i -lt 30; $i++) {
-                    Write-Host (' ' * 100)
+                        # Clear previous content
+                        for ($i = 0; $i -lt 30; $i++) {
+                            Write-Host (' ' * 100)
+                        }
+
+                        $cursorPos.Y = 8
+                        $Host.UI.RawUI.CursorPosition = $cursorPos
+                    } catch {
+                        $canUseCursor = $false
+                    }
                 }
-
-                $cursorPos.Y = 8
-                $Host.UI.RawUI.CursorPosition = $cursorPos
 
                 # Display interface metrics
                 Write-Host "Network Interface Performance" -ForegroundColor Yellow
@@ -243,6 +258,20 @@ function Watch-VSockPerformance {
                 $elapsed = ($currentTime - $startTime).TotalSeconds
                 Write-Host ""
                 Write-Host ("Elapsed: {0:N0}s | Last Update: {1}" -f $elapsed, $currentTime.ToString('HH:mm:ss')) -ForegroundColor Gray
+            }
+
+            # Check duration limit after collecting a sample
+            if ($endTime -and $currentTime -ge $endTime) {
+                if (-not $Quiet) {
+                    Write-Host "`n[*] Monitoring duration completed" -ForegroundColor Yellow
+                }
+                break
+            }
+            if ($maxIterations -and $loopCount -ge $maxIterations) {
+                if (-not $Quiet) {
+                    Write-Host "`n[*] Monitoring iteration limit reached" -ForegroundColor Yellow
+                }
+                break
             }
 
             # Sleep for interval

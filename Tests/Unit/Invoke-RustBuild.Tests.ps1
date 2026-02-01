@@ -1,5 +1,12 @@
 #Requires -Modules Pester
 
+if (-not (Get-Variable -Name CargoAvailable -Scope Script -ErrorAction SilentlyContinue)) {
+    $script:CargoAvailable = $false
+}
+if (-not (Get-Variable -Name CargoVersionOutput -Scope Script -ErrorAction SilentlyContinue)) {
+    $script:CargoVersionOutput = $null
+}
+
 Describe 'Invoke-RustBuild' {
     BeforeAll {
         $script:RustBuildPath = Join-Path $PSScriptRoot '..\..\Tools\Invoke-RustBuild.ps1'

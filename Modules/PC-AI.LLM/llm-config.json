@@ -1,18 +1,18 @@
 ﻿{
+  "DefaultTimeout": 120,
+  "RouterModel": "functiongemma-270m-it",
   "ProviderOrder": [
     "pcai-inference",
     "pcai-native"
   ],
-  "DefaultTimeout": 120,
-  "ProjectConfigPath": "C:\\Users\\david\\PC_AI\\Config\\llm-config.json",
-  "DefaultModel": "pcai-inference",
-  "PcaiInferenceApiUrl": "http://127.0.0.1:8080",
-  "ConfigPath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\llm-config.json",
-  "VLLMApiUrl": "http://127.0.0.1:8000",
-  "OllamaApiUrl": "http://127.0.0.1:8080",
-  "RouterModel": "functiongemma-270m-it",
-  "OllamaPath": "",
-  "LMStudioApiUrl": "http://localhost:1234",
   "RouterApiUrl": "http://127.0.0.1:8000",
-  "VLLMModel": "functiongemma-270m-it"
+  "VLLMModel": "functiongemma-270m-it",
+  "OllamaPath": "",
+  "DefaultModel": "pcai-inference",
+  "ProjectConfigPath": "C:\\Users\\david\\PC_AI\\Config\\llm-config.json",
+  "OllamaApiUrl": "http://127.0.0.1:8080",
+  "LMStudioApiUrl": "http://localhost:1234",
+  "ConfigPath": "C:\\Users\\david\\PC_AI\\Modules\\PC-AI.LLM\\llm-config.json",
+  "PcaiInferenceApiUrl": "http://127.0.0.1:8080",
+  "VLLMApiUrl": "http://127.0.0.1:8000"
 }

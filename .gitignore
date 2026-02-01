@@ -64,6 +64,15 @@ target/
 **/*.rs.bk
 Cargo.lock
 
+# Rust build output logs (JSON structured output)
+cargo_output*.json
+**/cargo_output*.json
+**/cargo_stdout.json
+
+# Vendored CUDA/GPU kernels (use GitHub Releases for precompiled binaries)
+**/vendor/
+!**/vendor/.gitkeep
+
 # Sccache
 .sccache/
 
@@ -147,3 +156,14 @@ fix_ps_files*.py
 usb_deep.json
 testResults.xml
 nul
+
+# GitHub Releases artifacts (precompiled CUDA binaries distributed separately)
+# These are built by CI and uploaded to GitHub Releases
+releases/
+*.release.zip
+*.release.tar.gz
+
+# CUDA compilation outputs (use GitHub Releases instead)
+**/*.cubin
+**/*.fatbin
+**/*.ptx

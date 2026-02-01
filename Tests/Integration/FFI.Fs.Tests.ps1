@@ -3,10 +3,10 @@
 
 <#
 .SYNOPSIS
-    FFI integration tests for PCAI Filesystem native library.
+    FFI integration tests for PCAI Filesystem native exports in pcai_core_lib.
 
 .DESCRIPTION
-    Tests the Rust pcai_fs DLL loading and C# FsModule wrapper functionality including:
+    Tests the Rust pcai_core_lib DLL loading and C# FsModule wrapper functionality including:
     1. File deletion operations
     2. Directory deletion with recursive option
     3. Text replacement in files
@@ -45,8 +45,8 @@ Describe "PCAI Filesystem Module - Phase 2" -Tag "FFI", "Fs", "Phase2" {
 
     Context "Build Artifacts" {
 
-        It "pcai_fs crate exists" {
-            Test-Path (Join-Path $NativeDir "pcai_core\pcai_fs") | Should -Be $true
+        It "pcai_core fs module exists" {
+            Test-Path (Join-Path $NativeDir "pcai_core\pcai_core_lib\src\fs\mod.rs") | Should -Be $true
         }
 
         It "FsModule.cs exists" {
@@ -62,7 +62,7 @@ Describe "PCAI Filesystem Module - Phase 2" -Tag "FFI", "Fs", "Phase2" {
 
         BeforeAll {
             # Build if DLL doesn't exist
-            if (-not (Test-DllExists "pcai_fs.dll")) {
+            if (-not (Test-DllExists "pcai_core_lib.dll")) {
                 Write-Host "Building native modules..." -ForegroundColor Yellow
                 Push-Location $NativeDir
                 try {
@@ -90,17 +90,17 @@ Describe "PCAI Filesystem Module - Phase 2" -Tag "FFI", "Fs", "Phase2" {
             }
         }
 
-        It "pcai_fs.dll exists after build" {
+        It "pcai_core_lib.dll exists after build" {
             if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
                 Set-ItResult -Skipped -Because "Rust toolchain not installed"
             }
 
-            $dllPath = Get-DllPath "pcai_fs.dll"
+            $dllPath = Get-DllPath "pcai_core_lib.dll"
             if (Test-Path $dllPath) {
                 $true | Should -Be $true
             }
             else {
-                Set-ItResult -Skipped -Because "pcai_fs.dll not built (run .\Native\build.ps1 first)"
+                Set-ItResult -Skipped -Because "pcai_core_lib.dll not built (run .\Native\build.ps1 first)"
             }
         }
 

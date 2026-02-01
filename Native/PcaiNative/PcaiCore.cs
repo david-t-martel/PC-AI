@@ -140,10 +140,7 @@ public static class PcaiCore
     /// </summary>
     public static string? FindFiles(string rootPath, string pattern, ulong maxResults = 0)
     {
-        if (!IsAvailable) return null;
-        var buffer = NativeCore.pcai_find_files(rootPath, pattern, maxResults);
-        try { return buffer.ToManagedString(); }
-        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+        return PcaiSearch.FindFilesJson(rootPath, pattern, (uint)maxResults);
     }
 
     /// <summary>
@@ -151,10 +148,7 @@ public static class PcaiCore
     /// </summary>
     public static string? SearchContent(string rootPath, string pattern, string? filePattern = null, ulong maxResults = 0, uint contextLines = 0)
     {
-        if (!IsAvailable) return null;
-        var buffer = NativeCore.pcai_search_content(rootPath, pattern, filePattern, maxResults, contextLines);
-        try { return buffer.ToManagedString(); }
-        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+        return PcaiSearch.SearchContentJson(rootPath, pattern, filePattern, (uint)maxResults, contextLines);
     }
 
     /// <summary>
@@ -162,10 +156,7 @@ public static class PcaiCore
     /// </summary>
     public static string? FindDuplicates(string rootPath, ulong minSize = 0, string? includePattern = null, string? excludePattern = null)
     {
-        if (!IsAvailable) return null;
-        var buffer = NativeCore.pcai_find_duplicates(rootPath, minSize, includePattern, excludePattern);
-        try { return buffer.ToManagedString(); }
-        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+        return PcaiSearch.FindDuplicatesJson(rootPath, minSize, includePattern, excludePattern);
     }
 
     /// <summary>
@@ -173,10 +164,23 @@ public static class PcaiCore
     /// </summary>
     public static string? QuerySystemInfo()
     {
-        if (!IsAvailable) return null;
-        var buffer = NativeCore.pcai_query_system_info();
-        try { return buffer.ToManagedString(); }
-        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+        return SystemModule.QuerySystemInfo();
+    }
+
+    /// <summary>
+    /// Analyzes the system PATH environment variable natively for issues.
+    /// </summary>
+    public static PathAnalysisStats AnalyzePath()
+    {
+        return SystemModule.AnalyzePath();
+    }
+
+    /// <summary>
+    /// Analyzes the system PATH environment variable and returns a detailed JSON report.
+    /// </summary>
+    public static string? AnalyzePathJson()
+    {
+        return SystemModule.AnalyzePathJson();
     }
 
     /// <summary>
@@ -195,10 +199,7 @@ public static class PcaiCore
     /// </summary>
     public static string? QueryHardwareMetrics()
     {
-        if (!IsAvailable) return null;
-        var buffer = NativeCore.pcai_query_hardware_metrics();
-        try { return buffer.ToManagedString(); }
-        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+        return PerformanceModule.QueryHardwareMetrics();
     }
 
     /// <summary>
@@ -215,8 +216,7 @@ public static class PcaiCore
     /// </summary>
     public static bool CheckResourceSafety(float gpuLimit = 0.8f)
     {
-        if (!IsAvailable) return true; // Fail safe if lib unavailable
-        return NativeCore.pcai_check_resource_safety(gpuLimit) != 0;
+        return PerformanceModule.CheckResourceSafety(gpuLimit);
     }
 
     /// <summary>
@@ -224,11 +224,7 @@ public static class PcaiCore
     /// </summary>
     public static string? GetSystemTelemetryJson()
     {
-        if (!IsAvailable) return null;
-        var ptr = NativeCore.pcai_get_system_telemetry_json();
-        if (ptr == IntPtr.Zero) return null;
-        try { return Marshal.PtrToStringUTF8(ptr); }
-        finally { NativeCore.pcai_free_string(ptr); }
+        return SystemModule.GetSystemTelemetryJson();
     }
 
     /// <summary>
@@ -236,11 +232,7 @@ public static class PcaiCore
     /// </summary>
     public static string? GetVmmHealthJson()
     {
-        if (!IsAvailable) return null;
-        var ptr = NativeCore.pcai_get_vmm_health_json();
-        if (ptr == IntPtr.Zero) return null;
-        try { return Marshal.PtrToStringUTF8(ptr); }
-        finally { NativeCore.pcai_free_string(ptr); }
+        return SystemModule.GetVmmHealthJson();
     }
 
     /// <summary>
@@ -368,11 +360,7 @@ public static class PcaiCore
     /// </summary>
     public static string? GetNetworkThroughput()
     {
-        if (!IsAvailable) return null;
-        var ptr = NativeCore.pcai_get_network_throughput_json();
-        if (ptr == IntPtr.Zero) return null;
-        try { return Marshal.PtrToStringUTF8(ptr); }
-        finally { NativeCore.pcai_free_string(ptr); }
+        return PerformanceModule.GetNetworkThroughput();
     }
 
     /// <summary>
@@ -380,11 +368,7 @@ public static class PcaiCore
     /// </summary>
     public static string? GetProcessHistory()
     {
-        if (!IsAvailable) return null;
-        var ptr = NativeCore.pcai_get_process_history_json();
-        if (ptr == IntPtr.Zero) return null;
-        try { return Marshal.PtrToStringUTF8(ptr); }
-        finally { NativeCore.pcai_free_string(ptr); }
+        return PerformanceModule.GetProcessHistory();
     }
 
     /// <summary>
@@ -438,15 +422,9 @@ public static class PcaiCore
     /// <summary>
     /// Gets disk usage statistics as JSON with detailed breakdown.
     /// </summary>
-    /// <param name="rootPath">Path to analyze.</param>
-    /// <param name="topN">Number of top subdirectories to include.</param>
-    /// <returns>JSON string with usage details, or null on error.</returns>
     public static string? GetDiskUsageJson(string? rootPath = null, uint topN = 10)
     {
-        if (!IsAvailable) return null;
-        var buffer = NativeCore.pcai_get_disk_usage_json(rootPath, topN);
-        try { return buffer.ToManagedString(); }
-        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+        return FsModule.GetDiskUsageJson(rootPath ?? ".", (int)topN);
     }
 
     /// <summary>

@@ -420,15 +420,34 @@ public static class PcaiSearch
     /// <summary>
     /// Gets diagnostic information about the search module.
     /// </summary>
-    public static SearchDiagnostics GetDiagnostics()
+    public static string GetDiagnostics()
     {
-        return new SearchDiagnostics
-        {
-            IsAvailable = IsAvailable,
-            Version = Version,
-            CoreAvailable = PcaiCore.IsAvailable,
-            CoreVersion = PcaiCore.Version
-        };
+        if (!IsAvailable) return "Search module not available.";
+        return $"Search Module: Functional, Root: {NativeCore.pcai_fs_version()}";
+    }
+
+    public static string? FindFilesJson(string? rootPath, string pattern, uint maxResults = 0)
+    {
+        if (!IsAvailable) return null;
+        var buffer = NativeCore.pcai_find_files(rootPath, pattern, maxResults);
+        try { return buffer.ToManagedString(); }
+        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+    }
+
+    public static string? SearchContentJson(string? rootPath, string pattern, string? filePattern = null, uint maxResults = 0, uint contextLines = 0)
+    {
+        if (!IsAvailable) return null;
+        var buffer = NativeCore.pcai_search_content(rootPath, pattern, filePattern, maxResults, contextLines);
+        try { return buffer.ToManagedString(); }
+        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
+    }
+
+    public static string? FindDuplicatesJson(string? rootPath, ulong minSize = 0, string? includePattern = null, string? excludePattern = null)
+    {
+        if (!IsAvailable) return null;
+        var buffer = NativeCore.pcai_find_duplicates(rootPath, minSize, includePattern, excludePattern);
+        try { return buffer.ToManagedString(); }
+        finally { NativeCore.pcai_free_string_buffer(ref buffer); }
     }
 }
 

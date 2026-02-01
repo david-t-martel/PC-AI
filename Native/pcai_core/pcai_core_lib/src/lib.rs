@@ -24,8 +24,8 @@ pub mod vmm_health;
 pub mod prompt_engine;
 pub mod performance;
 pub mod fs;
-// Temporarily disabled due to CUDA build issues - TODO: make CUDA optional
-// pub mod functiongemma;
+#[cfg(feature = "functiongemma")]
+pub mod functiongemma;
 
 pub use error::PcaiStatus;
 pub use json::{extract_json_from_markdown, pcai_extract_json, pcai_is_valid_json};
@@ -147,6 +147,39 @@ pub extern "C" fn pcai_get_usb_deep_diagnostics_json() -> *mut c_char {
 }
 
 #[no_mangle]
+pub extern "C" fn pcai_get_pnp_devices_json(class_filter: *const c_char) -> *mut c_char {
+    let filter = if class_filter.is_null() {
+        None
+    } else {
+        unsafe { CStr::from_ptr(class_filter).to_str().ok() }
+    };
+
+    let devices = telemetry::pnp::collect_pnp_devices(filter);
+    match serde_json::to_string(&devices) {
+        Ok(json) => rust_str_to_c(&json),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_get_disk_health_json() -> *mut c_char {
+    let health = telemetry::disk_health::collect_disk_health();
+    match serde_json::to_string(&health) {
+        Ok(json) => rust_str_to_c(&json),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_sample_hardware_events_json(days: u32, max_events: u32) -> *mut c_char {
+    let events = telemetry::event_log::sample_hardware_events(days, max_events);
+    match serde_json::to_string(&events) {
+        Ok(json) => rust_str_to_c(&json),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn pcai_get_network_throughput_json() -> *mut c_char {
     let interfaces = telemetry::network::collect_network_diagnostics();
     match serde_json::to_string(&interfaces) {
@@ -174,7 +207,12 @@ pub extern "C" fn pcai_query_prompt_assembly(
 
 #[no_mangle]
 pub extern "C" fn pcai_get_usb_problem_info(code: u32) -> *mut c_char {
-    match telemetry::usb_codes::get_problem_info(code) {
+    pcai_get_pnp_problem_info(code)
+}
+
+#[no_mangle]
+pub extern "C" fn pcai_get_pnp_problem_info(code: u32) -> *mut c_char {
+    match telemetry::device_codes::get_problem_info(code) {
         Some(info) => {
             let json = serde_json::json!({
                 "code": info.code,

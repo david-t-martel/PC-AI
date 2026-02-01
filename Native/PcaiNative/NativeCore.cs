@@ -119,6 +119,18 @@ internal static partial class NativeCore
     internal static extern IntPtr pcai_get_usb_deep_diagnostics_json();
 
     [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern IntPtr pcai_get_pnp_devices_json([MarshalAs(UnmanagedType.LPUTF8Str)] string? classFilter);
+
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern IntPtr pcai_get_pnp_problem_info(uint code);
+
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern IntPtr pcai_get_disk_health_json();
+
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern IntPtr pcai_sample_hardware_events_json(uint days, uint maxEvents);
+
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
     internal static extern IntPtr pcai_get_network_throughput_json();
 
     [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
@@ -126,6 +138,34 @@ internal static partial class NativeCore
 
     [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
     internal static extern IntPtr pcai_get_usb_problem_info(uint code);
+
+    // ========================================================================
+    // System Analysis
+    // ========================================================================
+
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern PathAnalysisStats pcai_analyze_path();
+
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern PcaiStringBuffer pcai_analyze_path_json();
+
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern LogSearchStats pcai_search_logs(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? pattern,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? filePattern,
+        [MarshalAs(UnmanagedType.U1)] bool caseSensitive,
+        uint contextLines,
+        uint maxMatches);
+
+    [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern PcaiStringBuffer pcai_search_logs_json(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? pattern,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string? filePattern,
+        [MarshalAs(UnmanagedType.U1)] bool caseSensitive,
+        uint contextLines,
+        uint maxMatches);
 
     // ========================================================================
     // Performance Monitoring
@@ -156,32 +196,33 @@ internal static partial class NativeCore
     internal static extern PcaiStringBuffer pcai_get_memory_stats_json();
 
     // ========================================================================
-    // System Analysis
+    // Filesystem Operations
     // ========================================================================
 
     [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern PathAnalysisStats pcai_analyze_path();
+    internal static extern uint pcai_fs_version();
 
     [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern PcaiStringBuffer pcai_analyze_path_json();
+    internal static extern PcaiStatus pcai_replace_in_file(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string filePath,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string pattern,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string replacement,
+        [MarshalAs(UnmanagedType.U1)] bool isRegex,
+        [MarshalAs(UnmanagedType.U1)] bool backup);
 
     [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern LogSearchStats pcai_search_logs(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? pattern,
+    internal static extern PcaiStringBuffer pcai_replace_in_files(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string rootPath,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string? filePattern,
-        [MarshalAs(UnmanagedType.U1)] bool caseSensitive,
-        uint contextLines,
-        uint maxMatches);
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string contentPattern,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string replacement,
+        [MarshalAs(UnmanagedType.U1)] bool isRegex,
+        [MarshalAs(UnmanagedType.U1)] bool backup);
 
     [DllImport(CoreDll, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern PcaiStringBuffer pcai_search_logs_json(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? rootPath,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? pattern,
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string? filePattern,
-        [MarshalAs(UnmanagedType.U1)] bool caseSensitive,
-        uint contextLines,
-        uint maxMatches);
+    internal static extern PcaiStatus pcai_delete_fs_item(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
+        [MarshalAs(UnmanagedType.U1)] bool recursive);
 
     // ========================================================================
     // Prompt & LLM Ops

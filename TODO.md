@@ -16,6 +16,7 @@
   - Native disk usage + top process listing wired in Acceleration module
 - [ ] Define a versioned C ABI contract for all Rust DLL exports (error codes, result structs, memory ownership)
 - [ ] Create a unified C# service layer that exposes Rust capabilities to PowerShell and TUI
+- [x] Consolidate pcai_fs exports into pcai_core_lib and route FsModule to the core DLL
 - [ ] Standardize JSON schemas for native outputs (shared schema folder + version pinning)
 - [x] Add a capability registry (DLL presence, feature flags, CPU/GPU support) surfaced to PowerShell UI
 - [ ] Centralize error translation (Rust error -> C# status -> PowerShell error record)

@@ -42,10 +42,9 @@ function Initialize-PcaiNative {
 
     # Find DLL locations
     $searchPaths = @(
-        (Join-Path $PSScriptRoot '..\..\..\bin')                    # PC_AI\bin
-        (Join-Path $PSScriptRoot '..\..\..\..\Native\bin')          # Native\bin relative
-        (Join-Path $env:USERPROFILE 'PC_AI\bin')                     # User bin
-        "$env:USERPROFILE\bin"                                       # General user bin
+        (Join-Path $PSScriptRoot '..\..\..\bin')                               # PC_AI\bin
+        (Join-Path $PSScriptRoot '..\..\..\Native\pcai_core\target\release')    # Native workspace target
+        (Join-Path $env:USERPROFILE 'PC_AI\bin')                               # User bin
     )
 
     $dllPath = $null
@@ -100,7 +99,7 @@ function Initialize-PcaiNative {
             $script:PcaiNativeVersion = [PcaiNative.PcaiCore]::Version
             Write-Verbose "PCAI System version: $($script:PcaiNativeVersion)"
 
-            Write-Verbose "PCAI Core loaded and functional"
+            Write-Verbose 'PCAI Core loaded and functional'
 
             $script:PcaiNativeLoaded = $true
             return $true
@@ -169,23 +168,19 @@ function Get-PcaiNativeStatus {
     $dlls = $null
     if ($dllPath) {
         $dlls = [PSCustomObject]@{
-            PcaiNative     = (Test-Path (Join-Path $dllPath 'PcaiNative.dll'))
-            CoreLib        = (Test-Path (Join-Path $dllPath 'pcai_core_lib.dll'))
-            Fs             = (Test-Path (Join-Path $dllPath 'pcai_fs.dll'))
-            Performance    = (Test-Path (Join-Path $dllPath 'pcai_performance.dll'))
-            Search         = (Test-Path (Join-Path $dllPath 'pcai_search.dll'))
-            System         = (Test-Path (Join-Path $dllPath 'pcai_system.dll'))
-            Inference      = (Test-Path (Join-Path $dllPath 'pcai_inference.dll'))
+            PcaiNative = (Test-Path (Join-Path $dllPath 'PcaiNative.dll'))
+            CoreLib    = (Test-Path (Join-Path $dllPath 'pcai_core_lib.dll'))
+            Inference  = (Test-Path (Join-Path $dllPath 'pcai_inference.dll'))
         }
     }
 
     [PSCustomObject]@{
-        Available       = $available
-        Version         = $script:PcaiNativeVersion
-        DllPath         = $dllPath
-        CoreAvailable   = $coreAvailable
-        CpuCount        = if ($coreAvailable) { [PcaiNative.PcaiCore]::CpuCount } else { [uint32][Environment]::ProcessorCount }
-        Modules         = if ($available) {
+        Available     = $available
+        Version       = $script:PcaiNativeVersion
+        DllPath       = $dllPath
+        CoreAvailable = $coreAvailable
+        CpuCount      = if ($coreAvailable) { [PcaiNative.PcaiCore]::CpuCount } else { [uint32][Environment]::ProcessorCount }
+        Modules       = if ($available) {
             [PSCustomObject]@{
                 Core        = $coreAvailable
                 Search      = $searchAvailable
@@ -194,7 +189,7 @@ function Get-PcaiNativeStatus {
                 Fs          = $fsAvailable
             }
         } else { $null }
-        Dlls            = $dlls
+        Dlls          = $dlls
     }
 }
 
@@ -229,13 +224,11 @@ function Invoke-PcaiNativeDuplicates {
     $resolvedPath = Resolve-Path $Path | Select-Object -ExpandProperty Path
 
     if ($StatsOnly) {
-        throw "StatsOnly not supported in consolidated NativeDuplicate implementation"
+        throw 'StatsOnly not supported in consolidated NativeDuplicate implementation'
     }
 
-    $json = [PcaiNative.PcaiCore]::FindDuplicates($resolvedPath, [uint64]$MinimumSize)
-    if ($json) {
-        return ($json | ConvertFrom-Json)
-    }
+    $result = [PcaiNative.PcaiSearch]::FindDuplicates($resolvedPath, [uint64]$MinimumSize, $IncludePattern, $ExcludePattern)
+    return $result
     return $null
 }
 
@@ -270,13 +263,11 @@ function Invoke-PcaiNativeFileSearch {
     }
 
     if ($StatsOnly) {
-        throw "StatsOnly not supported in consolidated NativeFileSearch implementation"
+        throw 'StatsOnly not supported in consolidated NativeFileSearch implementation'
     }
 
-    $json = [PcaiNative.PcaiCore]::FindFiles($resolvedPath, $Pattern, [uint32]$MaxResults)
-    if ($json) {
-        return ($json | ConvertFrom-Json)
-    }
+    $result = [PcaiNative.PcaiSearch]::FindFiles($Pattern, $resolvedPath, [uint32]$MaxResults)
+    return $result
     return $null
 }
 
@@ -317,13 +308,11 @@ function Invoke-PcaiNativeContentSearch {
     }
 
     if ($StatsOnly) {
-        throw "StatsOnly not supported in consolidated NativeContentSearch implementation"
+        throw 'StatsOnly not supported in consolidated NativeContentSearch implementation'
     }
 
-    $json = [PcaiNative.PcaiCore]::SearchContent($resolvedPath, $Pattern, $FilePattern, [uint32]$MaxResults, [uint32]$ContextLines)
-    if ($json) {
-        return ($json | ConvertFrom-Json)
-    }
+    $result = [PcaiNative.PcaiSearch]::SearchContent($Pattern, $resolvedPath, $FilePattern, [uint32]$MaxResults, [uint32]$ContextLines)
+    return $result
     return $null
 }
 
@@ -343,21 +332,12 @@ function Invoke-PcaiNativeSystemInfo {
 
     if (-not (Test-PcaiNativeAvailable)) { return $null }
 
-    if ($HighFidelity) {
-        $json = [PcaiNative.PcaiCore]::GetSystemTelemetryJson()
-        if ($json) { return ($json | ConvertFrom-Json) }
-        return $null
-    }
-
-    $json = if ($MetricsOnly) {
-        [PcaiNative.PcaiCore]::QueryHardwareMetrics()
+    $result = if ($MetricsOnly) {
+        [PcaiNative.PerformanceModule]::QueryHardwareMetrics()
     } else {
-        [PcaiNative.PcaiCore]::QuerySystemInfo()
+        [PcaiNative.SystemModule]::QuerySystemInfo()
     }
-
-    if ($json) {
-        return ($json | ConvertFrom-Json)
-    }
+    return $result
     return $null
 }
 

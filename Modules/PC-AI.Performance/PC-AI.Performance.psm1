@@ -12,6 +12,24 @@
     - System memory statistics
 #>
 
+# Module variables
+$script:ModuleRoot = $PSScriptRoot
+
+# Import private functions
+$privatePath = Join-Path $PSScriptRoot 'Private'
+if (Test-Path $privatePath) {
+    Get-ChildItem -Path $privatePath -Filter '*.ps1' | ForEach-Object {
+        . $_.FullName
+    }
+}
+
+# Import public functions
+$publicPath = Join-Path $PSScriptRoot 'Public'
+if (Test-Path $publicPath) {
+    Get-ChildItem -Path $publicPath -Filter '*.ps1' | ForEach-Object {
+        . $_.FullName
+    }
+}
 
 function Get-PcaiDiskUsage {
     <#
@@ -93,4 +111,13 @@ function Test-PcaiNative {
     return [PcaiNative.PerformanceModule]::Test()
 }
 
-Export-ModuleMember -Function Get-PcaiDiskUsage, Get-PcaiTopProcess, Get-PcaiMemoryStat, Test-PcaiNative
+Export-ModuleMember -Function @(
+    'Get-DiskSpace',
+    'Get-ProcessPerformance',
+    'Watch-SystemResources',
+    'Optimize-Disks',
+    'Get-PcaiDiskUsage',
+    'Get-PcaiTopProcess',
+    'Get-PcaiMemoryStat',
+    'Test-PcaiNative'
+)

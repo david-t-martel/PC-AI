@@ -55,7 +55,7 @@ namespace PcaiNative
     }
 
     /// <summary>
-    /// P/Invoke declarations for pcai_system.dll.
+    /// P/Invoke declarations for pcai_core_lib.dll (consolidated from system module).
     /// Provides PATH environment analysis and log file searching.
     /// </summary>
     public static class SystemModule
@@ -208,7 +208,62 @@ namespace PcaiNative
         /// <returns>True if the magic number matches.</returns>
         public static bool Test()
         {
-            return NativeCore.pcai_core_test() == ExpectedMagic;
+            if (!IsAvailable) return false;
+            return NativeCore.pcai_core_test() == 0x50434149; // "PCAI"
+        }
+
+        /// <summary>
+        /// Gets high-fidelity system telemetry as JSON using native core.
+        /// </summary>
+        public static string? GetSystemTelemetryJson()
+        {
+            if (!IsAvailable) return null;
+            var ptr = NativeCore.pcai_get_system_telemetry_json();
+            if (ptr == IntPtr.Zero) return null;
+            try
+            {
+                return Marshal.PtrToStringUTF8(ptr);
+            }
+            finally
+            {
+                NativeCore.pcai_free_string(ptr);
+            }
+        }
+
+        /// <summary>
+        /// Gets WSL/VMM health status using direct native socket interrogation.
+        /// </summary>
+        public static string? GetVmmHealthJson()
+        {
+            if (!IsAvailable) return null;
+            var ptr = NativeCore.pcai_get_vmm_health_json();
+            if (ptr == IntPtr.Zero) return null;
+            try
+            {
+                return Marshal.PtrToStringUTF8(ptr);
+            }
+            finally
+            {
+                NativeCore.pcai_free_string(ptr);
+            }
+        }
+
+        /// <summary>
+        /// Queries comprehensive system information natively.
+        /// </summary>
+        public static string? QuerySystemInfo()
+        {
+            if (!IsAvailable) return null;
+
+            var buffer = NativeCore.pcai_query_system_info();
+            try
+            {
+                return buffer.ToManagedString();
+            }
+            finally
+            {
+                NativeCore.pcai_free_string_buffer(ref buffer);
+            }
         }
 
         /// <summary>

@@ -1,11 +1,11 @@
 # API_SIGNATURE_REPORT
 
-Generated: 2026-01-31 00:58:19
+Generated: 2026-01-31 03:27:23
 
 PowerShell functions: 118
-Missing help blocks: 64
+Missing help blocks: 60
 C# DllImports: 42
-Missing Rust exports: 6
+Missing Rust exports: 0
 
 ## Missing help parameters
 - Compare-ToolPerformance: missing Detailed
@@ -19,7 +19,6 @@ Missing Rust exports: 6
 - Find-WithFd: missing Path, Pattern, Extension, Type, MaxDepth, Hidden, Exclude, FullPath, FdPath
 - Find-WithGetChildItem: missing Path, Pattern, Extension, Type, MaxDepth, Hidden, Exclude, FullPath
 - Get-DiskUsageFast: missing ThrottleLimit
-- Get-DiskUsageWithNative: missing Path, Top
 - Convert-SizeToBytes: missing Size
 - Get-DiskUsageWithDust: missing Path, Depth, DustPath
 - Get-DiskUsageParallel: missing Path, Depth, ThrottleLimit
@@ -28,7 +27,6 @@ Missing Rust exports: 6
 - Select-TopResults: missing InputObject, Top
 - Get-FileHashParallel: missing MinimumSize, MaximumSize
 - Get-ProcessesFast: missing RawOutput
-- Get-ProcessesWithNative: missing Top, SortBy
 - Get-ProcessesWithProcs: missing Name, SortBy, Top, Tree, Watch, RawOutput, ProcsPath
 - Get-ProcessesParallel: missing Name, SortBy, Top, Tree, Watch, RawOutput
 - Get-AcceleratedFunction: missing Tool
@@ -37,11 +35,9 @@ Missing Rust exports: 6
 - Measure-WithHyperfine: missing Command, Iterations, Warmup, Name, Shell, HyperfinePath
 - Measure-WithNative: missing Command, Iterations, Warmup, Name
 - Search-ContentFast: missing CaseSensitive, MaxResults, FilesOnly, ThrottleLimit
-- Search-WithPcaiNativeContent: missing Path, Pattern, LiteralPattern, FilePattern, Context, CaseSensitive, WholeWord, Invert, MaxResults, FilesOnly, ThrottleLimit, SearchPattern
 - Search-WithRipgrepAdvanced: missing Path, Pattern, LiteralPattern, FilePattern, Context, CaseSensitive, WholeWord, Invert, MaxResults, FilesOnly, ThrottleLimit, SearchPattern, RgPath
 - Search-WithParallelSelectString: missing Path, Pattern, LiteralPattern, FilePattern, Context, CaseSensitive, WholeWord, Invert, MaxResults, FilesOnly, ThrottleLimit, SearchPattern
 - Search-LogsFast: missing CountOnly
-- Search-WithPcaiNativeLogs: missing Path, Pattern, Include, Context, CaseSensitive, MaxCount, CountOnly
 - Search-WithRipgrep: missing Path, Pattern, Include, Context, CaseSensitive, MaxCount, CountOnly, RgPath
 - Search-WithSelectString: missing Path, Pattern, Include, Context, CaseSensitive, MaxCount, CountOnly
 - Clear-TempFiles: missing Target, OlderThanDays, IncludePrefetch, IncludeWindowsUpdate, Force
@@ -90,7 +86,7 @@ Missing Rust exports: 6
 - Invoke-PcaiServiceHost: missing HostPath
 - Start-RustInferenceServer: missing Port, ModelPath, GpuLayers, ServerArgs, NoWait
 - Start-CSharpServiceHost: missing HostPath, ServerArgs, NoWait
-- Invoke-WSLDockerHealthCheck: missing ScriptPath, AutoRecover, Verbose, Quick
+- Invoke-WSLDockerHealthCheck: missing ScriptPath, AutoRecover, Quick
 - Invoke-WSLNetworkToolkit: missing Mode, Optimize, ApplyConfig, TestNetworkingMode, NetworkingMode, FixDns, RestartWsl, ResetAdapters, ResetWinsock, RestartHns, RestartWslService, DisableVmqOnWsl, Force
 - Register-HVSockServices: missing ConfigPath, Force
 - Set-PCaiServiceState: missing Name, Action
@@ -99,16 +95,5 @@ Missing Rust exports: 6
 
 ## Extra help parameters
 - Search-ContentFast: extra IgnoreCase
-
-## Missing Rust exports for C# DllImports
-- pcai_delete_fs_item
-- pcai_get_disk_usage
-- pcai_get_disk_usage_json
-- pcai_get_top_processes_json
-- pcai_replace_in_file
-- pcai_replace_in_files
-
-## Missing C# methods referenced by PowerShell
-- CpuCount
 
 

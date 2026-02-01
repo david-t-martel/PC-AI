@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -28,40 +27,6 @@ namespace PcaiNative
         public ulong ElapsedMs { get; set; }
     }
 
-    // ============================================================================
-    // P/Invoke
-    // ============================================================================
-
-    internal static partial class NativeFs
-    {
-        private const string DllName = "pcai_fs.dll";
-
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern uint pcai_fs_version();
-
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern PcaiStatus pcai_replace_in_file(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string filePath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string pattern,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string replacement,
-            [MarshalAs(UnmanagedType.U1)] bool isRegex,
-            [MarshalAs(UnmanagedType.U1)] bool backup);
-
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern PcaiStringBuffer pcai_replace_in_files(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string rootPath,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string? filePattern,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string contentPattern,
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string replacement,
-            [MarshalAs(UnmanagedType.U1)] bool isRegex,
-            [MarshalAs(UnmanagedType.U1)] bool backup);
-
-        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern PcaiStatus pcai_delete_fs_item(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string path,
-            [MarshalAs(UnmanagedType.U1)] bool recursive);
-    }
-
     /// <summary>
     /// High-performance file system operations backed by Rust.
     /// </summary>
@@ -69,7 +34,7 @@ namespace PcaiNative
     {
         private static readonly Lazy<bool> _isAvailable = new(() =>
         {
-            try { return NativeFs.pcai_fs_version() > 0; }
+            try { return NativeCore.pcai_fs_version() > 0; }
             catch { return false; }
         });
 
@@ -81,7 +46,7 @@ namespace PcaiNative
         public static PcaiStatus ReplaceInFile(string filePath, string pattern, string replacement, bool isRegex = false, bool backup = false)
         {
             if (!IsAvailable) return PcaiStatus.NotImplemented;
-            return NativeFs.pcai_replace_in_file(filePath, pattern, replacement, isRegex, backup);
+            return NativeCore.pcai_replace_in_file(filePath, pattern, replacement, isRegex, backup);
         }
 
         /// <summary>
@@ -91,7 +56,7 @@ namespace PcaiNative
         {
             if (!IsAvailable) return null;
 
-            var buffer = NativeFs.pcai_replace_in_files(rootPath, filePattern, pattern, replacement, isRegex, backup);
+            var buffer = NativeCore.pcai_replace_in_files(rootPath, filePattern, pattern, replacement, isRegex, backup);
             try
             {
                 var json = buffer.ToManagedString();
@@ -110,7 +75,25 @@ namespace PcaiNative
         public static PcaiStatus DeleteItem(string path, bool recursive = false)
         {
             if (!IsAvailable) return PcaiStatus.NotImplemented;
-            return NativeFs.pcai_delete_fs_item(path, recursive);
+            return NativeCore.pcai_delete_fs_item(path, recursive);
+        }
+
+        /// <summary>
+        /// Gets disk usage statistics as JSON with detailed breakdown.
+        /// </summary>
+        public static string? GetDiskUsageJson(string rootPath, int topN = 10)
+        {
+            if (!IsAvailable) return null;
+
+            var buffer = NativeCore.pcai_get_disk_usage_json(rootPath, (uint)topN);
+            try
+            {
+                return buffer.ToManagedString();
+            }
+            finally
+            {
+                NativeCore.pcai_free_string_buffer(ref buffer);
+            }
         }
     }
 }

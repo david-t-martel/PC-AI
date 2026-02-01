@@ -51,19 +51,19 @@ public sealed class ToolExecutor
     {
         if (_toolsConfig?["tools"] is not JsonArray tools)
         {
-            return BuildEnvelope(name, ToolExecutionResult.Error("Tools configuration not loaded or invalid."));
+            return BuildEnvelope(name, ToolExecutionResult.Fail("Tools configuration not loaded or invalid."));
         }
 
         var toolDef = tools.FirstOrDefault(t => t?["function"]?["name"]?.ToString() == name);
         if (toolDef == null)
         {
-            return BuildEnvelope(name, ToolExecutionResult.Error($"Unknown tool: {name}"));
+            return BuildEnvelope(name, ToolExecutionResult.Fail($"Unknown tool: {name}"));
         }
 
         var mapping = toolDef["pcai_mapping"];
         if (mapping == null)
         {
-            return BuildEnvelope(name, ToolExecutionResult.Error($"No mapping found for tool: {name}"));
+            return BuildEnvelope(name, ToolExecutionResult.Fail($"No mapping found for tool: {name}"));
         }
 
         var limits = GetToolLimits(toolDef);
@@ -76,7 +76,7 @@ public sealed class ToolExecutor
 
             if (!await _interlock.VerifyActionAsync(name, description, isDestructive))
             {
-                return BuildEnvelope(name, ToolExecutionResult.Error("User rejected destructive tool execution."));
+                return BuildEnvelope(name, ToolExecutionResult.Fail("User rejected destructive tool execution."));
             }
         }
 
@@ -85,15 +85,15 @@ public sealed class ToolExecutor
         {
             var native = PcaiCore.GetUsbDeepDiagnostics();
             return BuildEnvelope(name, native != null
-                ? ToolExecutionResult.Success(native, exitCode: 0, durationMs: 0)
-                : ToolExecutionResult.Error("Native USB diagnostics failed."));
+                ? ToolExecutionResult.Ok(native, exitCode: 0, durationMs: 0)
+                : ToolExecutionResult.Fail("Native USB diagnostics failed."));
         }
         if (name == "pcai_get_network_info")
         {
             var native = PcaiCore.GetNetworkThroughput();
             return BuildEnvelope(name, native != null
-                ? ToolExecutionResult.Success(native, exitCode: 0, durationMs: 0)
-                : ToolExecutionResult.Error("Native network diagnostics failed."));
+                ? ToolExecutionResult.Ok(native, exitCode: 0, durationMs: 0)
+                : ToolExecutionResult.Fail("Native network diagnostics failed."));
         }
 
         // Standard PowerShell mapping
@@ -102,10 +102,10 @@ public sealed class ToolExecutor
 
         if (string.IsNullOrEmpty(cmdlet))
         {
-            return BuildEnvelope(name, ToolExecutionResult.Error($"No cmdlet mapped for tool: {name}"));
+            return BuildEnvelope(name, ToolExecutionResult.Fail($"No cmdlet mapped for tool: {name}"));
         }
 
-        ToolExecutionResult? lastResult = null;
+        var lastResult = ToolExecutionResult.Fail("Tool execution failed.");
         for (var attempt = 0; attempt <= limits.RetryCount; attempt++)
         {
             lastResult = _psHost != null
@@ -128,7 +128,7 @@ public sealed class ToolExecutor
             }
         }
 
-        return BuildEnvelope(name, lastResult ?? ToolExecutionResult.Error("Tool execution failed."), limits);
+        return BuildEnvelope(name, lastResult, limits);
     }
 
     private async Task<ToolExecutionResult> RunHostCommandAsync(string cmdlet, string? module, JsonNode? paramMappings, JsonElement arguments, ToolExecutionLimits limits)
@@ -149,10 +149,10 @@ public sealed class ToolExecutor
 
         if (IsErrorPayload(output))
         {
-            return ToolExecutionResult.Error(output, exitCode: 1, durationMs: sw.ElapsedMilliseconds);
+            return ToolExecutionResult.Fail(output, exitCode: 1, durationMs: sw.ElapsedMilliseconds);
         }
 
-        return ToolExecutionResult.Success(output, exitCode: 0, durationMs: sw.ElapsedMilliseconds);
+        return ToolExecutionResult.Ok(output, exitCode: 0, durationMs: sw.ElapsedMilliseconds);
     }
 
     private void AppendParameters(StringBuilder sb, JsonNode? paramMappings, JsonElement arguments)
@@ -214,7 +214,7 @@ public sealed class ToolExecutor
             using var process = Process.Start(startInfo);
             if (process == null)
             {
-                return ToolExecutionResult.Error("Failed to start PowerShell.", exitCode: 1, durationMs: sw.ElapsedMilliseconds);
+                return ToolExecutionResult.Fail("Failed to start PowerShell.", exitCode: 1, durationMs: sw.ElapsedMilliseconds);
             }
 
             var outputTask = process.StandardOutput.ReadToEndAsync();
@@ -225,7 +225,7 @@ public sealed class ToolExecutor
             if (completed != waitTask)
             {
                 try { process.Kill(entireProcessTree: true); } catch { }
-                return ToolExecutionResult.Error("PowerShell execution timed out.", exitCode: 124, durationMs: sw.ElapsedMilliseconds, timedOut: true);
+                return ToolExecutionResult.Fail("PowerShell execution timed out.", exitCode: 124, durationMs: sw.ElapsedMilliseconds, timedOut: true);
             }
 
             var output = await outputTask;
@@ -233,14 +233,14 @@ public sealed class ToolExecutor
 
             if (process.ExitCode != 0 && string.IsNullOrWhiteSpace(output))
             {
-                return ToolExecutionResult.Error($"PowerShell exited with code {process.ExitCode}: {error}", exitCode: process.ExitCode, durationMs: sw.ElapsedMilliseconds);
+                return ToolExecutionResult.Fail($"PowerShell exited with code {process.ExitCode}: {error}", exitCode: process.ExitCode, durationMs: sw.ElapsedMilliseconds);
             }
 
-            return ToolExecutionResult.Success(string.IsNullOrWhiteSpace(output) ? "{}" : output, process.ExitCode, sw.ElapsedMilliseconds);
+            return ToolExecutionResult.Ok(string.IsNullOrWhiteSpace(output) ? "{}" : output, process.ExitCode, sw.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
-            return ToolExecutionResult.Error($"Execution failed: {ex.Message}", exitCode: 1, durationMs: sw.ElapsedMilliseconds);
+            return ToolExecutionResult.Fail($"Execution failed: {ex.Message}", exitCode: 1, durationMs: sw.ElapsedMilliseconds);
         }
     }
 
@@ -327,10 +327,10 @@ public sealed class ToolExecutor
 
     private readonly record struct ToolExecutionResult(string? Output, bool Success, int ExitCode, string? Error, bool TimedOut, long DurationMs)
     {
-        public static ToolExecutionResult Success(string output, int exitCode, long durationMs) =>
+        public static ToolExecutionResult Ok(string output, int exitCode, long durationMs) =>
             new(output, true, exitCode, null, false, durationMs);
 
-        public static ToolExecutionResult Error(string error, int exitCode = 1, long durationMs = 0, bool timedOut = false) =>
+        public static ToolExecutionResult Fail(string error, int exitCode = 1, long durationMs = 0, bool timedOut = false) =>
             new(null, false, exitCode, error, timedOut, durationMs);
     }
 }

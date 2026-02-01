@@ -82,42 +82,11 @@ $script:InferenceMode = 'http'  # 'http' or 'native'
 $script:NativeInferenceReady = $false
 #endregion
 
-#region Output Formatting Functions
-function Write-Success {
-    param([string]$Message)
-    Write-Host $Message -ForegroundColor Green
-}
-
-function Write-Warning {
-    param([string]$Message)
-    Write-Host "WARNING: $Message" -ForegroundColor Yellow
-}
-
-function Write-Error {
-    param([string]$Message)
-    Write-Host "ERROR: $Message" -ForegroundColor Red
-}
-
-function Write-Info {
-    param([string]$Message)
-    Write-Host $Message -ForegroundColor Cyan
-}
-
-function Write-Header {
-    param([string]$Message)
-    Write-Host ""
-    Write-Host "=== $Message ===" -ForegroundColor Magenta
-    Write-Host ""
-}
-
-function Write-SubHeader {
-    param([string]$Message)
-    Write-Host "--- $Message ---" -ForegroundColor DarkCyan
-}
-
-function Write-Bullet {
-    param([string]$Message, [string]$Color = 'White')
-    Write-Host "  * $Message" -ForegroundColor $Color
+#region Core Module Loading
+# Load common module for shared UI and utilities
+$script:CommonPath = Join-Path $script:ModulesPath 'PC-AI.Common\PC-AI.Common.psm1'
+if (Test-Path $script:CommonPath) {
+    Import-Module $script:CommonPath -Force
 }
 #endregion
 
@@ -148,8 +117,7 @@ function Ensure-Module {
         Import-Module $modulePath -Force -ErrorAction Stop
         $script:LoadedModules[$ModuleName] = $true
         return $true
-    }
-    catch {
+    } catch {
         Write-Error "Failed to load module $ModuleName`: $_"
         return $false
     }
@@ -172,8 +140,7 @@ function Load-Settings {
         try {
             $script:Settings = Get-Content $settingsPath -Raw | ConvertFrom-Json
             return $script:Settings
-        }
-        catch {
+        } catch {
             Write-Warning "Could not load settings: $_"
             return $null
         }
@@ -193,8 +160,7 @@ function Load-LLMConfig {
         try {
             $script:LLMConfig = Get-Content $llmConfigPath -Raw | ConvertFrom-Json
             return $script:LLMConfig
-        }
-        catch {
+        } catch {
             Write-Warning "Could not load LLM config: $_"
             return $null
         }
@@ -216,20 +182,20 @@ function Initialize-InferenceBackend {
 
     # Skip if HTTP mode
     if ($Backend -eq 'http') {
-        Write-Verbose "Using HTTP inference backend"
+        Write-Verbose 'Using HTTP inference backend'
         $script:InferenceMode = 'http'
         return $true
     }
 
     # Try native inference
-    Write-Verbose "Attempting to initialize native inference backend..."
+    Write-Verbose 'Attempting to initialize native inference backend...'
 
     try {
         # Load PcaiInference module
         $modulePath = Join-Path $script:ModulesPath 'PcaiInference.psm1'
 
         if (-not (Test-Path $modulePath)) {
-            Write-Warning "PcaiInference module not found. Falling back to HTTP."
+            Write-Warning 'PcaiInference module not found. Falling back to HTTP.'
             $script:InferenceMode = 'http'
             return $false
         }
@@ -239,10 +205,10 @@ function Initialize-InferenceBackend {
         # Check DLL availability
         $status = Get-PcaiInferenceStatus
         if (-not $status.DllExists) {
-            Write-Warning "pcai_inference.dll not found. Build instructions:"
-            Write-Warning "  cd Deploy\pcai-inference"
-            Write-Warning "  cargo build --features ffi,mistralrs-backend --release"
-            Write-Warning "Falling back to HTTP inference."
+            Write-Warning 'pcai_inference.dll not found. Build instructions:'
+            Write-Warning '  cd Native\pcai_core\pcai_inference'
+            Write-Warning '  cargo build --features ffi,mistralrs-backend --release'
+            Write-Warning 'Falling back to HTTP inference.'
             $script:InferenceMode = 'http'
             return $false
         }
@@ -252,7 +218,7 @@ function Initialize-InferenceBackend {
         $initResult = Initialize-PcaiInference -Backend $backendName -Verbose:$VerbosePreference
 
         if (-not $initResult.Success) {
-            Write-Warning "Failed to initialize native backend. Falling back to HTTP."
+            Write-Warning 'Failed to initialize native backend. Falling back to HTTP.'
             $script:InferenceMode = 'http'
             return $false
         }
@@ -263,7 +229,7 @@ function Initialize-InferenceBackend {
             $loadResult = Import-PcaiModel -ModelPath $ModelPath -GpuLayers $GpuLayers -Verbose:$VerbosePreference
 
             if (-not $loadResult.Success) {
-                Write-Warning "Failed to load model. Falling back to HTTP."
+                Write-Warning 'Failed to load model. Falling back to HTTP.'
                 Close-PcaiInference
                 $script:InferenceMode = 'http'
                 return $false
@@ -273,17 +239,15 @@ function Initialize-InferenceBackend {
             $script:InferenceMode = 'native'
             $script:NativeInferenceReady = $true
             return $true
-        }
-        else {
+        } else {
             Write-Info "Native backend initialized (backend: $backendName). Model not loaded yet."
-            Write-Info "Use Import-PcaiModel to load a model, or inference will fall back to HTTP."
+            Write-Info 'Use Import-PcaiModel to load a model, or inference will fall back to HTTP.'
             $script:InferenceMode = 'http'  # Fall back until model is loaded
             return $false
         }
-    }
-    catch {
+    } catch {
         Write-Warning "Error initializing native inference: $_"
-        Write-Warning "Falling back to HTTP inference."
+        Write-Warning 'Falling back to HTTP inference.'
         $script:InferenceMode = 'http'
         return $false
     }
@@ -298,22 +262,22 @@ function Test-Administrator {
 }
 
 function Require-Administrator {
-    param([string]$Operation = "this operation")
+    param([string]$Operation = 'this operation')
 
     if (-not (Test-Administrator)) {
         Write-Error "Administrator privileges required for $Operation"
-        Write-Info "Please run PowerShell as Administrator and try again."
+        Write-Info 'Please run PowerShell as Administrator and try again.'
         return $false
     }
     return $true
 }
 
 function Warn-NonAdministrator {
-    param([string]$Operation = "this operation")
+    param([string]$Operation = 'this operation')
 
     if (-not (Test-Administrator)) {
         Write-Warning "Some features of $Operation may require Administrator privileges"
-        Write-Warning "Consider running as Administrator for full functionality"
+        Write-Warning 'Consider running as Administrator for full functionality'
     }
 }
 #endregion
@@ -326,11 +290,11 @@ function Get-ParsedArguments {
     )
 
     if (-not (Ensure-Module 'PC-AI.CLI')) {
-        Write-Error "CLI module unavailable; cannot parse arguments."
+        Write-Error 'CLI module unavailable; cannot parse arguments.'
         $fallback = @{
             SubCommand = $null
-            Flags = @{}
-            Values = @{}
+            Flags      = @{}
+            Values     = @{}
             Positional = @()
         }
         foreach ($key in $Defaults.Keys) {
@@ -347,11 +311,11 @@ function Get-ParsedArguments {
 function Show-MainHelp {
     Write-Header "PC-AI v$script:Version - Local LLM-Powered PC Diagnostics"
 
-    Write-Host "USAGE:" -ForegroundColor Yellow
-    Write-Host "    .\PC-AI.ps1 <command> [subcommand] [options]"
-    Write-Host ""
+    Write-Host 'USAGE:' -ForegroundColor Yellow
+    Write-Host '    .\PC-AI.ps1 <command> [subcommand] [options]'
+    Write-Host ''
 
-    Write-Host "COMMANDS:" -ForegroundColor Yellow
+    Write-Host 'COMMANDS:' -ForegroundColor Yellow
     $commandSummaries = @()
     if (Ensure-Module 'PC-AI.CLI') {
         $commandSummaries = Get-PCCommandSummary -ProjectRoot $PSScriptRoot
@@ -359,7 +323,7 @@ function Show-MainHelp {
     if ($commandSummaries -and $commandSummaries.Count -gt 0) {
         if (-not ($commandSummaries.Command -contains 'doctor')) {
             $commandSummaries += [PSCustomObject]@{
-                Command = 'doctor'
+                Command     = 'doctor'
                 Description = 'Run a one-command health check for common runtime failures.'
             }
         }
@@ -376,9 +340,9 @@ function Show-MainHelp {
             Write-Host "    $cmd" -ForegroundColor White
         }
     }
-    Write-Host ""
+    Write-Host ''
 
-    Write-Host "EXAMPLES:" -ForegroundColor Yellow
+    Write-Host 'EXAMPLES:' -ForegroundColor Yellow
     $examples = @()
     if (Ensure-Module 'PC-AI.CLI') {
         $examples = Get-PCModuleHelpIndex -ProjectRoot $PSScriptRoot |
@@ -393,15 +357,15 @@ function Show-MainHelp {
             }
         }
     } else {
-        Write-Host "    .\PC-AI.ps1 diagnose all"
-        Write-Host "    .\PC-AI.ps1 optimize wsl --dry-run"
-        Write-Host "    .\PC-AI.ps1 usb list"
-        Write-Host "    .\PC-AI.ps1 analyze"
-        Write-Host "    .\PC-AI.ps1 help diagnose"
+        Write-Host '    .\PC-AI.ps1 diagnose all'
+        Write-Host '    .\PC-AI.ps1 optimize wsl --dry-run'
+        Write-Host '    .\PC-AI.ps1 usb list'
+        Write-Host '    .\PC-AI.ps1 analyze'
+        Write-Host '    .\PC-AI.ps1 help diagnose'
     }
-    Write-Host ""
+    Write-Host ''
 
-    Write-Host "Module help is generated dynamically from module implementations." -ForegroundColor DarkGray
+    Write-Host 'Module help is generated dynamically from module implementations.' -ForegroundColor DarkGray
     Write-Host "Run '.\\PC-AI.ps1 help <command>' to see module function help." -ForegroundColor DarkGray
 }
 
@@ -412,7 +376,7 @@ function Show-ModuleHelp {
     )
 
     if (-not (Ensure-Module 'PC-AI.CLI')) {
-        Write-Warning "Help module unavailable. Showing basic help."
+        Write-Warning 'Help module unavailable. Showing basic help.'
         Show-MainHelp
         return
     }
@@ -425,9 +389,9 @@ function Show-ModuleHelp {
 
     $helpEntries = Get-PCModuleHelpIndex -Modules $modules -ProjectRoot $PSScriptRoot
     Write-Header "$CommandName - Module Help"
-    Write-Host "USAGE:" -ForegroundColor Yellow
+    Write-Host 'USAGE:' -ForegroundColor Yellow
     Write-Host "    .\\PC-AI.ps1 $CommandName <subcommand> [options]"
-    Write-Host ""
+    Write-Host ''
 
     foreach ($group in ($helpEntries | Group-Object Module)) {
         Write-SubHeader "$($group.Name)"
@@ -438,7 +402,7 @@ function Show-ModuleHelp {
                 Write-Bullet "$($entry.Name)"
             }
         }
-        Write-Host ""
+        Write-Host ''
     }
 }
 
@@ -450,41 +414,41 @@ function Show-HelpEntry {
 
     Write-Header "$($Entry.Name) - Help"
     if ($Entry.Synopsis) {
-        Write-SubHeader "Synopsis"
+        Write-SubHeader 'Synopsis'
         Write-Host $Entry.Synopsis
-        Write-Host ""
+        Write-Host ''
     }
     if ($Entry.Parameters -and $Entry.Parameters.Count -gt 0) {
-        Write-SubHeader "Parameters"
+        Write-SubHeader 'Parameters'
         if ($Entry.ParameterHelp -and $Entry.ParameterHelp.Count -gt 0) {
             foreach ($paramName in $Entry.Parameters) {
                 $paramDesc = $Entry.ParameterHelp[$paramName]
                 if ($paramDesc) {
-                    Write-Host ("  {0} - {1}" -f $paramName, $paramDesc)
+                    Write-Host ('  {0} - {1}' -f $paramName, $paramDesc)
                 } else {
-                    Write-Host ("  {0}" -f $paramName)
+                    Write-Host ('  {0}' -f $paramName)
                 }
             }
         } else {
             Write-Host ($Entry.Parameters -join ', ')
         }
-        Write-Host ""
+        Write-Host ''
     }
     if ($Entry.Description) {
-        Write-SubHeader "Description"
+        Write-SubHeader 'Description'
         Write-Host $Entry.Description
-        Write-Host ""
+        Write-Host ''
     }
     if ($Entry.Examples -and $Entry.Examples.Count -gt 0) {
-        Write-SubHeader "Examples"
+        Write-SubHeader 'Examples'
         foreach ($example in $Entry.Examples) {
             $formatted = $example -replace "(`r`n|`n)", "`n  "
             Write-Host "  $formatted"
-            Write-Host ""
+            Write-Host ''
         }
     }
     if ($Entry.SourcePath) {
-        Write-SubHeader "Source"
+        Write-SubHeader 'Source'
         Write-Host $Entry.SourcePath -ForegroundColor DarkGray
     }
 }
@@ -530,43 +494,42 @@ function Invoke-DiagnoseCommand {
     $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         output = $null
         format = 'txt'
-        days = 3
+        days   = 3
     }
 
     $subCommand = $parsed.SubCommand
 
     switch ($subCommand) {
         'hardware' {
-            Warn-NonAdministrator "hardware diagnostics"
+            Warn-NonAdministrator 'hardware diagnostics'
 
             if (-not (Ensure-Module 'PC-AI.Hardware')) { return }
 
-            Write-Header "Hardware Diagnostics"
+            Write-Header 'Hardware Diagnostics'
 
-            Write-SubHeader "Device Manager Errors"
+            Write-SubHeader 'Device Manager Errors'
             $deviceErrors = Get-DeviceErrors
             if ($deviceErrors) {
                 $deviceErrors | ForEach-Object {
                     Write-Bullet "$($_.Name) - Error Code: $($_.ConfigManagerErrorCode)" -Color Red
                 }
-            }
-            else {
-                Write-Success "No device errors found"
+            } else {
+                Write-Success 'No device errors found'
             }
 
-            Write-SubHeader "Disk Health (SMART)"
+            Write-SubHeader 'Disk Health (SMART)'
             $diskHealth = Get-DiskHealth
             $diskHealth | ForEach-Object {
                 $color = if ($_.Status -eq 'OK') { 'Green' } else { 'Red' }
                 Write-Bullet "$($_.Model) - Status: $($_.Status)" -Color $color
             }
 
-            Write-SubHeader "USB Device Status"
+            Write-SubHeader 'USB Device Status'
             $usbStatus = Get-UsbStatus
             Write-Bullet "USB Controllers: $($usbStatus.Controllers)"
             Write-Bullet "Connected Devices: $($usbStatus.Devices)"
 
-            Write-SubHeader "Network Adapters"
+            Write-SubHeader 'Network Adapters'
             $adapters = Get-NetworkAdapters
             $adapters | Where-Object { $_.PhysicalAdapter } | ForEach-Object {
                 $status = if ($_.NetEnabled) { 'Connected' } else { 'Disconnected' }
@@ -578,15 +541,15 @@ function Invoke-DiagnoseCommand {
         'wsl' {
             if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
 
-            Write-Header "WSL2 Diagnostics"
+            Write-Header 'WSL2 Diagnostics'
             $wslStatus = Get-WSLStatus
 
-            Write-SubHeader "WSL Status"
+            Write-SubHeader 'WSL Status'
             Write-Bullet "Version: $($wslStatus.Version)"
             Write-Bullet "Default Distribution: $($wslStatus.DefaultDistribution)"
 
             if ($wslStatus.Distributions) {
-                Write-SubHeader "Distributions"
+                Write-SubHeader 'Distributions'
                 $wslStatus.Distributions | ForEach-Object {
                     $color = if ($_.State -eq 'Running') { 'Green' } else { 'Gray' }
                     Write-Bullet "$($_.Name) (WSL$($_.Version)) - $($_.State)" -Color $color
@@ -594,7 +557,7 @@ function Invoke-DiagnoseCommand {
             }
 
             if ($wslStatus.NetworkInfo) {
-                Write-SubHeader "Network Configuration"
+                Write-SubHeader 'Network Configuration'
                 Write-Bullet "IP Address: $($wslStatus.NetworkInfo.IPAddress)"
                 Write-Bullet "Gateway: $($wslStatus.NetworkInfo.Gateway)"
             }
@@ -603,16 +566,16 @@ function Invoke-DiagnoseCommand {
         'network' {
             if (-not (Ensure-Module 'PC-AI.Network')) { return }
 
-            Write-Header "Network Diagnostics"
+            Write-Header 'Network Diagnostics'
             $netDiag = Get-NetworkDiagnostics
 
-            Write-SubHeader "Network Adapters"
+            Write-SubHeader 'Network Adapters'
             $netDiag.Adapters | ForEach-Object {
                 $color = if ($_.Status -eq 'Up') { 'Green' } else { 'Yellow' }
                 Write-Bullet "$($_.Name) - $($_.Status)" -Color $color
             }
 
-            Write-SubHeader "Connectivity Tests"
+            Write-SubHeader 'Connectivity Tests'
             $netDiag.Connectivity | ForEach-Object {
                 $color = if ($_.Success) { 'Green' } else { 'Red' }
                 Write-Bullet "$($_.Target): $(if ($_.Success) { 'OK' } else { 'Failed' })" -Color $color
@@ -620,18 +583,18 @@ function Invoke-DiagnoseCommand {
         }
 
         'hyperv' {
-            if (-not (Require-Administrator "Hyper-V diagnostics")) { return }
+            if (-not (Require-Administrator 'Hyper-V diagnostics')) { return }
             if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
 
-            Write-Header "Hyper-V Diagnostics"
+            Write-Header 'Hyper-V Diagnostics'
             $hypervStatus = Get-HyperVStatus
 
-            Write-SubHeader "Hyper-V Status"
+            Write-SubHeader 'Hyper-V Status'
             $color = if ($hypervStatus.Enabled) { 'Green' } else { 'Red' }
             Write-Bullet "Hyper-V Enabled: $($hypervStatus.Enabled)" -Color $color
 
             if ($hypervStatus.VMs) {
-                Write-SubHeader "Virtual Machines"
+                Write-SubHeader 'Virtual Machines'
                 $hypervStatus.VMs | ForEach-Object {
                     Write-Bullet "$($_.Name) - $($_.State)"
                 }
@@ -641,10 +604,10 @@ function Invoke-DiagnoseCommand {
         'docker' {
             if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
 
-            Write-Header "Docker Diagnostics"
+            Write-Header 'Docker Diagnostics'
             $dockerStatus = Get-DockerStatus
 
-            Write-SubHeader "Docker Desktop Status"
+            Write-SubHeader 'Docker Desktop Status'
             $color = if ($dockerStatus.Running) { 'Green' } else { 'Red' }
             Write-Bullet "Running: $($dockerStatus.Running)" -Color $color
 
@@ -653,14 +616,14 @@ function Invoke-DiagnoseCommand {
             }
 
             if ($dockerStatus.Containers) {
-                Write-SubHeader "Containers"
+                Write-SubHeader 'Containers'
                 Write-Bullet "Running: $($dockerStatus.Containers.Running)"
                 Write-Bullet "Stopped: $($dockerStatus.Containers.Stopped)"
             }
         }
 
         'events' {
-            Warn-NonAdministrator "event log analysis"
+            Warn-NonAdministrator 'event log analysis'
             if (-not (Ensure-Module 'PC-AI.Hardware')) { return }
 
             $days = [int]$parsed.Values['days']
@@ -669,29 +632,29 @@ function Invoke-DiagnoseCommand {
             $events = Get-SystemEvents -Days $days
 
             if ($events.Critical) {
-                Write-SubHeader "Critical Events"
+                Write-SubHeader 'Critical Events'
                 $events.Critical | Select-Object -First 10 | ForEach-Object {
                     Write-Bullet "$($_.TimeCreated): $($_.Message)" -Color Red
                 }
             }
 
             if ($events.Error) {
-                Write-SubHeader "Error Events"
+                Write-SubHeader 'Error Events'
                 $events.Error | Select-Object -First 10 | ForEach-Object {
                     Write-Bullet "$($_.TimeCreated): $($_.Message)" -Color Yellow
                 }
             }
 
             if (-not $events.Critical -and -not $events.Error) {
-                Write-Success "No critical or error events found"
+                Write-Success 'No critical or error events found'
             }
         }
 
         'all' {
-            Warn-NonAdministrator "full system diagnostics"
+            Warn-NonAdministrator 'full system diagnostics'
             if (-not (Ensure-Module 'PC-AI.Hardware')) { return }
 
-            Write-Header "Full System Diagnostics"
+            Write-Header 'Full System Diagnostics'
 
             $outputPath = $parsed.Values['output']
             if (-not $outputPath) {
@@ -705,23 +668,22 @@ function Invoke-DiagnoseCommand {
                 New-Item -Path $reportsDir -ItemType Directory -Force | Out-Null
             }
 
-            Write-Info "Generating comprehensive diagnostic report..."
+            Write-Info 'Generating comprehensive diagnostic report...'
             Write-Info "Output: $outputPath"
 
             try {
                 $report = New-DiagnosticReport -OutputPath $outputPath
-                Write-Success "Diagnostic report generated successfully"
+                Write-Success 'Diagnostic report generated successfully'
                 Write-Info "Report saved to: $outputPath"
 
                 # Show summary
                 if ($report.Summary) {
-                    Write-SubHeader "Summary"
+                    Write-SubHeader 'Summary'
                     Write-Bullet "Device Errors: $($report.Summary.DeviceErrors)"
                     Write-Bullet "Disk Issues: $($report.Summary.DiskIssues)"
                     Write-Bullet "Network Issues: $($report.Summary.NetworkIssues)"
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Failed to generate report: $_"
             }
         }
@@ -742,7 +704,7 @@ function Invoke-OptimizeCommand {
 
     $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         profile = 'default'
-        backup = 'true'
+        backup  = 'true'
     }
 
     $subCommand = $parsed.SubCommand
@@ -751,68 +713,66 @@ function Invoke-OptimizeCommand {
 
     switch ($subCommand) {
         'wsl' {
-            if (-not (Require-Administrator "WSL optimization")) { return }
+            if (-not (Require-Administrator 'WSL optimization')) { return }
             if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
 
-            Write-Header "WSL2 Optimization"
+            Write-Header 'WSL2 Optimization'
 
             if ($dryRun) {
-                Write-Info "[DRY RUN] Showing proposed changes..."
+                Write-Info '[DRY RUN] Showing proposed changes...'
             }
 
             try {
                 $result = Optimize-WSLConfig -DryRun:$dryRun -Force:$force
 
                 if ($result.Changes) {
-                    Write-SubHeader "Proposed/Applied Changes"
+                    Write-SubHeader 'Proposed/Applied Changes'
                     $result.Changes | ForEach-Object {
                         Write-Bullet $_
                     }
                 }
 
                 if (-not $dryRun -and $result.Success) {
-                    Write-Success "WSL optimization completed successfully"
+                    Write-Success 'WSL optimization completed successfully'
                     if ($result.RestartRequired) {
-                        Write-Warning "WSL restart required. Run: wsl --shutdown"
+                        Write-Warning 'WSL restart required. Run: wsl --shutdown'
                     }
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "WSL optimization failed: $_"
             }
         }
 
         'disk' {
-            if (-not (Require-Administrator "disk optimization")) { return }
+            if (-not (Require-Administrator 'disk optimization')) { return }
             if (-not (Ensure-Module 'PC-AI.Performance')) { return }
 
-            Write-Header "Disk Optimization"
+            Write-Header 'Disk Optimization'
 
             if ($dryRun) {
-                Write-Info "[DRY RUN] Showing disk optimization plan..."
+                Write-Info '[DRY RUN] Showing disk optimization plan...'
             }
 
             try {
                 $result = Optimize-Disks -DryRun:$dryRun -Force:$force
 
                 if ($result.Disks) {
-                    Write-SubHeader "Optimization Results"
+                    Write-SubHeader 'Optimization Results'
                     $result.Disks | ForEach-Object {
                         $action = if ($_.IsSSD) { 'TRIM' } else { 'Defrag' }
                         Write-Bullet "$($_.DriveLetter): $action - $($_.Status)"
                     }
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Disk optimization failed: $_"
             }
         }
 
         'vsock' {
-            if (-not (Require-Administrator "VSock optimization")) { return }
+            if (-not (Require-Administrator 'VSock optimization')) { return }
             if (-not (Ensure-Module 'PC-AI.Network')) { return }
 
-            Write-Header "VSock Optimization"
+            Write-Header 'VSock Optimization'
 
             $profile = $parsed.Values['profile']
 
@@ -824,75 +784,72 @@ function Invoke-OptimizeCommand {
                 $result = Optimize-VSock -Profile $profile -DryRun:$dryRun
 
                 if ($result.Settings) {
-                    Write-SubHeader "VSock Settings"
+                    Write-SubHeader 'VSock Settings'
                     $result.Settings | ForEach-Object {
                         Write-Bullet "$($_.Name): $($_.Value)"
                     }
                 }
 
                 if ($result.Success -and -not $dryRun) {
-                    Write-Success "VSock optimization completed"
+                    Write-Success 'VSock optimization completed'
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "VSock optimization failed: $_"
             }
         }
 
         'defender' {
-            if (-not (Require-Administrator "Defender exclusions")) { return }
+            if (-not (Require-Administrator 'Defender exclusions')) { return }
             if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
 
-            Write-Header "Windows Defender Exclusions"
+            Write-Header 'Windows Defender Exclusions'
 
             if ($dryRun) {
-                Write-Info "[DRY RUN] Showing proposed exclusions..."
+                Write-Info '[DRY RUN] Showing proposed exclusions...'
             }
 
             try {
                 $result = Set-WSLDefenderExclusions -DryRun:$dryRun
 
                 if ($result.Exclusions) {
-                    Write-SubHeader "Exclusions"
+                    Write-SubHeader 'Exclusions'
                     $result.Exclusions | ForEach-Object {
                         Write-Bullet "$($_.Type): $($_.Path)"
                     }
                 }
 
                 if ($result.Success -and -not $dryRun) {
-                    Write-Success "Defender exclusions configured"
+                    Write-Success 'Defender exclusions configured'
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Failed to set exclusions: $_"
             }
         }
 
         'network' {
-            if (-not (Require-Administrator "network repair")) { return }
+            if (-not (Require-Administrator 'network repair')) { return }
             if (-not (Ensure-Module 'PC-AI.Virtualization')) { return }
 
-            Write-Header "WSL Network Repair"
+            Write-Header 'WSL Network Repair'
 
             if ($dryRun) {
-                Write-Info "[DRY RUN] Showing repair actions..."
+                Write-Info '[DRY RUN] Showing repair actions...'
             }
 
             try {
                 $result = Repair-WSLNetworking -DryRun:$dryRun
 
                 if ($result.Actions) {
-                    Write-SubHeader "Repair Actions"
+                    Write-SubHeader 'Repair Actions'
                     $result.Actions | ForEach-Object {
                         Write-Bullet $_
                     }
                 }
 
                 if ($result.Success -and -not $dryRun) {
-                    Write-Success "Network repair completed"
+                    Write-Success 'Network repair completed'
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Network repair failed: $_"
             }
         }
@@ -913,7 +870,7 @@ function Invoke-UsbCommand {
 
     $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         distribution = $null
-        busid = $null
+        busid        = $null
     }
 
     $subCommand = $parsed.SubCommand
@@ -923,7 +880,7 @@ function Invoke-UsbCommand {
 
     switch ($subCommand) {
         'list' {
-            Write-Header "USB Devices"
+            Write-Header 'USB Devices'
 
             try {
                 $devices = Get-UsbDeviceList
@@ -935,18 +892,16 @@ function Invoke-UsbCommand {
                         Write-Host "  $($_.BusId)  " -NoNewline -ForegroundColor Cyan
                         Write-Host "$($_.Description) $state" -ForegroundColor $color
                     }
+                } else {
+                    Write-Info 'No USB devices found'
                 }
-                else {
-                    Write-Info "No USB devices found"
-                }
-            }
-            catch {
+            } catch {
                 Write-Error "Failed to list USB devices: $_"
             }
         }
 
         'attach' {
-            if (-not (Require-Administrator "USB attach")) { return }
+            if (-not (Require-Administrator 'USB attach')) { return }
 
             $busid = $parsed.Values['busid']
             if (-not $busid -and $parsed.Positional) {
@@ -954,14 +909,14 @@ function Invoke-UsbCommand {
             }
 
             if (-not $busid) {
-                Write-Error "Bus ID required. Use: PC-AI usb attach --busid <id>"
+                Write-Error 'Bus ID required. Use: PC-AI usb attach --busid <id>'
                 Write-Info "Run 'PC-AI usb list' to see available devices"
                 return
             }
 
             $distribution = $parsed.Values['distribution']
 
-            Write-Header "Attaching USB Device"
+            Write-Header 'Attaching USB Device'
             Write-Info "Bus ID: $busid"
             if ($distribution) {
                 Write-Info "Distribution: $distribution"
@@ -971,19 +926,17 @@ function Invoke-UsbCommand {
                 $result = Mount-UsbToWSL -BusId $busid -Distribution $distribution
 
                 if ($result.Success) {
-                    Write-Success "Device attached successfully"
-                }
-                else {
+                    Write-Success 'Device attached successfully'
+                } else {
                     Write-Error "Failed to attach device: $($result.Error)"
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Failed to attach USB device: $_"
             }
         }
 
         'detach' {
-            if (-not (Require-Administrator "USB detach")) { return }
+            if (-not (Require-Administrator 'USB detach')) { return }
 
             $busid = $parsed.Values['busid']
             if (-not $busid -and $parsed.Positional) {
@@ -991,62 +944,59 @@ function Invoke-UsbCommand {
             }
 
             if (-not $busid) {
-                Write-Error "Bus ID required. Use: PC-AI usb detach --busid <id>"
+                Write-Error 'Bus ID required. Use: PC-AI usb detach --busid <id>'
                 return
             }
 
-            Write-Header "Detaching USB Device"
+            Write-Header 'Detaching USB Device'
             Write-Info "Bus ID: $busid"
 
             try {
                 $result = Dismount-UsbFromWSL -BusId $busid -Unbind:$unbind
 
                 if ($result.Success) {
-                    Write-Success "Device detached successfully"
+                    Write-Success 'Device detached successfully'
                     if ($unbind) {
-                        Write-Info "Device unbound from usbipd"
+                        Write-Info 'Device unbound from usbipd'
                     }
-                }
-                else {
+                } else {
                     Write-Error "Failed to detach device: $($result.Error)"
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Failed to detach USB device: $_"
             }
         }
 
         'status' {
-            Write-Header "USB/WSL Passthrough Status"
+            Write-Header 'USB/WSL Passthrough Status'
 
             try {
                 $status = Get-UsbWSLStatus
 
-                Write-SubHeader "usbipd Status"
+                Write-SubHeader 'usbipd Status'
                 $color = if ($status.UsbIpdInstalled) { 'Green' } else { 'Red' }
                 Write-Bullet "usbipd-win Installed: $($status.UsbIpdInstalled)" -Color $color
 
                 if ($status.AttachedDevices) {
-                    Write-SubHeader "Attached to WSL"
+                    Write-SubHeader 'Attached to WSL'
                     $status.AttachedDevices | ForEach-Object {
                         Write-Bullet "$($_.BusId): $($_.Description)" -Color Green
                     }
                 }
 
                 if ($status.BoundDevices) {
-                    Write-SubHeader "Bound (Ready to Attach)"
+                    Write-SubHeader 'Bound (Ready to Attach)'
                     $status.BoundDevices | ForEach-Object {
                         Write-Bullet "$($_.BusId): $($_.Description)" -Color Yellow
                     }
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Failed to get USB status: $_"
             }
         }
 
         'bind' {
-            if (-not (Require-Administrator "USB bind")) { return }
+            if (-not (Require-Administrator 'USB bind')) { return }
 
             $busid = $parsed.Values['busid']
             if (-not $busid -and $parsed.Positional) {
@@ -1054,25 +1004,23 @@ function Invoke-UsbCommand {
             }
 
             if (-not $busid) {
-                Write-Error "Bus ID required. Use: PC-AI usb bind --busid <id>"
+                Write-Error 'Bus ID required. Use: PC-AI usb bind --busid <id>'
                 return
             }
 
-            Write-Header "Binding USB Device"
+            Write-Header 'Binding USB Device'
             Write-Info "Bus ID: $busid"
 
             try {
                 $result = Invoke-UsbBind -BusId $busid
 
                 if ($result.Success) {
-                    Write-Success "Device bound successfully"
-                    Write-Info "Device is now ready for WSL attachment"
-                }
-                else {
+                    Write-Success 'Device bound successfully'
+                    Write-Info 'Device is now ready for WSL attachment'
+                } else {
                     Write-Error "Failed to bind device: $($result.Error)"
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Failed to bind USB device: $_"
             }
         }
@@ -1092,21 +1040,21 @@ function Invoke-AnalyzeCommand {
     param([string[]]$CmdArgs)
 
     $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
-        report = $null
-        model = $null
+        report      = $null
+        model       = $null
         temperature = '0.3'
-        output = $null
+        output      = $null
     }
 
     if (-not (Ensure-Module 'PC-AI.LLM')) { return }
 
-    Write-Header "LLM Diagnostic Analysis"
+    Write-Header 'LLM Diagnostic Analysis'
 
     # Check LLM availability first
     $llmStatus = Get-LLMStatus
     if (-not $llmStatus.Available) {
-        Write-Error "No LLM provider available"
-        Write-Info "Ensure pcai-inference is running (default: http://127.0.0.1:8080)"
+        Write-Error 'No LLM provider available'
+        Write-Info 'Ensure pcai-inference is running (default: http://127.0.0.1:8080)'
         return
     }
 
@@ -1121,12 +1069,11 @@ function Invoke-AnalyzeCommand {
         if ($latestReport) {
             $reportPath = $latestReport.FullName
             Write-Info "Using latest report: $reportPath"
-        }
-        else {
+        } else {
             Write-Warning "No diagnostic reports found. Run 'PC-AI diagnose all' first."
 
             # Offer to run diagnostics
-            $response = Read-Host "Run diagnostics now? (y/n)"
+            $response = Read-Host 'Run diagnostics now? (y/n)'
             if ($response -eq 'y') {
                 Invoke-DiagnoseCommand @('all')
                 $latestReport = Get-ChildItem -Path $script:ReportsPath -Filter '*.txt' |
@@ -1135,8 +1082,7 @@ function Invoke-AnalyzeCommand {
                 if ($latestReport) {
                     $reportPath = $latestReport.FullName
                 }
-            }
-            else {
+            } else {
                 return
             }
         }
@@ -1154,7 +1100,7 @@ function Invoke-AnalyzeCommand {
     }
 
     Write-Info "Model: $model"
-    Write-Info "Analyzing report..."
+    Write-Info 'Analyzing report...'
 
     try {
         $analysisParams = @{
@@ -1171,15 +1117,15 @@ function Invoke-AnalyzeCommand {
 
         $result = Invoke-PCDiagnosis @analysisParams
 
-        Write-Header "Analysis Results"
+        Write-Header 'Analysis Results'
 
         if ($result.Summary) {
-            Write-SubHeader "Summary"
+            Write-SubHeader 'Summary'
             Write-Host $result.Summary
         }
 
         if ($result.Issues) {
-            Write-SubHeader "Identified Issues"
+            Write-SubHeader 'Identified Issues'
             $result.Issues | ForEach-Object {
                 $color = switch ($_.Priority) {
                     'Critical' { 'Red' }
@@ -1192,7 +1138,7 @@ function Invoke-AnalyzeCommand {
         }
 
         if ($result.Recommendations) {
-            Write-SubHeader "Recommendations"
+            Write-SubHeader 'Recommendations'
             $i = 1
             $result.Recommendations | ForEach-Object {
                 Write-Host "  $i. $_" -ForegroundColor Green
@@ -1206,8 +1152,7 @@ function Invoke-AnalyzeCommand {
             $result | ConvertTo-Json -Depth 10 | Set-Content $outputPath
             Write-Info "Analysis saved to: $outputPath"
         }
-    }
-    catch {
+    } catch {
         Write-Error "Analysis failed: $_"
     }
 }
@@ -1218,7 +1163,7 @@ function Invoke-ChatCommand {
     param([string[]]$CmdArgs)
 
     $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
-        model = $null
+        model  = $null
         system = $null
     }
 
@@ -1227,8 +1172,8 @@ function Invoke-ChatCommand {
     # Check LLM availability
     $llmStatus = Get-LLMStatus
     if (-not $llmStatus.Available) {
-        Write-Error "No LLM provider available"
-        Write-Info "Ensure pcai-inference is running (default: http://127.0.0.1:8080)"
+        Write-Error 'No LLM provider available'
+        Write-Info 'Ensure pcai-inference is running (default: http://127.0.0.1:8080)'
         return
     }
 
@@ -1240,15 +1185,15 @@ function Invoke-ChatCommand {
 
     $includeContext = $parsed.Flags['context']
 
-    Write-Header "PC-AI Chat"
+    Write-Header 'PC-AI Chat'
     Write-Info "Model: $model"
     Write-Info "Type '/help' for commands, '/quit' to exit"
-    Write-Host ""
+    Write-Host ''
 
     # Start chat session
     try {
         $chatParams = @{
-            Model = $model
+            Model       = $model
             Interactive = $true
         }
 
@@ -1261,8 +1206,7 @@ function Invoke-ChatCommand {
         }
 
         Invoke-LLMChat @chatParams
-    }
-    catch {
+    } catch {
         Write-Error "Chat session failed: $_"
     }
 }
@@ -1274,7 +1218,7 @@ function Invoke-LLMCommand {
 
     $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
         provider = 'pcai-inference'
-        model = $null
+        model    = $null
     }
 
     $subCommand = $parsed.SubCommand
@@ -1283,12 +1227,12 @@ function Invoke-LLMCommand {
 
     switch ($subCommand) {
         'status' {
-            Write-Header "LLM Provider Status"
+            Write-Header 'LLM Provider Status'
 
             try {
                 $status = Get-LLMStatus
 
-                Write-SubHeader "pcai-inference"
+                Write-SubHeader 'pcai-inference'
                 $color = if ($status.PcaiInference.ApiConnected) { 'Green' } else { 'Red' }
                 Write-Bullet "Available: $($status.PcaiInference.ApiConnected)" -Color $color
                 if ($status.PcaiInference.ApiConnected) {
@@ -1300,7 +1244,7 @@ function Invoke-LLMCommand {
                 }
 
                 if ($status.Router) {
-                    Write-SubHeader "FunctionGemma Router"
+                    Write-SubHeader 'FunctionGemma Router'
                     $color = if ($status.Router.ApiConnected) { 'Green' } else { 'Red' }
                     Write-Bullet "Available: $($status.Router.ApiConnected)" -Color $color
                     if ($status.Router.ApiConnected) {
@@ -1308,35 +1252,33 @@ function Invoke-LLMCommand {
                         Write-Bullet "Model: $($status.Router.Model)"
                     }
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Failed to get LLM status: $_"
             }
         }
 
         'models' {
-            Write-Header "Available LLM Models"
+            Write-Header 'Available LLM Models'
 
             $provider = $parsed.Values['provider']
 
             try {
                 $status = Get-LLMStatus
 
-                if ($provider -in @('pcai-inference','ollama') -and $status.PcaiInference.ApiConnected) {
-                    Write-SubHeader "pcai-inference Models"
+                if ($provider -in @('pcai-inference', 'ollama') -and $status.PcaiInference.ApiConnected) {
+                    Write-SubHeader 'pcai-inference Models'
                     $status.PcaiInference.Models | ForEach-Object {
                         $color = if ($_.Name -eq $status.PcaiInference.DefaultModel) { 'Green' } else { 'White' }
                         Write-Bullet "$($_.Name)" -Color $color
                     }
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Failed to list models: $_"
             }
         }
 
         'config' {
-            Write-Header "LLM Configuration"
+            Write-Header 'LLM Configuration'
 
             $llmConfig = Load-LLMConfig
 
@@ -1346,14 +1288,12 @@ function Invoke-LLMCommand {
                 try {
                     Set-LLMConfig -DefaultModel $model
                     Write-Success "Default model set to: $model"
-                }
-                catch {
+                } catch {
                     Write-Error "Failed to set model: $_"
                 }
-            }
-            else {
+            } else {
                 # Show config
-                Write-SubHeader "Current Configuration"
+                Write-SubHeader 'Current Configuration'
                 Write-Bullet "Default Model: $($llmConfig.providers.'pcai-inference'.defaultModel)"
                 Write-Bullet "Timeout: $($llmConfig.providers.'pcai-inference'.timeout)ms"
                 Write-Bullet "Max Context: $($llmConfig.contextManagement.maxContextTokens) tokens"
@@ -1361,17 +1301,16 @@ function Invoke-LLMCommand {
         }
 
         'test' {
-            Write-Header "LLM Connectivity Test"
+            Write-Header 'LLM Connectivity Test'
 
             try {
                 $testResult = Send-OllamaRequest -Prompt "Respond with 'OK' only." -Stream $false
 
                 if ($testResult) {
-                    Write-Success "LLM connectivity test passed"
+                    Write-Success 'LLM connectivity test passed'
                     Write-Info "Response: $testResult"
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "LLM connectivity test failed: $_"
             }
         }
@@ -1401,72 +1340,71 @@ function Invoke-CleanupCommand {
 
     switch ($subCommand) {
         'path' {
-            Write-Header "PATH Environment Cleanup"
+            Write-Header 'PATH Environment Cleanup'
 
             if ($dryRun) {
-                Write-Info "[DRY RUN] Analyzing PATH..."
+                Write-Info '[DRY RUN] Analyzing PATH...'
             }
 
             try {
                 $analysis = Get-PathDuplicates
 
                 if ($analysis.Duplicates) {
-                    Write-SubHeader "Duplicate Entries"
+                    Write-SubHeader 'Duplicate Entries'
                     $analysis.Duplicates | ForEach-Object {
                         Write-Bullet $_ -Color Yellow
                     }
                 }
 
                 if ($analysis.NonExistent) {
-                    Write-SubHeader "Non-Existent Paths"
+                    Write-SubHeader 'Non-Existent Paths'
                     $analysis.NonExistent | ForEach-Object {
                         Write-Bullet $_ -Color Red
                     }
                 }
 
                 if (-not $analysis.Duplicates -and -not $analysis.NonExistent) {
-                    Write-Success "PATH is clean - no issues found"
+                    Write-Success 'PATH is clean - no issues found'
                     return
                 }
 
                 if (-not $dryRun) {
                     if (-not $force) {
-                        $response = Read-Host "Clean up PATH? (y/n)"
+                        $response = Read-Host 'Clean up PATH? (y/n)'
                         if ($response -ne 'y') {
-                            Write-Info "Cleanup cancelled"
+                            Write-Info 'Cleanup cancelled'
                             return
                         }
                     }
 
-                    if (-not (Require-Administrator "PATH cleanup")) { return }
+                    if (-not (Require-Administrator 'PATH cleanup')) { return }
 
                     $result = Repair-MachinePath -CreateBackup
 
                     if ($result.Success) {
-                        Write-Success "PATH cleaned successfully"
+                        Write-Success 'PATH cleaned successfully'
                         Write-Info "Entries removed: $($result.EntriesRemoved)"
                         if ($result.BackupPath) {
                             Write-Info "Backup saved to: $($result.BackupPath)"
                         }
                     }
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "PATH cleanup failed: $_"
             }
         }
 
         'temp' {
-            Write-Header "Temporary Files Cleanup"
+            Write-Header 'Temporary Files Cleanup'
 
             if ($dryRun) {
-                Write-Info "[DRY RUN] Analyzing temp files..."
+                Write-Info '[DRY RUN] Analyzing temp files...'
             }
 
             try {
                 $result = Clear-TempFiles -DryRun:$dryRun
 
-                Write-SubHeader "Cleanup Summary"
+                Write-SubHeader 'Cleanup Summary'
                 Write-Bullet "Files found: $($result.FilesFound)"
                 Write-Bullet "Space to recover: $([math]::Round($result.SpaceBytes / 1MB, 2)) MB"
 
@@ -1475,14 +1413,13 @@ function Invoke-CleanupCommand {
                     Write-Bullet "Space recovered: $([math]::Round($result.SpaceRecovered / 1MB, 2)) MB"
 
                     if ($result.Errors) {
-                        Write-SubHeader "Errors (files in use)"
+                        Write-SubHeader 'Errors (files in use)'
                         $result.Errors | Select-Object -First 5 | ForEach-Object {
                             Write-Bullet $_ -Color Yellow
                         }
                     }
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Temp cleanup failed: $_"
             }
         }
@@ -1491,7 +1428,7 @@ function Invoke-CleanupCommand {
             $searchPath = if ($parsed.Positional) { $parsed.Positional[0] } else { $null }
 
             if (-not $searchPath) {
-                Write-Error "Path required. Use: PC-AI cleanup duplicates <path>"
+                Write-Error 'Path required. Use: PC-AI cleanup duplicates <path>'
                 return
             }
 
@@ -1500,7 +1437,7 @@ function Invoke-CleanupCommand {
                 return
             }
 
-            Write-Header "Duplicate File Detection"
+            Write-Header 'Duplicate File Detection'
             Write-Info "Searching: $searchPath"
             Write-Info "Recursive: $recursive"
 
@@ -1511,7 +1448,7 @@ function Invoke-CleanupCommand {
                     Write-SubHeader "Duplicate Sets Found: $($result.DuplicateSets.Count)"
 
                     $result.DuplicateSets | Select-Object -First 10 | ForEach-Object {
-                        Write-Host ""
+                        Write-Host ''
                         Write-Host "  Hash: $($_.Hash.Substring(0, 16))..." -ForegroundColor DarkGray
                         Write-Host "  Size: $([math]::Round($_.Size / 1KB, 2)) KB" -ForegroundColor DarkGray
                         $_.Files | ForEach-Object {
@@ -1519,15 +1456,13 @@ function Invoke-CleanupCommand {
                         }
                     }
 
-                    Write-Host ""
+                    Write-Host ''
                     Write-Bullet "Total duplicate sets: $($result.DuplicateSets.Count)" -Color Yellow
                     Write-Bullet "Potential space savings: $([math]::Round($result.WastedSpace / 1MB, 2)) MB" -Color Yellow
+                } else {
+                    Write-Success 'No duplicate files found'
                 }
-                else {
-                    Write-Success "No duplicate files found"
-                }
-            }
-            catch {
+            } catch {
                 Write-Error "Duplicate detection failed: $_"
             }
         }
@@ -1547,10 +1482,10 @@ function Invoke-PerfCommand {
     param([string[]]$CmdArgs)
 
     $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
-        top = 10
+        top      = 10
         duration = 30
         interval = 1000
-        sort = 'cpu'
+        sort     = 'cpu'
     }
 
     $subCommand = $parsed.SubCommand
@@ -1559,7 +1494,7 @@ function Invoke-PerfCommand {
 
     switch ($subCommand) {
         'disk' {
-            Write-Header "Disk Space Analysis"
+            Write-Header 'Disk Space Analysis'
 
             try {
                 $diskSpace = Get-DiskSpace
@@ -1570,12 +1505,12 @@ function Invoke-PerfCommand {
                     $totalGB = [math]::Round($_.TotalGB, 2)
 
                     $color = if ($usedPercent -gt 90) { 'Red' }
-                            elseif ($usedPercent -gt 75) { 'Yellow' }
-                            else { 'Green' }
+                    elseif ($usedPercent -gt 75) { 'Yellow' }
+                    else { 'Green' }
 
-                    Write-Host ""
+                    Write-Host ''
                     Write-Host "  Drive $($_.DriveLetter):" -ForegroundColor Cyan
-                    Write-Host "    Used: " -NoNewline
+                    Write-Host '    Used: ' -NoNewline
                     Write-Host "$usedPercent%" -ForegroundColor $color -NoNewline
                     Write-Host " ($($totalGB - $freeGB) GB / $totalGB GB)"
                     Write-Host "    Free: $freeGB GB"
@@ -1587,14 +1522,13 @@ function Invoke-PerfCommand {
                     $bar = '=' * $filledLength + '-' * ($barLength - $filledLength)
                     Write-Host "    [$bar]" -ForegroundColor $color
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Disk analysis failed: $_"
             }
         }
 
         'process' {
-            Write-Header "Top Processes by Resource Usage"
+            Write-Header 'Top Processes by Resource Usage'
 
             $topN = [int]$parsed.Values['top']
             $sortBy = $parsed.Values['sort']
@@ -1604,40 +1538,38 @@ function Invoke-PerfCommand {
 
                 Write-SubHeader "Top $topN by $($sortBy.ToUpper())"
 
-                $format = "{0,-6} {1,-30} {2,10} {3,12}"
-                Write-Host ($format -f "PID", "Name", "CPU %", "Memory MB") -ForegroundColor DarkGray
+                $format = '{0,-6} {1,-30} {2,10} {3,12}'
+                Write-Host ($format -f 'PID', 'Name', 'CPU %', 'Memory MB') -ForegroundColor DarkGray
 
                 $processes | ForEach-Object {
                     $cpuColor = if ($_.CPUPercent -gt 50) { 'Red' }
-                               elseif ($_.CPUPercent -gt 25) { 'Yellow' }
-                               else { 'White' }
+                    elseif ($_.CPUPercent -gt 25) { 'Yellow' }
+                    else { 'White' }
 
                     $memMB = [math]::Round($_.MemoryMB, 1)
                     $name = if ($_.Name.Length -gt 28) { $_.Name.Substring(0, 28) + '..' } else { $_.Name }
 
                     Write-Host ($format -f $_.PID, $name, "$($_.CPUPercent)%", "$memMB MB") -ForegroundColor $cpuColor
                 }
-            }
-            catch {
+            } catch {
                 Write-Error "Process analysis failed: $_"
             }
         }
 
         'watch' {
-            Write-Header "Real-Time System Monitor"
+            Write-Header 'Real-Time System Monitor'
 
             $duration = [int]$parsed.Values['duration']
             $interval = [int]$parsed.Values['interval']
 
             Write-Info "Duration: $duration seconds"
             Write-Info "Interval: $interval ms"
-            Write-Info "Press Ctrl+C to stop early"
-            Write-Host ""
+            Write-Info 'Press Ctrl+C to stop early'
+            Write-Host ''
 
             try {
                 Watch-SystemResources -Duration $duration -IntervalMs $interval
-            }
-            catch {
+            } catch {
                 Write-Error "Monitoring failed: $_"
             }
         }
@@ -1645,12 +1577,11 @@ function Invoke-PerfCommand {
         'vsock' {
             if (-not (Ensure-Module 'PC-AI.Network')) { return }
 
-            Write-Header "VSock Performance Monitor"
+            Write-Header 'VSock Performance Monitor'
 
             try {
                 Watch-VSockPerformance
-            }
-            catch {
+            } catch {
                 Write-Error "VSock monitoring failed: $_"
             }
         }
@@ -1670,7 +1601,7 @@ function Invoke-DoctorCommand {
     param([string[]]$CmdArgs)
 
     $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{
-        json = $false
+        json   = $false
         legacy = $false
     }
 
@@ -1734,8 +1665,8 @@ function Invoke-DoctorCommand {
 
     $health = $report.Health
 
-    Write-Header "PC-AI Doctor"
-    Write-SubHeader "Summary"
+    Write-Header 'PC-AI Doctor'
+    Write-SubHeader 'Summary'
 
     $overallColor = if ($health.OverallStatus -eq 'Healthy') { 'Green' } elseif ($health.OverallStatus -eq 'Degraded') { 'Yellow' } else { 'Yellow' }
     Write-Bullet "Overall: $($health.OverallStatus)" -Color $overallColor
@@ -1752,7 +1683,7 @@ function Invoke-DoctorCommand {
     $gpuColor = if ($health.Gpu.Status -eq 'OK') { 'Green' } elseif ($health.Gpu.Status -eq 'NotFound') { 'Yellow' } else { 'Yellow' }
     Write-Bullet "GPU: $($health.Gpu.Status)" -Color $gpuColor
 
-    Write-SubHeader "pcai-inference"
+    Write-SubHeader 'pcai-inference'
     Write-Bullet "URL: $pcaiUrl"
     $respondColor = if ($health.PcaiInference.Responding) { 'Green' } else { 'Red' }
     Write-Bullet "Responding: $($health.PcaiInference.Responding)" -Color $respondColor
@@ -1762,25 +1693,25 @@ function Invoke-DoctorCommand {
     $modelLoadedColor = if ($health.PcaiInference.ModelLoaded) { 'Green' } else { 'Yellow' }
     Write-Bullet "Model Loaded: $($health.PcaiInference.ModelLoaded)" -Color $modelLoadedColor
 
-    Write-SubHeader "FunctionGemma Router"
+    Write-SubHeader 'FunctionGemma Router'
     Write-Bullet "URL: $functionGemmaUrl"
     $fgRespondColor = if ($health.FunctionGemma.Responding) { 'Green' } else { 'Red' }
     Write-Bullet "Responding: $($health.FunctionGemma.Responding)" -Color $fgRespondColor
 
-    Write-SubHeader "Native Inference DLL"
+    Write-SubHeader 'Native Inference DLL'
     Write-Bullet "Available: $($health.NativeFFI.DllExists)" -Color $nativeColor
     if ($health.NativeFFI.Path) {
         Write-Bullet "Path: $($health.NativeFFI.Path)"
     }
 
-    Write-SubHeader "GPU"
+    Write-SubHeader 'GPU'
     if ($health.Gpu.Devices -and $health.Gpu.Devices.Count -gt 0) {
         foreach ($gpu in $health.Gpu.Devices) {
-            $driver = if ($gpu.DriverVersion) { " (Driver $($gpu.DriverVersion))" } else { "" }
+            $driver = if ($gpu.DriverVersion) { " (Driver $($gpu.DriverVersion))" } else { '' }
             Write-Bullet "$($gpu.Name)$driver"
         }
     } else {
-        Write-Bullet "No GPU devices detected"
+        Write-Bullet 'No GPU devices detected'
     }
 
     $nvidiaSmiColor = if ($health.Gpu.NvidiaSmi) { 'Green' } else { 'Yellow' }
@@ -1795,29 +1726,29 @@ function Invoke-DoctorCommand {
         }
     }
 
-    Write-SubHeader "Environment"
+    Write-SubHeader 'Environment'
     if ($health.WSL.Status -ne 'Unknown') {
         $wslColor = if ($health.WSL.Status -eq 'OK') { 'Green' } elseif ($health.WSL.Status -eq 'Stopped') { 'Yellow' } else { 'Red' }
         Write-Bullet "WSL: $($health.WSL.Status)" -Color $wslColor
     }
 
     if ($report.Recommendations -and $report.Recommendations.Count -gt 0) {
-        Write-SubHeader "Suggested Fixes"
+        Write-SubHeader 'Suggested Fixes'
         foreach ($rec in $report.Recommendations) {
             Write-Bullet $rec -Color Yellow
         }
     } else {
-        Write-Success "No issues detected."
+        Write-Success 'No issues detected.'
     }
 }
 #endregion
 
 #region Status Command
 function Invoke-StatusCommand {
-    Write-Header "PC-AI System Status"
+    Write-Header 'PC-AI System Status'
 
     # Framework info
-    Write-SubHeader "Framework"
+    Write-SubHeader 'Framework'
     Write-Bullet "Version: $script:Version"
     Write-Bullet "Modules Path: $script:ModulesPath"
     Write-Bullet "Config Path: $script:ConfigPath"
@@ -1828,7 +1759,7 @@ function Invoke-StatusCommand {
     Write-Bullet "Administrator: $isAdmin" -Color $adminColor
 
     # Module status
-    Write-SubHeader "Modules"
+    Write-SubHeader 'Modules'
     $modules = @(
         'PC-AI.Hardware',
         'PC-AI.Virtualization',
@@ -1849,7 +1780,7 @@ function Invoke-StatusCommand {
     }
 
     # Inference backend status
-    Write-SubHeader "Inference Backend"
+    Write-SubHeader 'Inference Backend'
     Write-Bullet "Mode: $script:InferenceMode"
 
     if ($script:InferenceMode -eq 'native') {
@@ -1857,24 +1788,22 @@ function Invoke-StatusCommand {
             $status = Get-PcaiInferenceStatus
             Write-Bullet "Native Backend: $($status.CurrentBackend)" -Color Green
             Write-Bullet "Model Loaded: $($status.ModelLoaded)" -Color $(if ($status.ModelLoaded) { 'Green' } else { 'Yellow' })
-        }
-        catch {
-            Write-Bullet "Native Backend: Error" -Color Red
+        } catch {
+            Write-Bullet 'Native Backend: Error' -Color Red
         }
     }
 
     # LLM status (quick check for HTTP mode)
-    Write-SubHeader "LLM Provider (HTTP)"
+    Write-SubHeader 'LLM Provider (HTTP)'
     try {
-        $pcaiTest = Invoke-RestMethod -Uri 'http://127.0.0.1:8080/v1/models' -Method Get -TimeoutSec 2 -ErrorAction SilentlyContinue
-        Write-Bullet "pcai-inference: Running" -Color Green
-    }
-    catch {
-        Write-Bullet "pcai-inference: Not Running" -Color Yellow
+        $null = Invoke-RestMethod -Uri 'http://127.0.0.1:8080/v1/models' -Method Get -TimeoutSec 2 -ErrorAction SilentlyContinue
+        Write-Bullet 'pcai-inference: Running' -Color Green
+    } catch {
+        Write-Bullet 'pcai-inference: Not Running' -Color Yellow
     }
 
     # Quick system info
-    Write-SubHeader "System"
+    Write-SubHeader 'System'
     $os = Get-CimInstance Win32_OperatingSystem
     $cs = Get-CimInstance Win32_ComputerSystem
     Write-Bullet "OS: $($os.Caption)"
@@ -1883,171 +1812,19 @@ function Invoke-StatusCommand {
 }
 #endregion
 
-#region Doctor Command
-function Invoke-DoctorCommand {
-    param([string[]]$CmdArgs)
-
-    $parsed = Get-ParsedArguments -InputArgs $CmdArgs -Defaults @{}
-    $asJson = $false
-    if ($parsed.Flags.ContainsKey('json')) { $asJson = $parsed.Flags['json'] }
-    $full = $false
-    if ($parsed.Flags.ContainsKey('full')) { $full = $parsed.Flags['full'] }
-
-    $results = [ordered]@{
-        Timestamp = Get-Date
-        Admin = Test-Administrator
-        Modules = @{}
-        Services = $null
-        LLM = $null
-        Native = $null
-        Recommendations = @()
-    }
-
-    $moduleList = @(
-        'PC-AI.LLM',
-        'PC-AI.Virtualization',
-        'PcaiInference',
-        'PC-AI.Acceleration'
-    )
-
-    foreach ($moduleName in $moduleList) {
-        $modulePath = Join-Path $script:ModulesPath "$moduleName\$moduleName.psd1"
-        $results.Modules[$moduleName] = (Test-Path $modulePath)
-    }
-
-    $doctorUsed = $false
-    if (Ensure-Module 'PC-AI.Virtualization') {
-        try {
-            if (Get-Command Invoke-PcaiDoctor -ErrorAction SilentlyContinue) {
-                $doctor = Invoke-PcaiDoctor
-                $results.Services = $doctor.Health
-                if ($doctor.Recommendations) {
-                    $results.Recommendations += @($doctor.Recommendations)
-                }
-                $doctorUsed = $true
-            } else {
-                $results.Services = Get-PcaiServiceHealth
-            }
-        } catch {
-            $results.Recommendations += "Failed to read PC-AI service health: $($_.Exception.Message)"
-        }
-    } else {
-        $results.Recommendations += "PC-AI.Virtualization module missing."
-    }
-
-    if (Ensure-Module 'PC-AI.LLM') {
-        try {
-            $results.LLM = Get-LLMStatus -TestConnection -IncludeVLLM
-        } catch {
-            $results.Recommendations += "Failed to read LLM status: $($_.Exception.Message)"
-        }
-    } else {
-        $results.Recommendations += "PC-AI.LLM module missing."
-    }
-
-    if (Ensure-Module 'PcaiInference') {
-        try {
-            $results.Native = Get-PcaiInferenceStatus
-        } catch {
-            $results.Recommendations += "Failed to read native inference status: $($_.Exception.Message)"
-        }
-    }
-
-    if (-not $results.Admin) {
-        $results.Recommendations += 'Run PowerShell as Administrator for full repair actions.'
-    }
-
-    if ($results.LLM -and -not $results.LLM.PcaiInference.ApiConnected) {
-        $results.Recommendations += "pcai-inference is not reachable at $($results.LLM.PcaiInference.ApiUrl). Start it with Invoke-PcaiServiceHost or run the server in Deploy\\pcai-inference."
-    }
-
-    if ($results.LLM -and $results.LLM.Router.ApiUrl -and -not $results.LLM.Router.ApiConnected) {
-        $results.Recommendations += "FunctionGemma router is not reachable at $($results.LLM.Router.ApiUrl). Start rust-functiongemma-runtime."
-    }
-
-    if ($results.Native) {
-        if (-not $results.Native.DllExists) {
-            $results.Recommendations += "pcai_inference.dll is missing. Build it: cd Deploy\\pcai-inference; .\\build.ps1"
-        } elseif (-not $results.Native.BackendInitialized) {
-            $results.Recommendations += "Native inference backend is not initialized. Use Initialize-PcaiInference and Import-PcaiModel."
-        } elseif (-not $results.Native.ModelLoaded) {
-            $results.Recommendations += "Native backend is initialized but no model is loaded."
-        }
-    }
-
-    if (-not $doctorUsed -and $results.Services -and $results.Services.Gpu) {
-        if ($results.Services.Gpu.Status -eq 'NotFound') {
-            $results.Recommendations += 'No GPU detected (CPU-only is OK for small models). Install GPU drivers if needed.'
-        }
-        if ($results.Services.Gpu.NvidiaSmi -eq $false) {
-            $results.Recommendations += 'nvidia-smi not found; NVIDIA diagnostics may be unavailable.'
-        }
-    }
-
-    if ($asJson) {
-        $results | ConvertTo-Json -Depth 8
-        return
-    }
-
-    Write-Header "PC-AI Doctor"
-    Write-SubHeader "Environment"
-    Write-Bullet "Admin: $($results.Admin)" -Color $(if ($results.Admin) { 'Green' } else { 'Yellow' })
-
-    Write-SubHeader "Modules"
-    foreach ($module in $results.Modules.Keys) {
-        $ok = $results.Modules[$module]
-        Write-Bullet "$module`: $ok" -Color $(if ($ok) { 'Green' } else { 'Red' })
-    }
-
-    if ($results.Services) {
-        Write-SubHeader "Services"
-        Write-Bullet "pcai-inference: $($results.Services.PcaiInference.Status)"
-        Write-Bullet "FunctionGemma: $($results.Services.FunctionGemma.Status)"
-        if ($results.Services.Gpu) {
-            Write-Bullet "GPU: $($results.Services.Gpu.Status)"
-        }
-    }
-
-    if ($results.LLM) {
-        Write-SubHeader "LLM"
-        Write-Bullet "pcai-inference: $($results.LLM.PcaiInference.ApiConnected) ($($results.LLM.PcaiInference.ApiUrl))"
-        Write-Bullet "Router: $($results.LLM.Router.ApiConnected) ($($results.LLM.Router.ApiUrl))"
-    }
-
-    if ($results.Native) {
-        Write-SubHeader "Native Inference"
-        Write-Bullet "DLL Exists: $($results.Native.DllExists)"
-        Write-Bullet "Backend Initialized: $($results.Native.BackendInitialized)"
-        Write-Bullet "Model Loaded: $($results.Native.ModelLoaded)"
-    }
-
-    if ($results.Recommendations.Count -gt 0) {
-        Write-SubHeader "Recommendations"
-        $results.Recommendations | ForEach-Object { Write-Bullet $_ -Color Yellow }
-    } else {
-        Write-SubHeader "Recommendations"
-        Write-Bullet "No obvious runtime issues detected." -Color Green
-    }
-
-    if ($full -and $results.Services) {
-        Write-SubHeader "Full Service Health (JSON)"
-        $results.Services | ConvertTo-Json -Depth 6
-    }
-}
-#endregion
 
 #region Version Command
 function Invoke-VersionCommand {
-    Write-Host ""
-    Write-Host "PC-AI Framework" -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host 'PC-AI Framework' -ForegroundColor Cyan
     Write-Host "Version: $script:Version" -ForegroundColor White
-    Write-Host ""
-    Write-Host "Local LLM-Powered PC Diagnostics and Optimization"
-    Write-Host "Copyright (c) 2025 PC_AI Project"
-    Write-Host ""
+    Write-Host ''
+    Write-Host 'Local LLM-Powered PC Diagnostics and Optimization'
+    Write-Host 'Copyright (c) 2025 PC_AI Project'
+    Write-Host ''
 
     # Module versions
-    Write-Host "Module Versions:" -ForegroundColor DarkGray
+    Write-Host 'Module Versions:' -ForegroundColor DarkGray
     $modules = Get-ChildItem -Path $script:ModulesPath -Directory -ErrorAction SilentlyContinue
 
     foreach ($module in $modules) {
@@ -2056,8 +1833,7 @@ function Invoke-VersionCommand {
             try {
                 $data = Import-PowerShellDataFile $manifest
                 Write-Host "  $($module.Name): $($data.ModuleVersion)" -ForegroundColor DarkGray
-            }
-            catch {
+            } catch {
                 Write-Host "  $($module.Name): Unknown" -ForegroundColor DarkGray
             }
         }
@@ -2101,7 +1877,6 @@ function Main {
             'perf' { Invoke-PerfCommand -CmdArgs $Arguments }
             'doctor' { Invoke-DoctorCommand -CmdArgs $Arguments }
             'status' { Invoke-StatusCommand }
-            'doctor' { Invoke-DoctorCommand -CmdArgs $Arguments }
             'version' { Invoke-VersionCommand }
             'help' {
                 $topic = if ($Arguments) { $Arguments[0] } else { $null }
@@ -2112,11 +1887,10 @@ function Main {
                 Show-MainHelp
             }
         }
-    }
-    finally {
+    } finally {
         # Clean up native inference if initialized
         if ($script:NativeInferenceReady) {
-            Write-Verbose "Cleaning up native inference backend..."
+            Write-Verbose 'Cleaning up native inference backend...'
             Close-PcaiInference
         }
     }

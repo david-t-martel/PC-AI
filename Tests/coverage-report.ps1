@@ -86,7 +86,6 @@ $($moduleCoverage | ForEach-Object { "| $($_.Module) | $($_.TestFiles) |" } | Ou
 | rust-functiongemma-runtime | $(@($rustTests | Where-Object { $_.FullName -match 'rust-functiongemma-runtime' }).Count) |
 | rust-functiongemma-train | $(@($rustTests | Where-Object { $_.FullName -match 'rust-functiongemma-train' }).Count) |
 | pcai_core | $(@($rustTests | Where-Object { $_.FullName -match 'pcai_core' }).Count) |
-| pcai_fs | $(@($rustTests | Where-Object { $_.FullName -match 'pcai_fs' }).Count) |
 
 $(if ($testResults) {
 @"

@@ -6,6 +6,10 @@
     Tests WSL status, Hyper-V detection, Docker diagnostics, and virtualization optimization
 #>
 
+if (-not (Get-Variable -Name IsAdmin -Scope Script -ErrorAction SilentlyContinue)) {
+    $script:IsAdmin = $false
+}
+
 BeforeAll {
     # Import module under test
     $ModulePath = Join-Path $PSScriptRoot '..\..\Modules\PC-AI.Virtualization\PC-AI.Virtualization.psd1'

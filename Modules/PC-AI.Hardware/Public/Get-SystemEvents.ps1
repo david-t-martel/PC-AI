@@ -44,50 +44,74 @@ function Get-SystemEvents {
     )
 
     try {
-        $startTime = (Get-Date).AddDays(-$Days)
+        $results = @()
+        $nativeAvailable = $false
 
-        # Define event levels: 1=Critical, 2=Error, 3=Warning, 4=Information
-        $levels = if ($IncludeInfo) { @(1, 2, 3, 4) } else { @(1, 2, 3) }
-
-        $events = Get-WinEvent -FilterHashtable @{
-            LogName   = 'System'
-            Level     = $levels
-            StartTime = $startTime
-        } -ErrorAction SilentlyContinue | Where-Object {
-            $_.ProviderName -match 'disk|storahci|nvme|usbhub|USB|nvstor|iaStor|stornvme|partmgr|ntfs|volmgr'
-        } | Select-Object -First $MaxEvents
-
-        if (-not $events -or $events.Count -eq 0) {
-            Write-Verbose "No disk/USB-related events found in the last $Days days."
-            return @()
+        # Attempt to use Native Core if available
+        $json = Get-HardwareSystemEventsNative -Days $Days -MaxEvents $MaxEvents
+        if ($json) {
+            $nativeEvents = $json | ConvertFrom-Json
+            foreach ($ev in $nativeEvents) {
+                $results += [PSCustomObject]@{
+                    TimeCreated  = [DateTime]::Parse($ev.time_created)
+                    ProviderName = $ev.provider_name
+                    Id           = $ev.id
+                    Level        = $ev.level_display
+                    Severity     = $ev.severity
+                    Message      = $ev.message
+                    FullMessage  = $ev.full_message
+                }
+            }
+            $nativeAvailable = $true
         }
 
-        $results = $events | ForEach-Object {
-            # Determine severity from level
-            $severity = switch ($_.Level) {
-                1 { 'Critical' }
-                2 { 'Error' }
-                3 { 'Warning' }
-                4 { 'Info' }
-                default { 'Unknown' }
-            }
+        if (-not $nativeAvailable) {
+            $startTime = (Get-Date).AddDays(-$Days)
+            $levels = if ($IncludeInfo) { @(1, 2, 3, 4) } else { @(1, 2, 3) }
 
-            [PSCustomObject]@{
-                TimeCreated  = $_.TimeCreated
-                ProviderName = $_.ProviderName
-                Id           = $_.Id
-                Level        = $_.LevelDisplayName
-                Severity     = $severity
-                Message      = ($_.Message -split "`n")[0]  # First line only
-                FullMessage  = $_.Message
+            $events = Get-WinEvent -FilterHashtable @{
+                LogName   = 'System'
+                Level     = $levels
+                StartTime = $startTime
+            } -ErrorAction SilentlyContinue | Where-Object {
+                $_.ProviderName -match 'disk|storahci|nvme|usbhub|USB|nvstor|iaStor|stornvme|partmgr|ntfs|volmgr'
+            } | Select-Object -First $MaxEvents
+
+            if ($events) {
+                foreach ($ev in $events) {
+                    $severity = switch ($ev.Level) {
+                        1 { 'Critical' }
+                        2 { 'Error' }
+                        3 { 'Warning' }
+                        4 { 'Info' }
+                        default { 'Unknown' }
+                    }
+
+                    $results += [PSCustomObject]@{
+                        TimeCreated  = $ev.TimeCreated
+                        ProviderName = $ev.ProviderName
+                        Id           = $ev.Id
+                        Level        = $ev.LevelDisplayName
+                        Severity     = $severity
+                        Message      = ($ev.Message -split "`n")[0]
+                        FullMessage  = $ev.Message
+                    }
+                }
             }
         }
 
         return $results | Sort-Object -Property TimeCreated -Descending
 
-    }
-    catch {
+    } catch {
         Write-Error "Failed to query system events: $($_.Exception.Message)"
         return @()
     }
+}
+
+function Get-HardwareSystemEventsNative {
+    param($Days, $MaxEvents)
+    if ($null -ne (Get-Module -Name 'PC-AI.Common' -ErrorAction SilentlyContinue) -and [PcaiNative.HardwareModule]::IsAvailable) {
+        return [PcaiNative.HardwareModule]::SampleHardwareEventsJson($Days, $MaxEvents)
+    }
+    return $null
 }

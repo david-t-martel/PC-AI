@@ -65,11 +65,18 @@ namespace PcaiNative
     }
 
     /// <summary>
-    /// P/Invoke declarations for pcai_performance.dll.
+    /// P/Invoke declarations for pcai_core_lib.dll (consolidated from performance module).
     /// Provides disk usage analysis, process monitoring, and memory statistics.
     /// </summary>
     public static class PerformanceModule
     {
+        private static readonly Lazy<bool> _isAvailable = new(() =>
+        {
+            try { return NativeCore.pcai_core_test() == 0x50434149; }
+            catch { return false; }
+        });
+
+        public static bool IsAvailable => _isAvailable.Value;
 
         // ====================================================================
         // Disk Usage Functions
@@ -168,6 +175,75 @@ namespace PcaiNative
             {
                 NativeCore.pcai_free_string_buffer(ref buffer);
             }
+        }
+
+        /// <summary>
+        /// Queries structured hardware metrics natively.
+        /// </summary>
+        public static PcaiMetrics? GetResourceMetrics()
+        {
+            // Placeholder - returns null until structured struct is ready
+            return null;
+        }
+
+        /// <summary>
+        /// Queries hardware metrics JSON natively.
+        /// </summary>
+        public static string? QueryHardwareMetrics()
+        {
+            var buffer = NativeCore.pcai_query_hardware_metrics();
+            try
+            {
+                return buffer.ToManagedString();
+            }
+            finally
+            {
+                NativeCore.pcai_free_string_buffer(ref buffer);
+            }
+        }
+
+        /// <summary>
+        /// Gets network throughput and stats using IPHelper.
+        /// </summary>
+        public static string? GetNetworkThroughput()
+        {
+            if (!IsAvailable) return null;
+            var ptr = NativeCore.pcai_get_network_throughput_json();
+            if (ptr == IntPtr.Zero) return null;
+            try
+            {
+                return Marshal.PtrToStringUTF8(ptr);
+            }
+            finally
+            {
+                NativeCore.pcai_free_string(ptr);
+            }
+        }
+
+        /// <summary>
+        /// Gets detailed process history using Psapi.
+        /// </summary>
+        public static string? GetProcessHistory()
+        {
+            if (!IsAvailable) return null;
+            var ptr = NativeCore.pcai_get_process_history_json();
+            if (ptr == IntPtr.Zero) return null;
+            try
+            {
+                return Marshal.PtrToStringUTF8(ptr);
+            }
+            finally
+            {
+                NativeCore.pcai_free_string(ptr);
+            }
+        }
+
+        /// <summary>
+        /// Checks if system resources are within safety limits (e.g. 80% load).
+        /// </summary>
+        public static bool CheckResourceSafety(float gpuLimit = 0.8f)
+        {
+            return NativeCore.pcai_check_resource_safety(gpuLimit) != 0;
         }
 
         // ====================================================================

@@ -36,6 +36,8 @@
   <ItemGroup>
     <!-- Ensure Rust DLLs are copied to output directory -->
     <None Include="pcai_core_lib.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_core_lib.dll')" />
+    <None Include="pcai_inference.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_inference.dll')" />
+    <None Include="pcai_router.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('pcai_router.dll')" />
   </ItemGroup>
 
 </Project>

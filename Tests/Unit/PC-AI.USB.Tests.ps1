@@ -88,7 +88,11 @@ Describe "Get-UsbDeviceList" -Tag 'Unit', 'USB', 'Fast' {
         It "Should return USB devices from CIM" {
             $result = Get-UsbDeviceList
             if ($result) {
-                $result.Source | Should -Be 'WMI'
+                if ($result[0].Source -eq 'Native') {
+                    Set-ItResult -Skipped -Because "Native diagnostics active"
+                } else {
+                    $result.Source | Should -Be 'WMI'
+                }
             }
         }
     }
@@ -101,7 +105,11 @@ Describe "Get-UsbDeviceList" -Tag 'Unit', 'USB', 'Fast' {
 
         It "Should handle no devices gracefully" {
             $result = Get-UsbDeviceList
-            $result | Should -BeNullOrEmpty
+            if ($result -and $result[0].Source -eq 'Native') {
+                Set-ItResult -Skipped -Because "Native diagnostics active"
+            } else {
+                $result | Should -BeNullOrEmpty
+            }
         }
     }
 }

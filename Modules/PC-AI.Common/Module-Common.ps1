@@ -1,28 +1,51 @@
-#Requires -Version 7.0
-<#
-.SYNOPSIS
-    Common utilities and shared state for PCAI modules.
-#>
+function Write-Success {
+    param([string]$Message)
+    Write-Host $Message -ForegroundColor Green
+}
+
+function Write-Warning {
+    param([string]$Message)
+    Write-Host "WARNING: $Message" -ForegroundColor Yellow
+}
+
+function Write-Error {
+    param([string]$Message)
+    Write-Host "ERROR: $Message" -ForegroundColor Red
+}
+
+function Write-Info {
+    param([string]$Message)
+    Write-Host $Message -ForegroundColor Cyan
+}
+
+function Write-Header {
+    param([string]$Message)
+    Write-Host ""
+    Write-Host "=== $Message ===" -ForegroundColor Magenta
+    Write-Host ""
+}
+
+function Write-SubHeader {
+    param([string]$Message)
+    Write-Host "--- $Message ---" -ForegroundColor DarkCyan
+}
+
+function Write-Bullet {
+    param([string]$Message, [string]$Color = 'White')
+    Write-Host "  * $Message" -ForegroundColor $Color
+}
 
 # Singleton initialization state
 $script:PcaiNativeInitialized = $false
 
 function Initialize-PcaiNative {
-    <#
-    .SYNOPSIS
-        Singleton initialization for PCAI native components.
-    #>
     [CmdletBinding()]
-    param(
-        [switch]$Force
-    )
+    param([switch]$Force)
 
     if ($script:PcaiNativeInitialized -and -not $Force) {
         return $true
     }
 
-    # Import the Acceleration module which contains the actual initialization logic
-    # This prevents circular dependencies and centralizes DLL loading.
     $accelModule = Get-Module PC-AI.Acceleration
     if (-not $accelModule) {
         $accelModule = Import-Module PC-AI.Acceleration -PassThru -ErrorAction SilentlyContinue
@@ -38,4 +61,4 @@ function Initialize-PcaiNative {
     return $false
 }
 
-Export-ModuleMember -Function Initialize-PcaiNative
+Export-ModuleMember -Function Write-Success, Write-Warning, Write-Error, Write-Info, Write-Header, Write-SubHeader, Write-Bullet, Initialize-PcaiNative

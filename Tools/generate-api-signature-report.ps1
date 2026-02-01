@@ -180,8 +180,7 @@ $extraHelpParams = @($psFunctions | Where-Object { @($_.ExtraHelpParameters).Cou
 $csharpRoot = Join-Path $RepoRoot 'Native\PcaiNative'
 $pcaiCorePath = Join-Path $csharpRoot 'PcaiCore.cs'
 $rustRoots = @(
-    (Join-Path $RepoRoot 'Native\pcai_core\pcai_core_lib\src'),
-    (Join-Path $RepoRoot 'Native\pcai_core\pcai_fs\src')
+    (Join-Path $RepoRoot 'Native\pcai_core\pcai_core_lib\src')
 )
 $csDllImports = Get-CSharpDllImports -Root $csharpRoot
 $rustExports = @()

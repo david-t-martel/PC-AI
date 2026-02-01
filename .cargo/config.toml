@@ -1,0 +1,29 @@
+[build]
+rustc-wrapper = "sccache"
+incremental = false
+
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
+rustflags = [
+	"-C",
+	"target-cpu=native",
+	"-C",
+	"link-arg=/INCREMENTAL:NO",
+	"-C",
+	"link-arg=/OPT:REF",
+	"-C",
+	"link-arg=/OPT:ICF",
+]
+
+[env]
+# Enable sccache for all builds in this workspace
+RUSTC_WRAPPER = "sccache"
+CARGO_INCREMENTAL = "0"
+SCCACHE_SERVER_PORT = "4226"
+SCCACHE_CACHE_COMPRESSION = "zstd"
+SCCACHE_DIRECT = "true"
+# CMake compiler launchers for C/C++/CUDA (llama.cpp, candle, etc.)
+CMAKE_C_COMPILER_LAUNCHER = "sccache"
+CMAKE_CXX_COMPILER_LAUNCHER = "sccache"
+# Ensure consistent CUDA paths if not set in environment
+# CUDA_PATH = "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.9"

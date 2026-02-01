@@ -114,8 +114,36 @@ function Get-EnrichedSystemPrompt {
         if ([PcaiNative.PcaiCore]::IsAvailable) {
             $snapshot = [PcaiNative.PcaiCore]::GetDashboardSnapshotJson()
             if ($snapshot) {
-                # Add snapshot directly to prompt, or format it
-                $telemetryBlock = "### LIVE SYSTEM TELEMETRY (NATIVE)`n$snapshot"
+                $summaryLines = $null
+                try {
+                    $snapshotObj = $snapshot | ConvertFrom-Json -ErrorAction Stop
+                    $metrics = $snapshotObj.Metrics
+                    if ($metrics) {
+                        $cpu = $metrics.cpu_usage_perc
+                        if ($null -eq $cpu -and $metrics.PSObject.Properties['CpuUsage']) { $cpu = $metrics.CpuUsage }
+                        $memUsed = $metrics.memory_usage_bytes
+                        if ($null -eq $memUsed -and $metrics.PSObject.Properties['MemoryUsage']) { $memUsed = $metrics.MemoryUsage }
+                        $memTotal = $metrics.total_memory_bytes
+                        if ($null -eq $memTotal -and $metrics.PSObject.Properties['TotalMemory']) { $memTotal = $metrics.TotalMemory }
+
+                        $cpuLine = if ($null -ne $cpu) { "CPU Usage: $([math]::Round($cpu, 2))%" } else { "CPU Usage: n/a" }
+                        $memLine = if ($null -ne $memUsed -and $null -ne $memTotal -and $memTotal -gt 0) {
+                            $usedGb = [math]::Round($memUsed / 1GB, 2)
+                            $totalGb = [math]::Round($memTotal / 1GB, 2)
+                            "Memory: $usedGb GB / $totalGb GB"
+                        } else {
+                            "Memory: n/a"
+                        }
+                        $summaryLines = "$cpuLine`n$memLine"
+                    }
+                } catch {}
+
+                if (-not $summaryLines) {
+                    $summaryLines = "CPU Usage: n/a`nMemory: n/a"
+                }
+
+                # Add snapshot directly to prompt, with a short summary for tests/readability
+                $telemetryBlock = "### LIVE SYSTEM TELEMETRY (NATIVE)`n$summaryLines`n$snapshot"
             }
         }
     } catch {}

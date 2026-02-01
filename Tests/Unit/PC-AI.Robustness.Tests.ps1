@@ -59,7 +59,7 @@ Describe "PC-AI Robustness" -Tag 'Unit', 'Robustness' {
             }
 
             # Must pass -ExecuteTools for truncation logic to run
-            $result = Invoke-FunctionGemmaReAct -Prompt "test" -MaxToolCalls 1 -ResultLimit 1024 -ExecuteTools
+            $result = Invoke-FunctionGemmaReAct -Prompt "test" -MaxToolCalls 1 -ResultLimit 1024 -ExecuteTools -SkipHealthCheck
 
             $result.ToolResults[0].result.Length | Should -BeLessThan 2000 # 1024 + truncation message
             $result.ToolResults[0].result | Should -Match "TRUNCATED"
@@ -67,21 +67,23 @@ Describe "PC-AI Robustness" -Tag 'Unit', 'Robustness' {
     }
 
     It "Should handle variables for prompt assembly" {
-        $type = [PcaiNative.PcaiCore]
-        if ($null -eq $type) { Set-ItResult -Skipped -Message "PcaiCore not found" ; return }
+        $type = [Type]::GetType('PcaiNative.PcaiCore', $false)
+        if ($null -eq $type) { Set-ItResult -Skipped -Because "PcaiCore not found" ; return }
 
         $template = "Hello {{Name}}"
         $vars = @{ Name = "Robustness" }
 
         # Use Try-Catch to avoid cryptic Pester binding errors if .NET fails
+        $result = $null
         try {
-            $result = [PcaiNative.PcaiCore]::AssemblePrompt($template, $vars)
-            if ($null -eq $result) { Set-ItResult -Skipped -Message "Native core unavailable" ; return }
-            $result | Should -Match "Hello Robustness"
+            $result = $type::AssemblePrompt($template, $vars)
         } catch {
             Write-Host "AssemblePrompt failure: $_"
             $_.Exception | Select-Object * | Out-String | Write-Host
-            fail "AssemblePrompt failed with: $($_.Exception.Message)"
+            throw "AssemblePrompt failed with: $($_.Exception.Message)"
         }
+
+        if ($null -eq $result) { Set-ItResult -Skipped -Because "Native core unavailable" ; return }
+        $result | Should -Match "Hello Robustness"
     }
 }

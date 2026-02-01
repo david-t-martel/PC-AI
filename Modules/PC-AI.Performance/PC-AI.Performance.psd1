@@ -21,7 +21,16 @@
     Description       = 'High-performance native metrics collector for PC_AI using Rust/C#.'
 
     # Functions to export from this module
-    FunctionsToExport = @('Get-PcaiDiskUsage', 'Get-PcaiTopProcess', 'Get-PcaiMemoryStat', 'Test-PcaiNative')
+    FunctionsToExport = @(
+        'Get-DiskSpace',
+        'Get-ProcessPerformance',
+        'Watch-SystemResources',
+        'Optimize-Disks',
+        'Get-PcaiDiskUsage',
+        'Get-PcaiTopProcess',
+        'Get-PcaiMemoryStat',
+        'Test-PcaiNative'
+    )
 
     # Struct mappings
     TypesToProcess    = @('PC-AI.Performance.types.ps1xml')

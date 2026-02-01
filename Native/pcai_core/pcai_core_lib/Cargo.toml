@@ -35,10 +35,11 @@ path-slash.workspace = true
 dunce.workspace = true
 winreg.workspace = true
 libc.workspace = true
-# Temporarily disabled due to CUDA build issues - TODO: make CUDA optional
-# rust-functiongemma-train = { path = "../../../Deploy/rust-functiongemma-train" }
+rust-functiongemma-train = { path = "../rust-functiongemma-train", optional = true }
 
-# Local crate dependencies (if any remained, but we consolidated them)
+[features]
+default = []
+functiongemma = ["dep:rust-functiongemma-train"]
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
@@ -68,9 +69,11 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_SystemInformation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_EventLog",
     "Win32_Devices",
     "Win32_NetworkManagement",
     "Win32_System",
+    "Win32_System_IO",
     "Win32_Networking",
 ] }
 

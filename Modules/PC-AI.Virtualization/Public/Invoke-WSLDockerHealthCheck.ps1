@@ -14,17 +14,15 @@ function Invoke-WSLDockerHealthCheck {
         [switch]$AutoRecover,
 
         [Parameter()]
-        [switch]$Verbose,
-
-        [Parameter()]
         [switch]$Quick
     )
 
     $scriptExists = Test-Path $ScriptPath
 
     $args = @()
+    $verboseRequested = $PSBoundParameters.ContainsKey('Verbose')
     if ($AutoRecover) { $args += '-AutoRecover' }
-    if ($Verbose) { $args += '-Verbose' }
+    if ($verboseRequested) { $args += '-Verbose' }
     if ($Quick) { $args += '-Quick' }
 
     if ($scriptExists) {

@@ -88,9 +88,16 @@ function Confirm-ToolParameters {
         $Parameters = @{}
     }
 
-    # Get schema properties and required list
-    $properties = $Schema.properties
-    $required = $Schema.required
+    # Get schema properties and required list safely
+    $properties = $null
+    $required = $null
+    if ($Schema -is [hashtable]) {
+        if ($Schema.ContainsKey('properties')) { $properties = $Schema['properties'] }
+        if ($Schema.ContainsKey('required')) { $required = $Schema['required'] }
+    } else {
+        if ($Schema.PSObject.Properties['properties']) { $properties = $Schema.properties }
+        if ($Schema.PSObject.Properties['required']) { $required = $Schema.required }
+    }
 
     # Validate required parameters
     if ($required -and $required.Count -gt 0) {
@@ -117,8 +124,15 @@ function Confirm-ToolParameters {
             $typeValid = Test-ParameterType -Value $paramValue -ExpectedType $expectedType -ParameterName $paramName -Errors $errors
 
             # Validate enum if present and type is valid
-            if ($typeValid -and $paramSchema.enum) {
-                Test-EnumValue -Value $paramValue -AllowedValues $paramSchema.enum -ParameterName $paramName -Errors $errors | Out-Null
+            $enumValues = $null
+            if ($paramSchema -is [hashtable]) {
+                if ($paramSchema.ContainsKey('enum')) { $enumValues = $paramSchema['enum'] }
+            } elseif ($paramSchema.PSObject.Properties['enum']) {
+                $enumValues = $paramSchema.enum
+            }
+
+            if ($typeValid -and $enumValues) {
+                Test-EnumValue -Value $paramValue -AllowedValues $enumValues -ParameterName $paramName -Errors $errors | Out-Null
             }
         }
     }

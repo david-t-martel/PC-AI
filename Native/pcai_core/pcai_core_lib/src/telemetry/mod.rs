@@ -1,7 +1,10 @@
 pub mod usb;
 pub mod network;
 pub mod process;
-pub mod usb_codes;
+pub mod device_codes;
+pub mod pnp;
+pub mod disk_health;
+pub mod event_log;
 
 use sysinfo::System;
 use std::sync::Mutex;

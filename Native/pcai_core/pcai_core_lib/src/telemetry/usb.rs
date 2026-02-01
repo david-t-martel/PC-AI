@@ -95,7 +95,7 @@ pub fn collect_usb_diagnostics() -> Vec<UsbDeviceDetail> {
             if CM_Get_DevNode_Status(&mut status, &mut problem_code, dev_info_data.DevInst, 0) == 0 {
                 detail.config_error_code = problem_code;
 
-                if let Some(info) = super::usb_codes::get_problem_info(problem_code) {
+                if let Some(info) = super::device_codes::get_problem_info(problem_code) {
                     detail.status = format!("Error: {}", info.short_description);
                     detail.error_summary = info.help_summary.to_string();
                     detail.help_url = info.help_url.to_string();

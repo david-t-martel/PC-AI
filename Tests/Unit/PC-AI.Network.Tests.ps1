@@ -6,6 +6,10 @@
     Tests network diagnostics, WSL connectivity, and VSock performance monitoring
 #>
 
+if (-not (Get-Variable -Name IsAdmin -Scope Script -ErrorAction SilentlyContinue)) {
+    $script:IsAdmin = $false
+}
+
 BeforeAll {
     # Import module under test
     $ModulePath = Join-Path $PSScriptRoot '..\..\Modules\PC-AI.Network\PC-AI.Network.psd1'
@@ -565,7 +569,7 @@ Describe "Watch-VSockPerformance" -Tag 'Unit', 'Network', 'Slow' {
         It "Should support IncludeVirtual parameter" {
             $result = Watch-VSockPerformance -Duration 1 -IncludeVirtual:$false -Quiet
             @($result).Count | Should -BeGreaterThan 0
-            ($result | Where-Object { $_.Interface -match 'vEthernet' }).Count | Should -Be 0
+            @($result | Where-Object { $_.Interface -match 'vEthernet' }).Count | Should -Be 0
         }
     }
 
