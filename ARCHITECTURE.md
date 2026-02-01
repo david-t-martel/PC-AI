@@ -1,11 +1,13 @@
 # PC_AI Architecture
 
 ## Overview
+
 PC_AI is a local-first diagnostics and optimization framework for Windows 10/11 with
 WSL2, Docker, and GPU tooling. It combines PowerShell orchestration, Rust/C# native
 acceleration, and local LLMs via **pcai-inference** (OpenAI-compatible HTTP + native FFI).
 
 Key goals:
+
 - Deterministic diagnostics with explicit tool execution
 - Local LLM reasoning with clear safety constraints
 - Optional tool-calling router for safe automation (FunctionGemma)
@@ -37,6 +39,7 @@ User Request
 ```
 
 ## Diagnostic Flow (Diagnose Mode)
+
 1. Collect system data via PC-AI modules (Hardware/Virtualization/Network/USB).
 2. (Optional) Router selects additional tools based on report gaps.
 3. Assemble diagnostic report and tool outputs.
@@ -44,11 +47,13 @@ User Request
 5. Generate structured recommendations.
 
 ## Chat Flow (Chat Mode)
+
 1. Use CHAT.md for system prompt.
 2. (Optional) Router selects and executes tools if needed.
 3. Main LLM produces final response.
 
 ## Configuration
+
 - `Config/llm-config.json`: pcai-inference + router endpoints, defaults, tool schema.
 - `Config/pcai-tools.json`: tool schema for FunctionGemma.
 - `DIAGNOSE.md`, `DIAGNOSE_LOGIC.md`: diagnostic system prompts.
@@ -56,16 +61,19 @@ User Request
 - `Config/hvsock-proxy.conf`: optional HVSocket aliases for local routing.
 
 ## Extending Tool Coverage
+
 1. Add a tool definition in `Config/pcai-tools.json`.
 2. Map it to a PowerShell cmdlet/module in the `pcai_mapping` section.
-3. Add scenario examples in `Deploy/functiongemma-finetune/scenarios.json`.
+3. Add scenario examples in `Deploy/rust-functiongemma-train/examples/scenarios.json`.
 4. Rebuild training data and fine-tune FunctionGemma.
 
 ## Deprecations
+
 - `Deploy/functiongemma-finetune/tool_router.py` is deprecated in favor of native
   routing via `Invoke-FunctionGemmaReAct` + `PcaiOpenAiClient`.
 
 ## Documentation Automation
+
 - `Tools/Invoke-DocPipeline.ps1`: full documentation + training pipeline (Rust, PowerShell, C#).
 - `Tools/generate-auto-docs.ps1`: lightweight auto-docs summary.
 - Reports written to `Reports/` (e.g. `DOC_PIPELINE_REPORT.md`, `AUTO_DOCS_SUMMARY.md`).

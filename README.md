@@ -279,7 +279,7 @@ PC_AI/
 │   ├── pcai-inference/        # Rust LLM inference engine (HTTP + FFI)
 │   ├── rust-functiongemma-runtime/ # Rust router runtime (tool_calls)
 │   ├── rust-functiongemma-train/   # Rust router dataset + training
-│   └── functiongemma-finetune/ # Legacy Python training + router tools
+│   └── functiongemma-finetune/ # Legacy Python training + router tools (archived)
 ├── Tests/                    # Pester test suites
 ├── Config/                   # Configuration files
 └── Reports/                  # Generated diagnostic reports
