@@ -14,6 +14,7 @@ Local-first diagnostics agent guidance for PC_AI (PowerShell + Rust/C# + local L
 - `PC-AI.ps1` is the unified CLI entry point.
 - PowerShell modules live under `Modules/` (Hardware/Virtualization/USB/Network/Performance/Cleanup/LLM/Acceleration).
 - Native acceleration: `Native/` (Rust DLLs → C# P/Invoke → PowerShell wrapper).
+- LLM inference: `Native/pcai_core/pcai_inference/` (Rust, dual-backend: llama.cpp or mistral.rs)
 - Router pipeline (optional):
     1. FunctionGemma runtime selects tools from `Config/pcai-tools.json`
     2. Tool outputs are gathered
@@ -33,6 +34,38 @@ Local-first diagnostics agent guidance for PC_AI (PowerShell + Rust/C# + local L
     - `functiongemma` → `http://127.0.0.1:8000` (router runtime)
 - HVSocket aliases: `Config/hvsock-proxy.conf` (optional)
 - Router entry points: `Invoke-FunctionGemmaReAct`, `Invoke-LLMChatRouted`
+
+## pcai-inference compilation
+
+Build the native LLM inference engine from `Native/pcai_core/pcai_inference/`:
+
+```powershell
+# CPU-only build (llamacpp backend)
+.\Invoke-PcaiBuild.ps1 -Backend llamacpp -Configuration Release
+
+# CUDA GPU build
+.\Invoke-PcaiBuild.ps1 -Backend llamacpp -Configuration Release -EnableCuda
+
+# Both backends with CUDA
+.\Invoke-PcaiBuild.ps1 -Backend all -Configuration Release -EnableCuda
+```
+
+**Build prerequisites:**
+- Visual Studio 2022 C++ Build Tools + Windows SDK
+- CMake 3.x (auto-detected from VS)
+- CUDA 12.x (for `-EnableCuda`)
+
+**Performance optimizations (auto-enabled):**
+- sccache: Compiler caching for faster rebuilds
+- Ninja generator: Parallel CMake builds
+- lld-link: Fast LLVM linker
+- CRT alignment: Forces `/MD` to avoid CUDA linker errors
+
+**Backend comparison:**
+| Backend | Strength | When to use |
+|---------|----------|-------------|
+| `llamacpp` | Mature, GGUF support, lower VRAM | Default, most models |
+| `mistralrs` | Flash attention, cuDNN, newer arch | Mistral/Llama3 with 12GB+ VRAM |
 
 ## LLM runtime debugging (native-first)
 
@@ -64,17 +97,7 @@ Use these when diagnosing LLM stack failures or routing issues:
 - Standardize JSON schemas for native outputs (schema folder + version pinning).
 - Provide progress + streaming updates for long native operations.
 - Finalize eval split + QLoRA quantization for rust-functiongemma-train.
-
-## Documentation automation
-
-- C# P/Invoke wrapper for PowerShell.
-
-## Known gaps / TODOs
-
-- Define a versioned C ABI contract for Rust DLL exports (error codes, ownership).
-- Standardize JSON schemas for native outputs (schema folder + version pinning).
-- Provide progress + streaming updates for long native operations.
-- Finalize eval split + QLoRA quantization for rust-functiongemma-train.
+- Publish precompiled CUDA binaries via GitHub Releases.
 
 ## Documentation automation
 

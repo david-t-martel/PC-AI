@@ -17,15 +17,17 @@ The agent operates on **Windows 10/11** with native-first inference via **pcai-i
 
 ```
 PC_AI/
-├── DIAGNOSE.md           # LLM system prompt defining assistant behavior
-├── DIAGNOSE_LOGIC.md     # Branched reasoning decision tree for analysis
-├── CHAT.md               # General chat system prompt
-├── Get-PcDiagnostics.ps1 # Core hardware/device diagnostics script
-├── Deploy/pcai-inference/        # Rust LLM inference engine (HTTP + FFI)
+├── DIAGNOSE.md                    # LLM system prompt defining assistant behavior
+├── DIAGNOSE_LOGIC.md              # Branched reasoning decision tree for analysis
+├── CHAT.md                        # General chat system prompt
+├── Get-PcDiagnostics.ps1          # Core hardware/device diagnostics script
+├── Native/pcai_core/              # Rust workspace (monorepo)
+│   ├── pcai_inference/            # Rust LLM inference engine (HTTP + FFI)
+│   └── pcai_core_lib/             # Shared Rust library (telemetry, fs, search)
+├── Native/PcaiNative/             # C# P/Invoke wrapper for PowerShell
 ├── Deploy/rust-functiongemma-runtime/ # Rust router runtime
 ├── Deploy/rust-functiongemma-train/   # Rust router dataset + training
-├── Deploy/functiongemma-finetune/ # Legacy Python training + router
-└── CLAUDE.md             # This file
+└── CLAUDE.md                      # This file
 ```
 
 ### Design Pattern
@@ -37,6 +39,38 @@ PC_AI/
 The agent follows a **collect → parse → route → reason → recommend** workflow where diagnostics output is structured into categories, optional tool routing is executed via the FunctionGemma runtime, and the main LLM produces recommendations.
 
 ## Commands
+
+### Build pcai-inference (Native LLM Engine)
+
+```powershell
+# Build with consolidated script (recommended)
+cd Native\pcai_core\pcai_inference
+.\Invoke-PcaiBuild.ps1 -Backend llamacpp -Configuration Release
+
+# Build with CUDA GPU acceleration
+.\Invoke-PcaiBuild.ps1 -Backend llamacpp -Configuration Release -EnableCuda
+
+# Build both backends (llamacpp + mistralrs)
+.\Invoke-PcaiBuild.ps1 -Backend all -Configuration Release -EnableCuda
+
+# Clean build (wipe target/ first)
+.\Invoke-PcaiBuild.ps1 -Backend llamacpp -Clean
+```
+
+**Feature Flags:**
+| Feature | Description |
+|---------|-------------|
+| `llamacpp` | llama.cpp backend (default, mature) |
+| `mistralrs-backend` | mistral.rs backend (alternative) |
+| `cuda-llamacpp` | CUDA for llama.cpp |
+| `cuda-mistralrs` | CUDA for mistral.rs |
+| `ffi` | C FFI exports for PowerShell |
+| `server` | HTTP server with OpenAI-compatible API |
+
+**Performance Tips:**
+- Enable sccache: `Tools\Initialize-CacheEnvironment.ps1`
+- Use Ninja generator (auto-detected)
+- CUDA builds require matching CRT: script auto-forces `/MD`
 
 ### Run Hardware Diagnostics
 ```powershell
@@ -118,9 +152,14 @@ wmic diskdrive get model, status
 ### FunctionGemma Router
 - Tool schema: `Config/pcai-tools.json`
 - Router interface: `Invoke-FunctionGemmaReAct` / `Invoke-LLMChatRouted`
-- Training data: `Deploy/rust-functiongemma-train/` (legacy Python in `Deploy/functiongemma-finetune/`)
+- Training data: `Deploy/rust-functiongemma-train/`
 - Runtime: `Deploy/rust-functiongemma-runtime/`
 - HVSocket aliases: `Config/hvsock-proxy.conf` with `hvsock://functiongemma` / `hvsock://pcai-inference`
+
+### pcai-inference Endpoints
+- Health check: `GET http://127.0.0.1:8080/health`
+- Models list: `GET http://127.0.0.1:8080/v1/models`
+- Completion: `POST http://127.0.0.1:8080/v1/completions`
 
 ## Expected Output Format
 
@@ -166,3 +205,51 @@ Test-Path "$env:USERPROFILE\Desktop\Hardware-Diagnostics-Report.txt"
 - Requires Administrator for full diagnostics
 - Uses Get-CimInstance (not deprecated Get-WmiObject)
 - Handles missing features gracefully with try/catch
+
+### pcai-inference Build Requirements
+
+**Required:**
+- Visual Studio 2022 with C++ Build Tools + Windows SDK
+- CMake 3.x (included with VS or `winget install Kitware.CMake`)
+- Rust toolchain (`rustup`)
+
+**Optional (for GPU):**
+- CUDA Toolkit 12.x (`CUDA_PATH` env var)
+- cuDNN (for mistral.rs flash attention)
+- sccache (for faster rebuilds)
+
+**Common Build Issues:**
+| Issue | Solution |
+|-------|----------|
+| "GNU compiler not supported" | Run from VS Developer PowerShell, not WSL/MinGW |
+| "CMake not found" | `winget install Kitware.CMake`, restart terminal |
+| "CUDA not found" | Install CUDA Toolkit, verify `$env:CUDA_PATH` |
+| CRT mismatch linker errors | Script auto-forces `/MD`; run with `-Clean` if switching backends |
+
+### Performance Configuration
+
+```json
+// Config/llm-config.json
+{
+  "backend": {
+    "type": "llama_cpp",
+    "n_gpu_layers": 35,    // GPU offload (0 = CPU only)
+    "n_ctx": 4096          // Context window
+  },
+  "model": {
+    "path": "Models/model.gguf",
+    "generation": {
+      "max_tokens": 512,
+      "temperature": 0.7
+    }
+  }
+}
+```
+
+**GPU Layer Offload Guide:**
+| VRAM | Recommended `n_gpu_layers` |
+|------|---------------------------|
+| 4GB  | 10-15 |
+| 8GB  | 25-30 |
+| 12GB | 35-40 |
+| 24GB | 50+ (full offload) |
